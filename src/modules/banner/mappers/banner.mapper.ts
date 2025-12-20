@@ -1,0 +1,141 @@
+import { Banner, Product } from '@prisma/client';
+import { plainToInstance } from 'class-transformer';
+import { BannerEntity } from '../entities/banner.entity';
+import { EBannerType, EBannerStatus } from '../enums/banner.enum';
+import { ProductEntity } from '../../product/entities/product.entity';
+
+type BannerWithProduct = Banner & {
+  product?: Product | null;
+};
+
+/**
+ * BannerMapper utility class for converting between Prisma models and entities/DTOs
+ */
+export class BannerMapper {
+  /**
+   * Converts Prisma Banner model to BannerEntity
+   * @param prismaBanner - Prisma Banner model from database
+   * @returns BannerEntity instance
+   */
+  static toEntity(prismaBanner: Banner): BannerEntity {
+    const entity = new BannerEntity();
+    entity.id = prismaBanner.id;
+    entity.type = prismaBanner.type as EBannerType;
+    entity.status = prismaBanner.status as EBannerStatus;
+    entity.productId = prismaBanner.productId;
+    entity.title = prismaBanner.title;
+    entity.badgeText = prismaBanner.badgeText;
+    entity.mainText = prismaBanner.mainText;
+    entity.ctaButtonText = prismaBanner.ctaButtonText;
+    entity.ctaButtonUrl = prismaBanner.ctaButtonUrl;
+    entity.imageUrl = prismaBanner.imageUrl;
+    entity.mobileImageUrl = prismaBanner.mobileImageUrl;
+    entity.displayOrder = prismaBanner.displayOrder;
+    entity.startDate = prismaBanner.startDate;
+    entity.endDate = prismaBanner.endDate;
+    entity.productName = prismaBanner.productName;
+    entity.productPrice = prismaBanner.productPrice;
+    entity.productBrand = prismaBanner.productBrand;
+    entity.productExplanation = prismaBanner.productExplanation;
+    entity.createdAt = prismaBanner.createdAt;
+    entity.updatedAt = prismaBanner.updatedAt;
+    
+    return entity;
+  }
+
+  /**
+   * Converts Prisma Banner model with Product relation to BannerEntity
+   * @param prismaBanner - Prisma Banner model with optional Product relation
+   * @returns BannerEntity instance with nested product
+   */
+  static toEntityWithProduct(prismaBanner: BannerWithProduct): BannerEntity {
+    const entity = this.toEntity(prismaBanner);
+    
+    // Map product relation if included
+    if (prismaBanner.product) {
+      entity.product = plainToInstance(ProductEntity, prismaBanner.product, {
+        excludeExtraneousValues: true,
+      });
+    }
+    
+    return entity;
+  }
+
+  /**
+   * Converts Prisma Banner to BannerEntity (direct conversion)
+   * @param prismaBanner - Prisma Banner or BannerWithProduct
+   * @returns BannerEntity for API responses
+   */
+  static toResponse(prismaBanner: Banner | BannerWithProduct): BannerEntity {
+    if ('product' in prismaBanner) {
+      return this.toEntityWithProduct(prismaBanner);
+    }
+    return this.toEntity(prismaBanner);
+  }
+
+  /**
+   * Converts array of Prisma Banner models to BannerEntity array
+   * @param prismaBanners - Array of Prisma Banner models
+   * @returns Array of BannerEntity instances
+   */
+  static toEntityList(prismaBanners: Banner[]): BannerEntity[] {
+    return prismaBanners.map((banner) => this.toEntity(banner));
+  }
+
+  /**
+   * Converts array of Prisma Banner models with Product relations to BannerEntity array
+   * @param prismaBanners - Array of Prisma Banner models with optional Product relations
+   * @returns Array of BannerEntity instances with nested products
+   */
+  static toEntityListWithProduct(prismaBanners: BannerWithProduct[]): BannerEntity[] {
+    return prismaBanners.map((banner) => this.toEntityWithProduct(banner));
+  }
+
+  /**
+   * Converts array of BannerEntity to BannerResponseDto array
+   * @param entities - Array of BannerEntity instances
+   * @returns Array of BannerEntity for API responses
+   */
+  static toResponseList(entities: BannerEntity[]): BannerEntity[] {
+    return entities;
+  }
+
+  /**
+   * Converts Prisma Banner model directly to BannerResponseDto
+   * @param prismaBanner - Prisma Banner model
+   * @returns BannerEntity for API responses
+   */
+  static prismaToResponse(prismaBanner: Banner): BannerEntity {
+    return this.toEntity(prismaBanner);
+  }
+
+  /**
+   * Converts Prisma Banner model with Product relation directly to BannerResponseDto
+   * @param prismaBanner - Prisma Banner model with optional Product relation
+   * @returns BannerEntity for API responses
+   */
+  static prismaToResponseWithProduct(prismaBanner: BannerWithProduct): BannerEntity {
+    return this.toEntityWithProduct(prismaBanner);
+  }
+
+  /**
+   * Converts array of Prisma Banner models directly to BannerResponseDto array
+   * @param prismaBanners - Array of Prisma Banner models
+   * @returns Array of BannerEntity for API responses
+   */
+  static prismaToResponseList(prismaBanners: Banner[]): BannerEntity[] {
+    const entities = this.toEntityList(prismaBanners);
+    return this.toResponseList(entities);
+  }
+
+  /**
+   * Converts array of Prisma Banner models with Product relations directly to BannerResponseDto array
+   * @param prismaBanners - Array of Prisma Banner models with optional Product relations
+   * @returns Array of BannerResponseDto for API responses
+   */
+  static prismaToResponseListWithProduct(prismaBanners: BannerWithProduct[]): BannerEntity[] {
+    const entities = this.toEntityListWithProduct(prismaBanners);
+    return this.toResponseList(entities);
+  }
+}
+

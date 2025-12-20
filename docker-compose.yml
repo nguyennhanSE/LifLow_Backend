@@ -1,0 +1,97 @@
+
+services:
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   image: liflow-backend-image
+  #   pull_policy: never
+  #   env_file:
+  #     - .env.prod
+  #   environment:
+  #     # Override DATABASE_HOST to use Docker service name instead of localhost
+  #     - DATABASE_HOST=postgres
+  #     # DATABASE_URL will be constructed by wait-for-postgres.sh script
+  #     # Override REDIS_HOST to use Docker service name
+  #     - REDIS_HOST=redis
+  #   ports:
+  #     - "3500:3500"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_started
+  #   restart: unless-stopped
+  #   networks:
+  #     - liflow-network
+
+  postgres:
+    image: postgres
+    env_file:
+      - .env.dev  
+    environment:
+      # IMPORTANT:
+      # - `${...}` here is resolved by Docker Compose *before* containers start.
+      # - `env_file: .env.dev` does NOT populate those `${...}` values for Compose interpolation.
+      #   (it only injects env into the container once it starts).
+      # So we provide defaults to prevent Postgres from exiting when variables are missing.
+      POSTGRES_USER: ${DATABASE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-123456}
+      POSTGRES_DB: ${DATABASE_NAME:-postgres}
+      PGDATA: /data/postgres
+    volumes:
+      - postgres:/data/postgres
+    ports:
+      - "5540:5432"
+    networks:
+      - liflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  redis: 
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - liflow-network
+    # Ubuntu/EC2 optimizations
+    # sysctls:
+    #   - net.core.somaxconn=65535
+    # ulimits:
+    #   memlock: -1
+    # environment:
+    #   - REDIS_REPLICATION_MODE=master
+  backup:
+    image: prodrigestivill/postgres-backup-local
+    env_file:
+      - .env.dev
+    restart: unless-stopped
+    volumes:
+      - ./backups:/backups
+    environment:
+      # Use Docker service name for postgres connection
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${DATABASE_NAME:-postgres}
+      - POSTGRES_USER=${POSTGRES_BACKUP_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_BACKUP_USER_PASSWORD:-postgres}
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=7
+      - EXTRA_OPTS=--schema=public
+    networks:
+      - liflow-network
+    
+networks:
+  liflow-network:
+    driver: bridge
+
+volumes:
+  postgres:
+  pgadmin:
+  redis_data:
+
+

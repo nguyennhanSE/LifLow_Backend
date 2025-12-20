@@ -1,0 +1,516 @@
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Prisma, Order } from '@prisma/client';
+import {
+  CreateOrderDto,
+  OrderFilterDto,
+  OrderListResponse,
+  OrderResponseDto,
+  UpdateOrderDto,
+} from './dto/order.dto';
+import { OrderRepository } from './repositories/order.repository';
+import { toOrderResponseDto } from './mapper/order.mapper';
+import { OrderNotFoundException } from './exceptions/order-not-found.exception';
+import { OrderValidationException } from './exceptions/order-validation.exception';
+import { EOrderSituation } from './enum/order.enum';
+import { OrderEntity } from './entities/order.entity';
+
+@Injectable()
+export class OrdersService {
+  constructor(private readonly orderRepository: OrderRepository) {}
+
+  /**
+   * Create a new order
+   * - Generates a unique orderNumber when not provided
+   * - Validates the user exists if ordererId is present
+   */
+  async create(createOrderDto: CreateOrderDto): Promise<OrderResponseDto> {
+    try {
+      // Validate user existence when ordererId is provided
+      if (createOrderDto.ordererId) {
+        const userExists = await this.orderRepository.userExists(
+          createOrderDto.ordererId,
+        );
+        if (!userExists) {
+          throw new OrderValidationException('User not found');
+        }
+      }
+
+      const orderNumber =
+        createOrderDto.orderNumber || (await this.generateUniqueOrderNumber());
+
+      const created = await this.orderRepository.create({
+        ...createOrderDto,
+        orderNumber,
+      });
+
+      return toOrderResponseDto(created);
+    } catch (error) {
+      this.handlePrismaError(error, 'Failed to create order');
+    }
+  }
+
+  /**
+   * Get all orders with filtering, pagination, search, and sorting
+   */
+  async findAll(filterDto: OrderFilterDto): Promise<OrderListResponse> {
+    try {
+      const page = filterDto.page || 1;
+      const limit = filterDto.limit || 10;
+      const sortBy = filterDto.sortBy || 'createdAt';
+      const sortOrder = filterDto.sortOrder || 'desc';
+
+      const where = this.buildWhereClause(filterDto);
+      const orderBy = this.buildOrderByClause(sortBy, sortOrder);
+      const skip = (page - 1) * limit;
+
+      const [orders, total] = await Promise.all([
+        this.orderRepository.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          includeUser: true,
+        }),
+        this.orderRepository.count(where),
+      ]);
+
+      const totalPages = Math.ceil(total / limit) || 1;
+
+      return {
+        orders: orders.map(toOrderResponseDto),
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      };
+    } catch (error) {
+      this.handlePrismaError(error, 'Failed to fetch orders');
+    }
+  }
+
+  /**
+   * Advanced search with preset periods and full-text search
+   */
+  async advancedSearch(filterDto: OrderFilterDto): Promise<OrderListResponse> {
+    const withPeriod = this.applyPeriodToFilter(filterDto);
+    return this.findAll(withPeriod);
+  }
+
+  /**
+   * Dashboard statistics grouped by order status
+   */
+  async getDashboardStats(): Promise<Record<string, number>> {
+    try {
+      const statuses = {
+        newOrders: EOrderSituation.ORDER_NEW,
+        paymentCompleted: EOrderSituation.ORDER_PAYMENT_COMPLETED,
+        preparingProduct: EOrderSituation.ORDER_IN_PREPARE,
+        inTransit: EOrderSituation.ORDER_BEING_SHIPPED,
+        invoiceTransmitted: EOrderSituation.ORDER_SHIPPED,
+        cancelled: EOrderSituation.ORDER_CANCELLED,
+        returned: EOrderSituation.ORDER_RETURNED,
+      };
+
+      const results = await Promise.all(
+        Object.values(statuses).map((status) =>
+          this.orderRepository.countByStatus(status),
+        ),
+      );
+
+      const entries = Object.keys(statuses).map((key, idx) => [
+        key,
+        results[idx],
+      ]);
+
+      return Object.fromEntries(entries);
+    } catch (error) {
+      this.handlePrismaError(error, 'Failed to fetch dashboard statistics');
+    }
+  }
+
+  /**
+   * Export filtered orders to CSV
+   */
+  async exportToCSV(filterDto: OrderFilterDto): Promise<string> {
+    try {
+      const withPeriod = this.applyPeriodToFilter(filterDto);
+      const where = this.buildWhereClause(withPeriod);
+      const orders = await this.orderRepository.findMany({
+        where,
+        orderBy: this.buildOrderByClause(
+          withPeriod.sortBy || 'createdAt',
+          withPeriod.sortOrder || 'desc',
+        ),
+        includeUser: true,
+      });
+
+      const { format } = await import('fast-csv');
+
+      return await new Promise((resolve, reject) => {
+        const chunks: string[] = [];
+        const stream = format({ headers: true });
+
+        stream.on('data', (chunk: Buffer) => chunks.push(chunk.toString()));
+        stream.on('error', (err: Error) => reject(err));
+        stream.on('end', () => resolve(chunks.join('')));
+
+        orders.forEach((order) => {
+          stream.write({
+            주문번호: order.orderNumber || '',
+            품목별주문번호: order.itemWiseOrderNumber || '',
+            총주문금액: order.totalOrderAmount ?? 0,
+            총결제금액: order.totalPaymentAmount ?? 0,
+            상품번호: order.productNumber ?? '',
+            주문상품명: order.productName || '',
+            주문상품명옵션: order.productNameWithOptions || '',
+            수량: order.quantity ?? 0,
+            수령인: order.recipient || '',
+            주소: order.recipientAddressFull || '',
+            우편번호: order.recipientPostalCode ?? '',
+            휴대전화: order.recipientMobilePhone || '',
+            전화번호: order.recipientPhoneNumber || '',
+            배송메시지: order.deliveryMessage || '',
+            판매가: order.salePrice ?? 0,
+            결제구분: order.paymentType || '',
+            결제수단: order.paymentMethod || '',
+            발주일: order.orderDate || '',
+            주문자명: order.ordererName || '',
+            주문자휴대전화: order.ordererMobilePhone || '',
+            주문자ID: order.ordererId || '',
+            희망배송일: order.desiredDeliveryDate || '',
+            주문시회원등급: order.membershipLevelAtOrderTime || '',
+            주문상태: (order as any).orderStatus || '',
+            생성일: order.createdAt?.toISOString?.() || '',
+            수정일: order.updatedAt?.toISOString?.() || '',
+          });
+        });
+
+        stream.end();
+      });
+    } catch (error) {
+      this.handlePrismaError(error, 'Failed to export orders to CSV');
+    }
+  }
+
+  /**
+   * Get a single order by ID (includes user relation)
+   */
+  async findOne(id: string): Promise<OrderResponseDto> {
+    try {
+      const order = await this.orderRepository.findById(id, true);
+
+      if (!order) {
+        throw new OrderNotFoundException(`Order with id ${id} not found`);
+      }
+
+      return toOrderResponseDto(order);
+    } catch (error) {
+      this.handlePrismaError(error, `Failed to fetch order ${id}`);
+    }
+  }
+
+  /**
+   * Update an existing order (partial updates supported)
+   */
+  async update(
+    id: string,
+    updateOrderDto: UpdateOrderDto,
+  ): Promise<OrderEntity> {
+    try {
+      // Ensure order exists
+      const existing = await this.orderRepository.findById(id, false);
+      if (!existing) {
+        throw new OrderNotFoundException(`Order with id ${id} not found`);
+      }
+
+      // Validate user if changing ordererId
+      if (updateOrderDto.ordererId) {
+        const userExists = await this.orderRepository.userExists(
+          updateOrderDto.ordererId,
+        );
+        if (!userExists) {
+          throw new OrderValidationException('User not found');
+        }
+      }
+
+      const updated = await this.orderRepository.update(
+        id,
+        {
+          ...updateOrderDto,
+        },
+        true,
+      );
+
+      return updated;
+    } catch (error) {
+      this.handlePrismaError(error, `Failed to update order ${id}`);
+    }
+  }
+
+  /**
+   * Delete an order (hard delete)
+   */
+  async remove(id: string): Promise<{ message: string }> {
+    try {
+      const existing = await this.orderRepository.findById(id, false);
+      if (!existing) {
+        throw new OrderNotFoundException(`Order with id ${id} not found`);
+      }
+
+      await this.orderRepository.delete(id);
+
+      return { message: `Order ${id} deleted successfully` };
+    } catch (error) {
+      this.handlePrismaError(error, `Failed to delete order ${id}`);
+    }
+  }
+
+  /**
+   * Build dynamic where clause for filtering and search
+   */
+  private buildWhereClause(
+    filterDto: OrderFilterDto,
+  ): Prisma.OrderWhereInput {
+    const where: Prisma.OrderWhereInput = {};
+
+    const searchTerms: Prisma.OrderWhereInput[] = [];
+
+    // Exact / partial field searches
+    if (filterDto.orderNumber) {
+      searchTerms.push({
+        orderNumber: { contains: filterDto.orderNumber, mode: 'insensitive' },
+      });
+    }
+    if (filterDto.productName) {
+      searchTerms.push({
+        productName: { contains: filterDto.productName, mode: 'insensitive' },
+      });
+    }
+    if (filterDto.customerName) {
+      searchTerms.push({
+        ordererName: { contains: filterDto.customerName, mode: 'insensitive' },
+      });
+    }
+    if (filterDto.recipientName) {
+      searchTerms.push({
+        recipient: { contains: filterDto.recipientName, mode: 'insensitive' },
+      });
+    }
+
+    // General search across multiple fields
+    // if (filterDto.search) {
+    //   const search = filterDto.search;
+    //   searchTerms.push({
+    //     OR: [
+    //       { orderNumber: { contains: search, mode: 'insensitive' } },
+    //       { productName: { contains: search, mode: 'insensitive' } },
+    //       { ordererName: { contains: search, mode: 'insensitive' } },
+    //       { recipient: { contains: search, mode: 'insensitive' } },
+    //     ],
+    //   });
+    // }
+
+    if (searchTerms.length > 0) {
+      where.AND = searchTerms;
+    }
+
+    // Order situation/status filter
+    if (filterDto.situation && filterDto.situation !== 'ALL') {
+      where.situation = filterDto.situation;
+    }
+
+    // User filter
+    if (filterDto.ordererId) {
+      where.ordererId = filterDto.ordererId;
+    }
+
+    // Handle period filter (convert to dateFrom/dateTo)
+    let dateFrom = filterDto.dateFrom;
+    let dateTo = filterDto.dateTo;
+
+    if (filterDto.period) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      switch (filterDto.period) {
+        case 'today': {
+          dateFrom = today.toISOString().split('T')[0];
+          dateTo = today.toISOString().split('T')[0];
+          break;
+        }
+        case '7d': {
+          const sevenDaysAgo = new Date(today);
+          sevenDaysAgo.setDate(today.getDate() - 7);
+          dateFrom = sevenDaysAgo.toISOString().split('T')[0];
+          dateTo = today.toISOString().split('T')[0];
+          break;
+        }
+        case '1m': {
+          const oneMonthAgo = new Date(today);
+          oneMonthAgo.setMonth(today.getMonth() - 1);
+          dateFrom = oneMonthAgo.toISOString().split('T')[0];
+          dateTo = today.toISOString().split('T')[0];
+          break;
+        }
+        case 'all': {
+          // No date filter
+          dateFrom = undefined;
+          dateTo = undefined;
+          break;
+        }
+      }
+    }
+
+    // Date range (orderDate stored as string in YYYY-MM-DD or YYYY-MM-DD HH:mm:ss)
+    if (dateFrom || dateTo) {
+      where.orderDate = {};
+      if (dateFrom) {
+        (where.orderDate as Prisma.StringFilter).gte = dateFrom;
+      }
+      if (dateTo) {
+        // Add one day to include the entire end date
+        const endDate = new Date(dateTo);
+        endDate.setDate(endDate.getDate() + 1);
+        (where.orderDate as Prisma.StringFilter).lt = endDate.toISOString().split('T')[0];
+      }
+    }
+
+    return where;
+  }
+
+  /**
+   * Build orderBy clause with whitelisted fields
+   */
+  private buildOrderByClause(
+    sortBy?: string,
+    sortOrder: 'asc' | 'desc' = 'desc',
+  ): Prisma.OrderOrderByWithRelationInput {
+    const allowedFields: Array<keyof Order> = [
+      'createdAt',
+      'updatedAt',
+      'orderDate',
+      'totalOrderAmount',
+      'totalPaymentAmount',
+      'orderNumber',
+      'productName',
+      'ordererName',
+      'recipient',
+    ];
+
+    const field: keyof Order = allowedFields.includes(
+      sortBy as keyof Order,
+    )
+      ? (sortBy as keyof Order)
+      : 'createdAt';
+
+    return { [field]: sortOrder };
+  }
+
+  /**
+   * Generate a unique order number (e.g., ORD-20251210-ABC123)
+   */
+  private generateOrderNumber(): string {
+    const now = new Date();
+    const datePart = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+    ].join('');
+
+    const randomPart = Math.random().toString(36).substring(2, 5).toUpperCase();
+    return `ORD-${datePart}-${randomPart}`;
+  }
+
+  /**
+   * Ensure generated order number is unique
+   */
+  private async generateUniqueOrderNumber(
+    maxAttempts = 5,
+  ): Promise<string> {
+    for (let i = 0; i < maxAttempts; i++) {
+      const orderNumber = this.generateOrderNumber();
+      const exists = await this.orderRepository.count({ orderNumber });
+      if (exists === 0) {
+        return orderNumber;
+      }
+    }
+    // Fallback last generated value
+    return this.generateOrderNumber();
+  }
+
+  /**
+   * Normalize Prisma errors into meaningful HTTP exceptions
+   */
+  private handlePrismaError(error: any, defaultMessage: string): never {
+    if (error instanceof OrderNotFoundException) {
+      throw error;
+    }
+
+    if (error?.code === 'P2002') {
+      const field = error.meta?.target?.[0] || 'field';
+      throw new OrderValidationException(
+        `Order with this ${field} already exists`,
+      );
+    }
+
+    if (error?.code === 'P2003') {
+      throw new OrderValidationException('Invalid order data');
+    }
+
+    if (error?.code === 'P2025') {
+      throw new OrderNotFoundException('Order not found');
+    }
+
+    if (error?.code === 'P1001') {
+      throw new InternalServerErrorException('Database connection error');
+    }
+
+    throw new InternalServerErrorException(defaultMessage);
+  }
+
+  /**
+   * Apply period presets to date range filters
+   */
+  private applyPeriodToFilter(
+    filterDto: OrderFilterDto,
+  ): OrderFilterDto {
+    const period = filterDto.period;
+    if (!period || period === 'all') {
+      return filterDto;
+    }
+
+    const now = new Date();
+    const start = new Date(now);
+
+    if (period === 'today') {
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(now);
+      const day = start.toISOString().substring(0, 10);
+      return {
+        ...filterDto,
+        dateFrom: day,
+        dateTo: day,
+      };
+    }
+
+    if (period === '7d') {
+      start.setDate(now.getDate() - 6);
+    } else if (period === '1m') {
+      start.setMonth(now.getMonth() - 1);
+    }
+
+    const dateFrom = start.toISOString().substring(0, 10);
+    const dateTo = now.toISOString().substring(0, 10);
+
+    return {
+      ...filterDto,
+      dateFrom,
+      dateTo,
+    };
+  }
+}
+

@@ -1,0 +1,34 @@
+import { CouponType, CouponTargetGrade, CouponHistoryStatus } from '../enums/coupon.enum';
+
+export class CouponEntity {
+  id!: string;
+  name!: string;
+  code!: string;
+  type!: CouponType;
+  discountRate?: number | null;
+  discountAmount?: number | null;
+  minPurchaseAmount!: number;
+  maxDiscountAmount?: number | null;
+  imageUrl?: string | null;
+  startDate!: Date;
+  endDate!: Date;
+  isActive!: boolean;
+  isAutoIssue!: boolean;
+  autoIssueDayOfMonth?: Date | null;
+  targetGrades!: CouponTargetGrade[];
+  createdAt!: Date;
+  updatedAt!: Date;
+}
+
+export class CouponWithHistories extends CouponEntity {
+  histories?: {
+    id: string;
+    couponId: string;
+    userId: string;
+    status: CouponHistoryStatus;
+    issuedAt?: Date | null;
+    usedAt?: Date | null;
+    expiredAt?: Date | null;
+    cancelledAt?: Date | null;
+  }[];
+}

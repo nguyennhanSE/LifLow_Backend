@@ -1,0 +1,54 @@
+import { Order, User } from '@prisma/client';
+import { OrderResponseDto } from '../dto/order.dto';
+import { OrderEntity } from '../entities/order.entity';
+// import { toUserEntity } from '../../user/mapper/user.mapper';
+import { EOrderSituation } from '../enum/order.enum';
+// type OrderWithUser = Order & { user?: User | null };
+
+
+export function toOrderEntity(order: Order): OrderEntity {
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    itemWiseOrderNumber: order.itemWiseOrderNumber,
+    totalOrderAmount: order.totalOrderAmount,
+    totalPaymentAmount: order.totalPaymentAmount,
+    productNumber: order.productNumber,
+    productName: order.productName,
+    productNameWithOptions: order.productNameWithOptions,
+    quantity: order.quantity,
+    recipient: order.recipient,
+    recipientAddressFull: order.recipientAddressFull,
+    recipientPostalCode: order.recipientPostalCode,
+    recipientMobilePhone: order.recipientMobilePhone,
+    recipientPhoneNumber: order.recipientPhoneNumber,
+    deliveryMessage: order.deliveryMessage,
+    salePrice: order.salePrice,
+    paymentType: order.paymentType,
+    paymentMethod: order.paymentMethod,
+    orderDate: order.orderDate,
+    ordererName: order.ordererName,
+    ordererMobilePhone: order.ordererMobilePhone,
+    ordererId: order.ordererId,
+    desiredDeliveryDate: order.desiredDeliveryDate,
+    membershipLevelAtOrderTime: order.membershipLevelAtOrderTime,
+    orderStatus: (order as any).orderStatus ?? null,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    // user: order.user ? toUserEntity(order.user) : null,
+    situation: order.situation as EOrderSituation,
+    courierCompany: order.courierCompany,
+  };
+}
+
+export function toOrderResponseDto(order: Order): OrderResponseDto {
+  return toOrderEntity(order);
+}
+// export function toOrderResponseDto(order: OrderWithUser): OrderResponseDto {
+//   const entity = toOrderEntity(order);
+//   return {
+//     ...entity,
+//     user: entity.user || undefined,
+//   };
+// }
+

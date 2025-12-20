@@ -1,0 +1,45 @@
+export enum EPermissions {
+    DASHBOARD_ACCESS = 'DASHBOARD_ACCESS',
+    MEMBER_MANAGEMENT_READ = 'MEMBER_MANAGEMENT_READ',
+    MEMBER_MANAGEMENT_WRITE = 'MEMBER_MANAGEMENT_WRITE',
+    MEMBER_MANAGEMENT_DELETE = 'MEMBER_MANAGEMENT_DELETE',
+    PRODUCT_MANAGEMENT_READ = 'PRODUCT_MANAGEMENT_READ',
+    PRODUCT_MANAGEMENT_WRITE = 'PRODUCT_MANAGEMENT_WRITE',
+    PRODUCT_MANAGEMENT_DELETE = 'PRODUCT_MANAGEMENT_DELETE',
+    ORDER_MANAGEMENT_READ = 'ORDER_MANAGEMENT_READ',
+    ORDER_MANAGEMENT_WRITE = 'ORDER_MANAGEMENT_WRITE',
+    ORDER_MANAGEMENT_DELETE = 'ORDER_MANAGEMENT_DELETE',
+    RECIPE_MANAGEMENT_READ = 'RECIPE_MANAGEMENT_READ',
+    RECIPE_MANAGEMENT_WRITE = 'RECIPE_MANAGEMENT_WRITE',
+    RECIPE_MANAGEMENT_DELETE = 'RECIPE_MANAGEMENT_DELETE',
+    BANNER_MANAGEMENT_READ = 'BANNER_MANAGEMENT_READ',
+    BANNER_MANAGEMENT_WRITE = 'BANNER_MANAGEMENT_WRITE',
+    BANNER_MANAGEMENT_DELETE = 'BANNER_MANAGEMENT_DELETE',
+}
+
+
+const allPermissions = new Array<EPermissions>();
+allPermissions.push(EPermissions.DASHBOARD_ACCESS);
+allPermissions.push(EPermissions.MEMBER_MANAGEMENT_READ);
+allPermissions.push(EPermissions.MEMBER_MANAGEMENT_WRITE);
+allPermissions.push(EPermissions.MEMBER_MANAGEMENT_DELETE);
+allPermissions.push(EPermissions.PRODUCT_MANAGEMENT_READ);
+allPermissions.push(EPermissions.PRODUCT_MANAGEMENT_WRITE);
+allPermissions.push(EPermissions.PRODUCT_MANAGEMENT_DELETE);
+allPermissions.push(EPermissions.ORDER_MANAGEMENT_READ);
+allPermissions.push(EPermissions.ORDER_MANAGEMENT_WRITE);
+allPermissions.push(EPermissions.ORDER_MANAGEMENT_DELETE);
+allPermissions.push(EPermissions.RECIPE_MANAGEMENT_READ);
+allPermissions.push(EPermissions.RECIPE_MANAGEMENT_WRITE);
+allPermissions.push(EPermissions.RECIPE_MANAGEMENT_DELETE);
+allPermissions.push(EPermissions.BANNER_MANAGEMENT_READ);
+allPermissions.push(EPermissions.BANNER_MANAGEMENT_WRITE);
+allPermissions.push(EPermissions.BANNER_MANAGEMENT_DELETE);
+
+export const ALL_PERMISSIONS = allPermissions;
+export const Dashboard_Permission = EPermissions.DASHBOARD_ACCESS;
+export const Member_Management_Permission = EPermissions.MEMBER_MANAGEMENT_READ && EPermissions.MEMBER_MANAGEMENT_WRITE && EPermissions.MEMBER_MANAGEMENT_DELETE;
+export const Product_Management_Permission = EPermissions.PRODUCT_MANAGEMENT_READ && EPermissions.PRODUCT_MANAGEMENT_WRITE && EPermissions.PRODUCT_MANAGEMENT_DELETE;
+export const Order_Management_Permission = EPermissions.ORDER_MANAGEMENT_READ && EPermissions.ORDER_MANAGEMENT_WRITE && EPermissions.ORDER_MANAGEMENT_DELETE;
+export const Recipe_Management_Permission = EPermissions.RECIPE_MANAGEMENT_READ && EPermissions.RECIPE_MANAGEMENT_WRITE && EPermissions.RECIPE_MANAGEMENT_DELETE;
+export const Banner_Management_Permission = EPermissions.BANNER_MANAGEMENT_READ && EPermissions.BANNER_MANAGEMENT_WRITE && EPermissions.BANNER_MANAGEMENT_DELETE;

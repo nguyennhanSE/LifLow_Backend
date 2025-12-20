@@ -1,0 +1,548 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// User
+model User {
+  id String @id @unique // ID is unique and also serves as username
+  password String? @map("password")
+  name String
+  membershipLevel String?
+  age Int?
+  email String
+  phoneNumber String @map("phone_number")
+  totalUsedPoints Int @default(0) @map("total_used_points")
+  availablePoints Int @default(0) @map("available_points")
+  registrationDate String @map("registration_date") // Join Date
+  dormancyDate String? @map("dormancy_date") // Date account marked inactive
+  withdrawalDate String? @map("withdrawal_date")
+  withdrawalType String? @map("withdrawal_type")
+  reasonForWithdrawal String? @map("reason_for_withdrawal")
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  // Payment Information
+  totalPurchaseAmount Int @default(0) @map("total_purchase_amount")
+  // Permissions
+  dashboardAccess Boolean @default(false) @map("dashboard_access")
+  memberAccess Boolean @default(false) @map("member_access")
+  productAccess Boolean @default(false) @map("product_access")
+  orderAccess Boolean @default(false) @map("order_access")
+  recipeAccess Boolean @default(false) @map("recipe_access")
+  bannerAccess Boolean @default(false) @map("banner_access")
+  
+  // Relations
+  userRole UserRole[]
+  userMembership UserMembership[]
+  point Point?
+  session Session[]
+  orders Order[]
+  recipes Recipe[]
+  couponHistories CouponHistory[]
+  @@map("users")
+}
+
+model UserMembership {
+  id String @id @default(uuid()) @unique
+  userId String
+  membershipId String
+  membershipName String @map("membership_name")
+  membershipDescription String @map("membership_description")
+  status String @default("normal") @map("status")
+
+  startDate DateTime @map("start_date")
+  endDate DateTime @map("end_date")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  // extension
+  updatedByAdmin Boolean @default(false) @map("updated_by_admin")
+
+  @@index([userId, membershipId])
+  @@index([membershipId])
+  @@index([userId])
+  @@map("user_memberships")
+}
+
+model Membership {
+  id String @id @default(uuid())
+  name String @unique
+  description String?
+  minPrice Int @map("min_price")
+  userMembership UserMembership[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  @@map("memberships")
+  @@index([name])
+  @@index([minPrice])
+}
+
+model Role {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+
+  userRole UserRole[]
+  // rolePermission RolePermission[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@index([userId])
+  @@map("user_roles")
+}
+
+// model Permission {
+//   id String @id @default(uuid())
+//   name String @unique
+//   description String?
+
+//   rolePermissions RolePermission[]
+
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime? @updatedAt
+
+//   @@map("permissions")
+// }
+
+// model RolePermission {
+//   roleId String
+//   permissionId String
+
+//   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+//   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+//   createdAt DateTime @default(now())
+
+//   @@id([roleId, permissionId])
+//   @@index([roleId])
+//   @@index([permissionId])
+//   @@map("role_permissions")
+// }
+
+
+
+
+model Session {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  refreshToken     String             @unique
+  ip               String?
+  expiredAt        DateTime
+  refreshTokenUsed RefreshTokenUsed[]
+
+  @@index([userId, expiredAt])
+  @@map("sessions")
+}
+
+model RefreshTokenUsed {
+  id           String  @id @default(uuid())
+  refreshToken String  @unique
+  sessionId    String
+  session      Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("refresh_token_used")
+}
+
+enum OrderSituation {
+  ORDER_NEW // 신규
+  ORDER_PAYMENT_PENDING // 결제대기
+  ORDER_PAYMENT_COMPLETED // 결제완료
+  ORDER_IN_PREPARE // 결제실패
+  ORDER_BEING_SHIPPED // 배송중
+  ORDER_SHIPPED // 배송완료
+  ORDER_CANCELLED // 취소됨
+  ORDER_RETURNED // 반품됨
+}
+// Order
+model Order {
+  id String @id @default(uuid())
+  orderNumber String @default("") @map("order_number") // 1. 주문번호 (Order Number) - text, default
+  itemWiseOrderNumber String @default("") @map("item_wise_order_number") // 2. 품목별 주문번호 (Item-wise Order Number) - text, default
+  totalOrderAmount Int @map("total_order_amount") // 3. 총 주문금액 (Total Order Amount) - int4
+  totalPaymentAmount Int @map("total_payment_amount") // 4. 총 결제금액 (Total Payment Amount) - int4
+  productNumber Int @map("product_number") // 5. 상품번호 (Product Number) - int4
+  productName String @default("") @map("product_name") // 6. 주문상품명 (Ordered Product Name) - text, default
+  productNameWithOptions String @default("") @map("product_name_with_options") // 7. 주문상품명(옵션포) (Ordered Product Name with Options) - text, default
+  quantity Int @map("quantity") // 8. 수량 (Quantity) - int4
+  recipient String @default("") @map("recipient") // 9. 수령인 (Recipient) - text, default
+  recipientAddressFull String @default("") @map("recipient_address_full") // 10. 수령인 주소(전체) (Recipient Address Full) - text, default
+  recipientPostalCode Int @map("recipient_postal_code") // 11. 수령인 우편번호 (Recipient Postal Code) - int4
+  recipientMobilePhone String @default("") @map("recipient_mobile_phone") // 12. 수령인 휴대전화 (Recipient Mobile Phone) - text, default
+  recipientPhoneNumber String @default("") @map("recipient_phone_number") // 13. 수령인 전화번호 (Recipient Phone Number) - text, default
+  deliveryMessage String @default("") @map("delivery_message") // 14. 배송메시지 (Delivery Message) - text, default
+  salePrice Int @map("sale_price") // 15. 판매가 (Sale Price) - int4
+  paymentType String @default("") @map("payment_type") // 16. 결제구분 (Payment Type) - text, default
+  paymentMethod String @default("") @map("payment_method") // 17. 결제수단 (Payment Method) - text, default
+  orderDate String @default("") @map("order_date") // 18. 발주일 (Order Date) - text, default
+  ordererName String @default("") @map("orderer_name") // 19. 주문자명 (Orderer Name) - text, default
+  ordererMobilePhone String @default("") @map("orderer_mobile_phone") // 20. 주문자 휴대전화 (Orderer Mobile Phone) - text, default
+  ordererId String? @map("orderer_id") // 21. 주문자ID (Orderer ID) - text, default (nullable for relation)
+  desiredDeliveryDate String @default("") @map("desired_delivery_date") // 22. 희망배송일 (Desired Delivery Date) - text, default
+  membershipLevelAtOrderTime String @default("") @map("membership_level_at_order_time") // 23. 주문 시 회원등급 (Membership Level at Order Time) - text, default
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Extension
+  situation OrderSituation? @map("situation") // 상황
+  courierCompany String? @map("courier_company") // 택배사
+  // Relation to User (optional, handles null ordererId)
+  user User? @relation(fields: [ordererId], references: [id], onDelete: SetNull)
+  couponHistories CouponHistory[]
+
+  @@map("orders")
+}
+
+// Product
+model Product {
+  id String @id @default(uuid())
+  productCode String? @map("product_code") // 상품코드
+  ownProductCode String? @map("own_product_code") // 자체 상품코드
+  displayStatus String? @map("display_status") // 진열상태
+  saleStatus String? @map("sale_status") // 판매상태
+  productCategoryNumber String? @map("product_category_number") // 상품분류 번호
+  productCategoryNewProductArea String? @map("product_category_new_product_area") // 상품분류 신상품영역
+  productCategoryRecommendedProductArea String? @map("product_category_recommended_product_area") // 상품분류 추천상품영역
+  productName String? @db.VarChar(128) @map("product_name") // 상품명
+  englishProductName String? @map("english_product_name") // 영문 상품명
+  productNameForManagement String? @map("product_name_for_management") // 상품명(관리용)
+  supplierProductName String? @map("supplier_product_name") // 공급사 상품명
+  modelName String? @map("model_name") // 모델명
+  productSummaryDescription String? @map("product_summary_description") // 상품 요약설명
+  productBriefDescription String? @map("product_brief_description") // 상품 간략설명
+  searchKeywordSetting String? @map("search_keyword_setting") // 검색어설정
+  taxClassification String? @map("tax_classification") // 과세구분
+  consumerPrice Int? @map("consumer_price") // 소비자가
+  supplyPrice Int? @map("supply_price") // 공급가
+  productPrice Int? @map("product_price") // 상품가
+  salePrice Int? @map("sale_price") // 판매가
+  useSalePriceAlternativeText String? @map("use_sale_price_alternative_text") // 판매가 대체문구 사용
+  salePriceAlternativeText String? @map("sale_price_alternative_text") // 판매가 대체문구
+  orderQuantityLimitCriteria String? @map("order_quantity_limit_criteria") // 주문수량 제한 기준
+  minOrderQuantity Int? @map("min_order_quantity") // 최소 주문수량(이상)
+  maxOrderQuantity Int? @map("max_order_quantity") // 최대 주문수량(이하)
+  rewardPoints Int? @map("reward_points") // 적립금
+  rewardPointsClassification String? @map("reward_points_classification") // 적립금 구분
+  commonEventInfo String? @map("common_event_info") // 공통이벤트 정보
+  adultVerification String? @map("adult_verification") // 성인인증
+  optionUsage String? @map("option_usage") // 옵션사용
+  itemCompositionMethod String? @map("item_composition_method") // 품목 구성방식
+  optionDisplayMethod String? @map("option_display_method") // 옵션 표시방식
+  optionSetName String? @map("option_set_name") // 옵션세트명
+  optionInput String? @map("option_input") // 옵션입력
+  optionStyle String? @map("option_style") // 옵션 스타일
+  buttonImageSetting String? @map("button_image_setting") // 버튼이미지 설정
+  colorSetting String? @map("color_setting") // 색상 설정
+  requiredOrNot String? @map("required_or_not") // 필수여부
+  outOfStockDisplayText String? @map("out_of_stock_display_text") // 품절표시 문구
+  additionalInputOption String? @map("additional_input_option") // 추가입력옵션
+  additionalInputOptionName String? @map("additional_input_option_name") // 추가입력옵션 명칭
+  additionalInputOptionRequiredOrNot String? @map("additional_input_option_required_or_not") // 추가입력옵션 선택/필수여부
+  inputCharacterCount String? @map("input_character_count") // 입력글자수(자)
+  imageRegistrationDetail String? @map("image_registration_detail") // 이미지등록(상세)
+  imageRegistrationList String? @map("image_registration_list") // 이미지등록(목록)
+  imageRegistrationSmallList String? @map("image_registration_small_list") // 이미지등록(작은목록)
+  imageRegistrationThumbnail String? @map("image_registration_thumbnail") // 이미지등록(축소)
+  manufacturer String? @map("manufacturer") // 제조사
+  supplier String? @map("supplier") // 공급사
+  brand String? @map("brand") // 브랜드
+  trend String? @map("trend") // 트렌드
+  ownClassificationCode String? @map("own_classification_code") // 자체분류 코드
+  manufacturingDate String? @map("manufacturing_date") // 제조일자
+  releaseDate String? @map("release_date") // 출시일자
+  validityPeriodUsage String? @map("validity_period_usage") // 유효기간 사용여부
+  validityPeriod String? @map("validity_period") // 유효기간
+  origin Int? @map("origin") // 원산지
+  productVolume String? @map("product_volume") // 상품부피(cm)
+  volumeWeight String? @map("volume_weight") // 부피무게(kg)
+  productPaymentGuide String? @map("product_payment_guide") // 상품결제안내
+  productDeliveryGuide String? @map("product_delivery_guide") // 상품배송안내
+  exchangeReturnGuide String? @map("exchange_return_guide") // 교환/반품안내
+  serviceInquiryGuide String? @map("service_inquiry_guide") // 서비스문의/안내
+  deliveryInfo String? @map("delivery_info") // 배송정보
+  deliveryMethod String? @map("delivery_method") // 배송방법
+  domesticOverseasDelivery String? @map("domestic_overseas_delivery") // 국내/해외배송
+  deliveryArea String? @map("delivery_area") // 배송지역
+  deliveryFeePrepaymentSetting String? @map("delivery_fee_prepayment_setting") // 배송비 선결제 설정
+  deliveryPeriod String? @map("delivery_period") // 배송기간
+  deliveryFeeClassification String? @map("delivery_fee_classification") // 배송비 구분
+  deliveryFeeInput String? @map("delivery_fee_input") // 배송비입력
+  productClassificationCustoms String? @map("product_classification_customs") // 상품 구분(해외통관)
+  productMaterial String? @map("product_material") // 상품소재
+  englishProductMaterialCustoms String? @map("english_product_material_customs") // 영문 상품소재(해외통관)
+  fabricCustoms String? @map("fabric_customs") // 옷감(해외통관)
+  seoSearchEngineExposureSetting String? @map("seo_search_engine_exposure_setting") // 검색엔진최적화(SEO) 검색엔진 노출 설정
+  seoTitle String? @map("seo_title") // 검색엔진최적화(SEO) Title
+  seoAuthor String? @map("seo_author") // 검색엔진최적화(SEO) Author
+  seoDescription String? @map("seo_description") // 검색엔진최적화(SEO) Description
+  seoKeywords String? @map("seo_keywords") // 검색엔진최적화(SEO) Keywords
+  seoProductImageAltText String? @map("seo_product_image_alt_text") // 검색엔진최적화(SEO) 상품 이미지 Alt 텍스트
+  individualPaymentMethodSetting String? @map("individual_payment_method_setting") // 개별결제수단설정
+  productDeliveryTypeCode String? @map("product_delivery_type_code") // 상품배송유형 코드
+  storePickupSetting String? @map("store_pickup_setting") // 스토어픽업 설정
+  productTotalWeight Int? @map("product_total_weight") // 상품 전체중량(kg)
+  hsCode BigInt? @map("hs_code") // HS코드
+  additionalItem01TodayDepartureDeliveryUsage String? @map("additional_item_01_today_departure_delivery_usage") // 추가항목01_오늘출발 배송 사용설정
+  additionalItem02TodayDepartureDeliveryTime String? @map("additional_item_02_today_departure_delivery_time") // 추가항목02_오늘출발 배송 시간설정
+  additionalItem03StorageMethod String? @map("additional_item_03_storage_method") // 추가항목03_보관방식
+  additionalItem04Origin String? @map("additional_item_04_origin") // 추가항목04_원산지
+  additionalItem05Event String? @map("additional_item_05_event") // 추가항목05_이벤트
+  additionalItem06ParcelDelivery String? @map("additional_item_06_parcel_delivery") // 추가항목06_택배배송
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // relation
+  banners Banner?
+
+  @@map("products")
+}
+
+// Point
+model Point {
+  id String @id @default(uuid())
+  date String? @db.VarChar(50) @map("date") // 일자 (Date) - character varying(50)
+  userId String? @unique @db.VarChar(50) @map("user_id") // 아이디 (ID) - character varying(50)
+  membershipLevel String? @db.VarChar(50) @map("membership_level") // 회원등급 (Membership Level) - character varying(50)
+  content String? @db.VarChar(50) @map("content") // 내용 (Content/Details) - character varying(50)
+  orderNumber String? @db.VarChar(50) @map("order_number") // 주문번호 (Order Number) - character varying(50)
+  pointsType String? @db.VarChar(50) @map("points_type") // 적립금 유형 (Accumulated Points Type) - character varying(50)
+  availablePointsIncrease Int? @map("available_points_increase") // 가용적립금 증가 (Available Points Increase) - integer
+  availablePointsDeduction Int? @map("available_points_deduction") // 가용적립금 차감 (Available Points Deduction) - integer
+  availablePointsBalance Int? @map("available_points_balance") // 가용적립금 잔액 (Available Points Balance) - integer
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relation to User (1-1 relationship) - set to null when user is deleted
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@map("points")
+}
+
+
+// Recipe
+model Recipe {
+  id             String   @id @default(uuid())
+  title          String   @db.VarChar(255)
+  authorId       String?
+  authorName     String   @db.VarChar(100) // denormalized for fast listing
+  category       String   @db.VarChar(50) // denormalized category name
+  recipeCategoryId String? @map("recipe_category_id")
+  dateOfWriting  DateTime @map("date_of_writing")
+  views          Int      @default(0)
+  status         String   @default("active") // e.g., active | inactive
+  thumbnailUrl   String?  @map("thumbnail_url")
+  content        String
+  ingredients    String[] @map("ingredients")
+
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  // extension
+  isActive       Boolean @default(true) @map("is_active") // 활성화 여부
+
+  // Relations
+  author         User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  recipeCategory RecipeCategory? @relation(fields: [recipeCategoryId], references: [id], onDelete: SetNull) // Back-reference (RecipeCategory owns the relation)
+
+  @@index([status])
+  @@index([authorId])
+  @@index([dateOfWriting])
+  @@map("recipes")
+}
+
+model RecipeCategory {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(50) @map("name")
+  description String? @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // One RecipeCategory can have many Recipes
+  recipes Recipe[]
+
+  @@index([name])
+  @@map("recipe_categories")
+}
+// Coupon
+enum CouponType {
+  PERCENT // 정률 할인 (Discount rate %)
+  AMOUNT  // 정액 할인 (Discount amount)
+}
+
+enum CouponTargetGrade {
+  VIP  // VIP
+  VVIP // VVIP
+}
+
+enum CouponHistoryStatus {
+  ISSUED    // 발급됨
+  USED      // 사용됨
+  EXPIRED   // 만료됨
+  CANCELLED // 취소됨
+}
+
+model Coupon {
+  id String @id @default(uuid())
+
+  name String @db.VarChar(255) @map("name") // 쿠폰명
+  code String @unique @db.VarChar(100) @map("code") // 쿠폰코드
+
+  type CouponType @map("type") // 쿠폰 타입
+
+  // 할인 정보 (type에 따라 하나만 사용)
+  discountRate Int? @map("discount_rate") // 할인율(%) - 정률
+  discountAmount Int? @map("discount_amount") // 할인금액(KRW) - 정액
+
+  minPurchaseAmount Int @default(0) @map("min_purchase_amount") // 최소 구매 금액(KRW)
+  maxDiscountAmount Int? @map("max_discount_amount") // 최대 할인 금액(KRW) - 정률일 때 주로 사용
+
+  imageUrl String? @map("image_url") // 쿠폰 이미지 URL (optional)
+
+  startDate DateTime @map("start_date") // 시작일
+  endDate DateTime @map("end_date") // 종료일
+
+  isActive Boolean @default(true) @map("is_active") // 활성화 여부
+
+  // 자동 발급 설정 (등급별, 매월 특정일)
+  isAutoIssue Boolean @default(false) @map("is_auto_issue") // 자동 발급 여부
+  autoIssueDayOfMonth DateTime? @map("auto_issue_day_of_month") // 매월 n일 (default: 1)
+  targetGrades CouponTargetGrade[] @default([]) @map("target_grades") // 발급 대상 등급 (VIP, VVIP)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  histories CouponHistory[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([startDate, endDate])
+  @@map("coupons")
+}
+
+// CouponHistory
+model CouponHistory {
+  id String @id @default(uuid())
+
+  couponId String @map("coupon_id")
+  userId String @map("user_id")
+
+  // Optional link to an order when used
+  orderId String? @map("order_id")
+
+  status CouponHistoryStatus @default(ISSUED) @map("status") // 상태
+
+  issuedAt DateTime @default(now()) @map("issued_at") // 발급일
+  usedAt DateTime? @map("used_at") // 사용일
+  expiredAt DateTime? @map("expired_at") // 만료 처리일(배치 처리 시)
+  cancelledAt DateTime? @map("cancelled_at") // 취소일
+
+  // Snapshot fields (useful for auditing)
+  discountAppliedAmount Int? @map("discount_applied_amount") // 실제 적용된 할인 금액(KRW)
+  purchaseAmountAtUse Int? @map("purchase_amount_at_use") // 사용 시 구매 금액(KRW)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  coupon Coupon? @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([couponId])
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
+  @@index([issuedAt])
+  @@map("coupon_histories")
+}
+// Banner
+enum BannerType {
+  MAIN_PRODUCTS      // Main Products (메인 상품)
+  CATEGORY          // Category (카테고리)
+  FOOTER            // Footer
+  CONTENT_HERO      // Content Hero
+  SPECIAL_PRICE     // This week's special price (이번주 특가)
+}
+enum BannerStatus {
+  ACTIVE   // 활성화
+  INACTIVE // 비활성화
+  SCHEDULED // 예약됨
+}
+
+model Banner {
+  id String @id @default(uuid())
+
+  type BannerType @map("type") // 배너 타입
+  status BannerStatus @default(ACTIVE) @map("status") // 배너 상태
+
+  // Product relation (optional - only for product banners)
+  productId String? @unique @map("product_id") // 1-1 relation with Product
+  
+  // Banner content
+  title String? @db.VarChar(255) @map("title") // 배너 제목
+  badgeText String? @db.VarChar(100) @map("badge_text") // 뱃지 텍스트 (e.g., "asdasad for new members only")
+  mainText String? @db.Text @map("main_text") // 메인 텍스트
+  ctaButtonText String? @db.VarChar(100) @map("cta_button_text") // CTA 버튼 텍스트 (e.g., "purchase")
+  ctaButtonUrl String? @db.VarChar(500) @map("cta_button_url") // CTA 버튼 URL (e.g., "/products/1")
+  
+  // Image
+  imageUrl String @map("image_url") // 배너 이미지 URL (required, min 800x800px)
+  mobileImageUrl String? @map("mobile_image_url") // 모바일용 이미지 URL (optional)
+  
+  // Display settings
+  displayOrder Int @default(0) @map("display_order") // 표시 순서 (낮을수록 먼저 표시)
+  
+  // Scheduling
+  startDate DateTime? @map("start_date") // 시작일 (optional for scheduling)
+  endDate DateTime? @map("end_date") // 종료일 (optional for scheduling)
+  
+  // Additional product info (denormalized for performance)
+  // These are automatically populated from Product when productId is set
+  productName String? @db.VarChar(255) @map("product_name")
+  productPrice Int? @map("product_price")
+  productBrand String? @db.VarChar(255) @map("product_brand")
+  productExplanation String? @db.Text @map("product_explanation")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([status])
+  @@index([displayOrder])
+  @@index([startDate, endDate])
+  @@index([productId])
+  @@map("banners")
+}
