@@ -14,9 +14,18 @@ import { OrderValidationException } from './exceptions/order-validation.exceptio
 import { EOrderSituation } from './enum/order.enum';
 import { OrderEntity } from './entities/order.entity';
 
+type SalesByDayPoint = { date: string; totalPaymentAmount: number };
+
 @Injectable()
 export class OrdersService {
   constructor(private readonly orderRepository: OrderRepository) {}
+
+  private formatLocalYyyyMmDd(d: Date): string {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
 
   /**
    * Create a new order
@@ -129,6 +138,65 @@ export class OrdersService {
       return Object.fromEntries(entries);
     } catch (error) {
       this.handlePrismaError(error, 'Failed to fetch dashboard statistics');
+    }
+  }
+
+  /**
+   * Dashboard UI statistics:
+   * - dailySales: totalPaymentAmount for today (based on orderDate string)
+   * - salesLastDays: series for last N days (based on orderDate string)
+   * - orderStatus: counts grouped by situation
+   */
+  async getDashboardUiStats(days = 7): Promise<{
+    dailySales: { date: string; totalPaymentAmount: number };
+    salesLastDays: SalesByDayPoint[];
+    orderStatus: Record<string, number>;
+  }> {
+    try {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayStr = this.formatLocalYyyyMmDd(today);
+
+      const start = new Date(today);
+      start.setDate(today.getDate() - (Math.max(days, 1) - 1));
+      const startStr = this.formatLocalYyyyMmDd(start);
+
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      const tomorrowStr = this.formatLocalYyyyMmDd(tomorrow);
+
+      const endExclusive = new Date(start);
+      endExclusive.setDate(start.getDate() + Math.max(days, 1));
+      const endExclusiveStr = this.formatLocalYyyyMmDd(endExclusive);
+
+      const [orderStatus, dailySalesTotal, grouped] = await Promise.all([
+        this.getDashboardStats(),
+        this.orderRepository.sumTotalPaymentAmountByOrderDateRange(
+          todayStr,
+          tomorrowStr,
+        ),
+        this.orderRepository.sumTotalPaymentAmountGroupByDayByOrderDateRange(
+          startStr,
+          endExclusiveStr,
+        ),
+      ]);
+
+      const groupedMap = new Map(grouped.map((g) => [g.date, g.totalPaymentAmount]));
+      const series: SalesByDayPoint[] = [];
+      for (let i = 0; i < Math.max(days, 1); i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const ds = this.formatLocalYyyyMmDd(d);
+        series.push({ date: ds, totalPaymentAmount: groupedMap.get(ds) ?? 0 });
+      }
+
+      return {
+        dailySales: { date: todayStr, totalPaymentAmount: dailySalesTotal },
+        salesLastDays: series,
+        orderStatus,
+      };
+    } catch (error) {
+      this.handlePrismaError(error, 'Failed to fetch dashboard UI statistics');
     }
   }
 
@@ -338,22 +406,23 @@ export class OrdersService {
 
       switch (filterDto.period) {
         case 'today': {
-          dateFrom = today.toISOString().split('T')[0];
-          dateTo = today.toISOString().split('T')[0];
+          const d = this.formatLocalYyyyMmDd(today);
+          dateFrom = d;
+          dateTo = d;
           break;
         }
         case '7d': {
           const sevenDaysAgo = new Date(today);
           sevenDaysAgo.setDate(today.getDate() - 7);
-          dateFrom = sevenDaysAgo.toISOString().split('T')[0];
-          dateTo = today.toISOString().split('T')[0];
+          dateFrom = this.formatLocalYyyyMmDd(sevenDaysAgo);
+          dateTo = this.formatLocalYyyyMmDd(today);
           break;
         }
         case '1m': {
           const oneMonthAgo = new Date(today);
           oneMonthAgo.setMonth(today.getMonth() - 1);
-          dateFrom = oneMonthAgo.toISOString().split('T')[0];
-          dateTo = today.toISOString().split('T')[0];
+          dateFrom = this.formatLocalYyyyMmDd(oneMonthAgo);
+          dateTo = this.formatLocalYyyyMmDd(today);
           break;
         }
         case 'all': {
@@ -373,9 +442,11 @@ export class OrdersService {
       }
       if (dateTo) {
         // Add one day to include the entire end date
-        const endDate = new Date(dateTo);
+        const [y, m, d] = dateTo.split('-').map((v) => parseInt(v, 10));
+        const endDate = new Date(y, (m ?? 1) - 1, d ?? 1);
         endDate.setDate(endDate.getDate() + 1);
-        (where.orderDate as Prisma.StringFilter).lt = endDate.toISOString().split('T')[0];
+        (where.orderDate as Prisma.StringFilter).lt =
+          this.formatLocalYyyyMmDd(endDate);
       }
     }
 
@@ -489,7 +560,7 @@ export class OrdersService {
     if (period === 'today') {
       start.setHours(0, 0, 0, 0);
       const end = new Date(now);
-      const day = start.toISOString().substring(0, 10);
+      const day = this.formatLocalYyyyMmDd(start);
       return {
         ...filterDto,
         dateFrom: day,
@@ -503,8 +574,8 @@ export class OrdersService {
       start.setMonth(now.getMonth() - 1);
     }
 
-    const dateFrom = start.toISOString().substring(0, 10);
-    const dateTo = now.toISOString().substring(0, 10);
+    const dateFrom = this.formatLocalYyyyMmDd(start);
+    const dateTo = this.formatLocalYyyyMmDd(now);
 
     return {
       ...filterDto,

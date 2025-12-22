@@ -10,6 +10,19 @@ import * as bcrypt from 'bcrypt';
 export class UserService {
   constructor(private readonly userRepository: UserRepository) {}
 
+  async countNewSignupsToday(): Promise<{ date: string; count: number }> {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+
+    const count = await this.userRepository.countUsersCreatedBetween(start, end);
+    const yyyy = start.getFullYear();
+    const mm = String(start.getMonth() + 1).padStart(2, '0');
+    const dd = String(start.getDate()).padStart(2, '0');
+    return { date: `${yyyy}-${mm}-${dd}`, count };
+  }
+
   /**
    * Get user by account (id)
    */

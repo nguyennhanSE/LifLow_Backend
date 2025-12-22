@@ -13,6 +13,17 @@ import { OrderRepository } from "../../order/repositories/order.repository";
 export class UserRepository {
   constructor(private readonly prisma: PrismaService, private readonly orderRepository: OrderRepository) {}
 
+  async countUsersCreatedBetween(from: Date, toExclusive: Date): Promise<number> {
+    return this.prisma.user.count({
+      where: {
+        createdAt: {
+          gte: from,
+          lt: toExclusive,
+        },
+      },
+    });
+  }
+
   /**
    * Get user by account (id) with relations
    */

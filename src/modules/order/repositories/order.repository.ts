@@ -89,6 +89,52 @@ export class OrderRepository {
     return this.prisma.order.count({ where: { situation: status } as any });
   }
 
+  /**
+   * Sum total_payment_amount within an order_date [from, toExclusive) range.
+   * Note: order_date is stored as TEXT, but lexicographic range works with YYYY-MM-DD (and YYYY-MM-DD HH:mm:ss).
+   */
+  async sumTotalPaymentAmountByOrderDateRange(
+    from: string,
+    toExclusive: string,
+  ): Promise<number> {
+    const result = await this.prisma.$queryRaw<
+      Array<{ total_payment_amount: string }>
+    >`
+      SELECT COALESCE(SUM(o.total_payment_amount), 0) as total_payment_amount
+      FROM orders o
+      WHERE o.order_date >= ${from}
+        AND o.order_date < ${toExclusive}
+    `;
+
+    return parseInt(result?.[0]?.total_payment_amount ?? '0', 10) || 0;
+  }
+
+  /**
+   * Group total_payment_amount by day (LEFT(order_date, 10)) within an order_date [from, toExclusive) range.
+   */
+  async sumTotalPaymentAmountGroupByDayByOrderDateRange(
+    from: string,
+    toExclusive: string,
+  ): Promise<Array<{ date: string; totalPaymentAmount: number }>> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ date: string; total_payment_amount: string }>
+    >`
+      SELECT
+        LEFT(o.order_date, 10) as date,
+        COALESCE(SUM(o.total_payment_amount), 0) as total_payment_amount
+      FROM orders o
+      WHERE o.order_date >= ${from}
+        AND o.order_date < ${toExclusive}
+      GROUP BY LEFT(o.order_date, 10)
+      ORDER BY date ASC
+    `;
+
+    return (rows ?? []).map((r) => ({
+      date: r.date,
+      totalPaymentAmount: parseInt(r.total_payment_amount ?? '0', 10) || 0,
+    }));
+  }
+
   async userExists(userId: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     return !!user;

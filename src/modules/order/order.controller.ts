@@ -100,6 +100,32 @@ export class OrdersController {
     return responseModel;
   }
 
+  @Get('stats/dashboard-ui')
+  @Roles(ERoleName.ADMIN)
+  @ApiOperation({
+    summary:
+      'Dashboard UI statistics (daily sales, sales last 7 days, order status counts)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard UI statistics retrieved successfully',
+  })
+  async getDashboardUiStats(@Query('days') days?: string) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const parsedDays = days ? parseInt(days, 10) : 7;
+      const stats = await this.ordersService.getDashboardUiStats(
+        Number.isFinite(parsedDays) ? parsedDays : 7,
+      );
+      responseModel.setData(stats);
+    } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  }
+
   @Get('search')
   @Roles(ERoleName.ADMIN)
   @ApiOperation({ summary: 'Advanced search for orders' })

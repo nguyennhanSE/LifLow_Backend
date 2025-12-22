@@ -6,6 +6,7 @@ import { config } from '../../config';
 import { IAwsService } from './aws.interface';
 import { Logger } from "@nestjs/common";
 import { LoggerModule } from "src/libs/logger/logger.module";
+import { AwsController } from "./aws.controller";
 
 const logger = new Logger(AwsService.name);
 
@@ -27,7 +28,7 @@ const s3ClientProvider = {
 
 @Module({
     imports: [LoggerModule],
-    controllers: [],
+    controllers: [AwsController],
     providers: [s3ClientProvider, { provide: IAwsService, useClass: AwsService }, AwsService],
     exports: [IAwsService, AwsService, S3Client],
 })

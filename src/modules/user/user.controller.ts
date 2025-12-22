@@ -90,6 +90,23 @@ export class UserController {
     return responseModel;
   }
 
+  @Get('stats/new-signup/today')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER)
+  @ApiOperation({ summary: 'New sign-up count (users created today)' })
+  @ApiResponse({ status: 200, description: 'New sign-up count retrieved successfully' })
+  async getNewSignupToday() {
+    const responseModel = new ResponseModel();
+
+    try {
+      const result = await this.userService.countNewSignupsToday();
+      responseModel.setData(result);
+    } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  }
+
   @Get(':id')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER)
   @ApiOperation({ summary: 'Get user by ID' })
