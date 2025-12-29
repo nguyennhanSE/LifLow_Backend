@@ -167,7 +167,7 @@ export class UserRepository {
       await tx.user.update({
         where: { id: userId },
         data: {
-          ...userData,
+          ...(userData as Prisma.UserUpdateInput),
           updatedAt: new Date(),
         },
       });
@@ -315,9 +315,9 @@ export class UserRepository {
     const skip = (page - 1) * limit;
 
     // Execute queries with relations
-    console.log('skip', skip);
-    console.log('limit', limit);
-    console.log('orderBy', orderBy);
+    // console.log('skip', skip);
+    // console.log('limit', limit);
+    // console.log('orderBy', orderBy);
     const [docs, totalDocs] = await Promise.all([
       this.prisma.user.findMany({
         where,
@@ -376,4 +376,163 @@ export class UserRepository {
       };
     }
   }
+  async getAdminPaginate(
+    filter: UserFilterDto,
+    options: PaginateOptions
+  ): Promise<IPaginate<UserEntity>> {
+    const page = options.page || 1;
+    const limit = options.limit || 10;
+    const sort = options.sort || 'asc';
+    const sortBy = options.sortBy || 'createdAt';
+    const counted = options.counted ?? true;
+
+    const { q: search, email, searchField, role } = filter;
+
+    // Build where clause
+    const where: Prisma.UserWhereInput = {};
+
+    // Always exclude USER role, regardless of filter (including 'ALL')
+    if (role && role !== 'ALL') {
+      // Filter by specific role AND exclude USER
+      where.AND = [
+        {
+          userRole: {
+            some: {
+              role: {
+                name: role,
+              },
+            },
+          },
+        },
+        {
+          userRole: {
+            none: {
+              role: {
+                name: ERoleName.USER,
+              },
+            },
+          },
+        },
+      ];
+    } else {
+      // If no specific role filter or 'ALL', exclude USER role
+      where.userRole = {
+        none: {
+          role: {
+            name: ERoleName.USER,
+          },
+        },
+      };
+    }
+
+    if (email) {
+      where.email = email;
+    }
+
+    if (search) {
+      console.log(`[DEBUG] Searching for: "${search}", searchField: "${searchField || 'none'}"`);
+      if (searchField) {
+        // Search in specific field
+        where[searchField as keyof Prisma.UserWhereInput] = {
+          contains: search,
+          mode: 'insensitive',
+        } as any;
+      } else {
+        // Search in name or email
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+      console.log('[DEBUG] Where clause:', JSON.stringify(where, null, 2));
+    }
+
+    // Build orderBy
+    const allowedSortFields = ['id', 'name', 'email', 'createdAt', 'updatedAt', 'registrationDate'];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    
+    // Map sort field to Prisma orderBy
+    let orderBy: Prisma.UserOrderByWithRelationInput;
+    if (sortField === 'id') {
+      orderBy = { id: sort };
+    } else if (sortField === 'name') {
+      orderBy = { name: sort };
+    } else if (sortField === 'email') {
+      orderBy = { email: sort };
+    } else if (sortField === 'createdAt') {
+      orderBy = { createdAt: sort };
+    } else if (sortField === 'updatedAt') {
+      orderBy = { updatedAt: sort };
+    } else if (sortField === 'registrationDate') {
+      orderBy = { registrationDate: sort };
+    } else {
+      orderBy = { createdAt: sort };
+    }
+
+    // Calculate skip
+    const skip = (page - 1) * limit;
+
+    // Execute queries with relations
+    // console.log('skip', skip);
+    // console.log('limit', limit);
+    // console.log('orderBy', orderBy);
+    const [docs, totalDocs] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        include: {
+          userRole: {
+            include: {
+              role: true,
+            },
+          },
+          userMembership: {
+            include: {
+              membership: true,
+            },
+          },
+        },
+      }),
+      counted ? this.prisma.user.count({ where }) : Promise.resolve(0),
+    ]);
+
+    // Map to entities with relations
+    const mappedDocs = docs.map(toUserEntityWithRelations);
+
+    // Calculate pagination metadata
+    const totalPages = counted ? Math.ceil(totalDocs / limit) : 0;
+    const currentPage = page;
+    const nextPage = currentPage < totalPages ? currentPage + 1 : null;
+    const previousPage = currentPage > 1 ? currentPage - 1 : null;
+    const hasNext = nextPage !== null;
+    const hasPrev = previousPage !== null;
+
+    if (counted) {
+      return {
+        docs: mappedDocs,
+        docsCount: mappedDocs.length,
+        totalDocs,
+        totalPages,
+        currentPage,
+        nextPage,
+        previousPage,
+        limit,
+        hasNext,
+        hasPrev,
+      };
+    } else {
+      return {
+        docs: mappedDocs,
+        currentPage,
+        nextPage,
+        previousPage,
+        limit,
+        hasNext,
+        hasPrev,
+      };
+    }
+  }
+
 }

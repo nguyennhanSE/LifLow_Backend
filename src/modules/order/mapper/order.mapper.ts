@@ -1,10 +1,14 @@
-import { Order, User } from '@prisma/client';
+import { Order, Product, User } from '@prisma/client';
 import { OrderResponseDto } from '../dto/order.dto';
 import { OrderEntity } from '../entities/order.entity';
 // import { toUserEntity } from '../../user/mapper/user.mapper';
 import { EOrderSituation } from '../enum/order.enum';
+import { toUserEntity } from 'src/modules/user/mapper/user.mapper';
+import { toProductEntity, toProductEntitySummary } from 'src/modules/product/mapper/product.mapper';
+import { ProductEntity } from 'src/modules/product/entities/product.entity';
 // type OrderWithUser = Order & { user?: User | null };
 
+type OrderWithRelations = Order & { user?: User | null; product?: Product | null };
 
 export function toOrderEntity(order: Order): OrderEntity {
   return {
@@ -13,7 +17,7 @@ export function toOrderEntity(order: Order): OrderEntity {
     itemWiseOrderNumber: order.itemWiseOrderNumber,
     totalOrderAmount: order.totalOrderAmount,
     totalPaymentAmount: order.totalPaymentAmount,
-    productNumber: order.productNumber,
+    productId: order.productId,
     productName: order.productName,
     productNameWithOptions: order.productNameWithOptions,
     quantity: order.quantity,
@@ -38,17 +42,22 @@ export function toOrderEntity(order: Order): OrderEntity {
     // user: order.user ? toUserEntity(order.user) : null,
     situation: order.situation as EOrderSituation,
     courierCompany: order.courierCompany,
+    invoiceNumber: order.invoiceNumber,
   };
 }
 
-export function toOrderResponseDto(order: Order): OrderResponseDto {
-  return toOrderEntity(order);
+export function toOrderResponseDto(order: OrderEntity): OrderResponseDto {
+  return {
+    ...order,
+    ordererId: order.ordererId ?? null, // Convert undefined to null
+  } as OrderResponseDto;
 }
-// export function toOrderResponseDto(order: OrderWithUser): OrderResponseDto {
-//   const entity = toOrderEntity(order);
-//   return {
-//     ...entity,
-//     user: entity.user || undefined,
-//   };
-// }
+
+export function toOrderEntityWithRelations(order: OrderWithRelations): OrderEntity {
+  return {
+    ...toOrderEntity(order),
+    user: order.user ? toUserEntity(order.user) : null,
+    product: order.product ? toProductEntitySummary(toProductEntity(order.product)) : null,
+  };
+}
 

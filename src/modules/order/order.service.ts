@@ -8,7 +8,7 @@ import {
   UpdateOrderDto,
 } from './dto/order.dto';
 import { OrderRepository } from './repositories/order.repository';
-import { toOrderResponseDto } from './mapper/order.mapper';
+import { toOrderResponseDto, toOrderEntity, toOrderEntityWithRelations } from './mapper/order.mapper';
 import { OrderNotFoundException } from './exceptions/order-not-found.exception';
 import { OrderValidationException } from './exceptions/order-validation.exception';
 import { EOrderSituation } from './enum/order.enum';
@@ -52,7 +52,8 @@ export class OrdersService {
         orderNumber,
       });
 
-      return toOrderResponseDto(created);
+      const orderEntity = toOrderEntity(created);
+      return toOrderResponseDto(orderEntity);
     } catch (error) {
       this.handlePrismaError(error, 'Failed to create order');
     }
@@ -86,7 +87,10 @@ export class OrdersService {
       const totalPages = Math.ceil(total / limit) || 1;
 
       return {
-        orders: orders.map(toOrderResponseDto),
+        orders: orders.map(order => {
+          const orderEntity = toOrderEntity(order);
+          return toOrderResponseDto(orderEntity);
+        }),
         pagination: {
           total,
           page,
@@ -232,7 +236,7 @@ export class OrdersService {
             품목별주문번호: order.itemWiseOrderNumber || '',
             총주문금액: order.totalOrderAmount ?? 0,
             총결제금액: order.totalPaymentAmount ?? 0,
-            상품번호: order.productNumber ?? '',
+            상품번호: order.productId ?? '',
             주문상품명: order.productName || '',
             주문상품명옵션: order.productNameWithOptions || '',
             수량: order.quantity ?? 0,
@@ -275,7 +279,8 @@ export class OrdersService {
         throw new OrderNotFoundException(`Order with id ${id} not found`);
       }
 
-      return toOrderResponseDto(order);
+      const orderEntity = toOrderEntity(order);
+      return toOrderResponseDto(orderEntity);
     } catch (error) {
       this.handlePrismaError(error, `Failed to fetch order ${id}`);
     }
@@ -348,24 +353,14 @@ export class OrdersService {
     const searchTerms: Prisma.OrderWhereInput[] = [];
 
     // Exact / partial field searches
-    if (filterDto.orderNumber) {
+    if (filterDto.q) {
       searchTerms.push({
-        orderNumber: { contains: filterDto.orderNumber, mode: 'insensitive' },
-      });
-    }
-    if (filterDto.productName) {
-      searchTerms.push({
-        productName: { contains: filterDto.productName, mode: 'insensitive' },
-      });
-    }
-    if (filterDto.customerName) {
-      searchTerms.push({
-        ordererName: { contains: filterDto.customerName, mode: 'insensitive' },
-      });
-    }
-    if (filterDto.recipientName) {
-      searchTerms.push({
-        recipient: { contains: filterDto.recipientName, mode: 'insensitive' },
+        OR: [
+          { orderNumber: { contains: filterDto.q, mode: 'insensitive' } },
+          { productName: { contains: filterDto.q, mode: 'insensitive' } },
+          { ordererName: { contains: filterDto.q, mode: 'insensitive' } },
+          { recipient: { contains: filterDto.q, mode: 'insensitive' } },
+        ],
       });
     }
 

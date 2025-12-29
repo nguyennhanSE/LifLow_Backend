@@ -12,14 +12,18 @@ import { PaginatedResponseDto } from './dto/paginated-response.dto';
 import { BannerBulkUpdateStatusDto } from './dto/bulk-update-status.dto';
 import { ReorderBannersDto } from './dto/reorder-banners.dto';
 import { BannerMapper } from './mappers/banner.mapper';
-import { EBannerType } from './enums/banner.enum';
+import { EBannerType, ECategoryType } from './enums/banner.enum';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AppLogger } from '../../libs/logger/logger.service';
 import { BannerEntity } from './entities/banner.entity';
+import { AwsService } from 'src/libs/integration/aws/aws.service';
+
 
 @Injectable()
 export class BannerService {
-  constructor(private readonly bannerRepository: BannerRepository, private readonly productService: ProductService, private readonly prisma: PrismaService, private readonly logger: AppLogger) {}
+  constructor(private readonly bannerRepository: BannerRepository, private readonly productService: ProductService, private readonly prisma: PrismaService, private readonly logger: AppLogger,
+    private readonly awsService: AwsService,
+  ) {}
 
   /**
    * Create a new banner
@@ -104,8 +108,10 @@ export class BannerService {
   ): Promise<BannerEntity> {
     try {
       // Verify banner exists
-      await this.findOne(id);
-
+      const existingBanner = await this.findOne(id);
+      if (!existingBanner) {
+        throw new NotFoundException(`Banner with ID ${id} not found`);
+      }
       // Validate business rules
       await this.validateUpdateBanner(id, updateBannerDto);
 
@@ -169,7 +175,7 @@ export class BannerService {
 
   /**
    * Sync product data for a banner
-   * Useful when product information changes
+   * Verifies that the product still exists and is valid through ProductCategoryBannerRelation
    */
   async syncProductData(bannerId: string): Promise<BannerEntity> {
     try {
@@ -180,35 +186,27 @@ export class BannerService {
         throw new NotFoundException(`Banner with ID ${bannerId} not found`);
       }
 
-      if (!banner.productId) {
+      // Check if banner has product relations through ProductCategoryBannerRelation
+      if (!banner.productCategoryBannerRelations || banner.productCategoryBannerRelations.length === 0) {
         throw new BadRequestException(
-          'Banner does not have an associated product',
+          'Banner does not have an associated product through ProductCategoryBannerRelation',
         );
       }
 
-      // Fetch latest product data
-      const product = await this.productService.getProductById(
-        banner.productId,
-      );
-
-      // Update banner with fresh denormalized product fields
-      const updateData: UpdateBannerDto = {
-        productName: product.productName ?? undefined,
-        productPrice: product.productPrice ?? undefined,
-        productBrand: product.brand ?? undefined,
-        productExplanation: product.productSummaryDescription ?? undefined,
-      };
-
-      const updatedBanner = await this.bannerRepository.update(
-        bannerId,
-        updateData,
-      );
+      // Verify all products in relations still exist
+      for (const relation of banner.productCategoryBannerRelations) {
+        const productId = relation.productId;
+        if (productId && typeof productId === 'string') {
+          await this.productService.getProductById(productId);
+        }
+      }
 
       this.logger.log(
-        `Synced product data for banner: ID=${bannerId}, ProductID=${banner.productId}`,
+        `Verified product data for banner: ID=${bannerId}, Relations=${banner.productCategoryBannerRelations.length}`,
       );
 
-      return updatedBanner;
+      // Return the banner as-is since we're just verifying the products exist
+      return banner;
     } catch (error) {
       this.logger.error(
         `Failed to sync product data for banner ${bannerId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -310,6 +308,13 @@ export class BannerService {
     // Validate product exists if productId is provided
     if (createBannerDto.productId) {
       await this.validateProductExists(createBannerDto.productId);
+      
+      // Validate that productCategoryNumber is also provided when productId is provided
+      if (!createBannerDto.productCategoryNumber) {
+        throw new BadRequestException(
+          'productCategoryNumber is required when productId is provided',
+        );
+      }
     }
 
     // Validate date range
@@ -339,22 +344,29 @@ export class BannerService {
       updateBannerDto.productId !== null
     ) {
       await this.validateProductExists(updateBannerDto.productId);
+      
+      // Validate that productCategoryNumber is also provided when productId is provided
+      if (!updateBannerDto.productCategoryNumber) {
+        throw new BadRequestException(
+          'productCategoryNumber is required when productId is provided',
+        );
+      }
     }
 
     // Validate date range if dates are being updated
-    const banner = await this.bannerRepository.findOne(id);
-    if (banner) {
-      const startDate = updateBannerDto.startDate
-        ? new Date(updateBannerDto.startDate)
-        : banner.startDate;
-      const endDate = updateBannerDto.endDate
-        ? new Date(updateBannerDto.endDate)
-        : banner.endDate;
+    // const banner = await this.bannerRepository.findOne(id);
+    // if (banner) {
+    //   const startDate = updateBannerDto.startDate
+    //     ? new Date(updateBannerDto.startDate)
+    //     : banner.startDate;
+    //   const endDate = updateBannerDto.endDate
+    //     ? new Date(updateBannerDto.endDate)
+    //     : banner.endDate;
 
-      if (startDate && endDate) {
-        this.validateDateRange(startDate, endDate);
-      }
-    }
+    //   if (startDate && endDate) {
+    //     this.validateDateRange(startDate, endDate);
+    //   }
+    // }
   }
 
   /**
@@ -380,5 +392,58 @@ export class BannerService {
         'Start date must be before end date',
       );
     }
+  }
+
+  async getBannersByCategory(category: ECategoryType): Promise<BannerEntity[]> {
+    const banners = await this.bannerRepository.getBannersByCategory(category);
+    return banners;
+  }
+
+  async updateBannerImageUrl(id: string, file?: Express.Multer.File): Promise<BannerEntity> {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+    const banner = await this.bannerRepository.findOne(id);
+    if (!banner) {
+      throw new NotFoundException(`Banner with ID ${id} not found`);
+    }
+
+    // Store old image URL for cleanup
+    const oldImageUrl = banner.imageUrl;
+    let oldS3Key: string | null = null;
+
+    // Extract S3 key from old image URL if it's an S3 URL
+    try {
+      const imageUrlObj = new URL(oldImageUrl);
+      // Extract key from S3 URL format: https://bucket.s3.region.amazonaws.com/key
+      // or https://bucket.s3-region.amazonaws.com/key
+      if (imageUrlObj.hostname.includes('s3') && imageUrlObj.hostname.includes('amazonaws.com')) {
+        // Remove leading slash from pathname to get the key
+        oldS3Key = imageUrlObj.pathname.startsWith('/') 
+          ? imageUrlObj.pathname.substring(1) 
+          : imageUrlObj.pathname;
+        this.logger.debug('Old S3 key extracted:', oldS3Key);
+      }
+    } catch (error) {
+      this.logger.warn('Could not parse old image URL for cleanup:', oldImageUrl);
+    }
+
+    // Upload new file and update banner in transaction
+    const transaction = await this.prisma.$transaction(async (tx) => {
+      const newImageUrl = await this.awsService.uploadFile('banners', banner.id, file);
+      const updatedBanner = await this.bannerRepository.updateWithImageUrl(id, newImageUrl as string);
+      
+      // Delete old file from S3 after successful update (non-blocking)
+      if (oldS3Key) {
+        this.awsService.deleteObject(oldS3Key).catch((error) => {
+          this.logger.warn(`Failed to delete old S3 object: ${oldS3Key}`, error);
+          // Don't throw - cleanup failure shouldn't break the update
+        });
+      }
+      
+      return updatedBanner;
+    });
+    
+    return transaction;
   }
 }

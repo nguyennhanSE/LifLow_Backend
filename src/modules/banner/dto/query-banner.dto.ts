@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { EBannerType, EBannerStatus } from '../enums/banner.enum';
+import { EBannerType, EBannerStatus, ECategoryType } from '../enums/banner.enum';
 
 export class QueryBannerDto {
   @ApiPropertyOptional({
@@ -37,6 +37,24 @@ export class QueryBannerDto {
   @IsOptional()
   @IsUUID('4', { message: 'productId must be a valid UUID' })
   productId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by product category number',
+    example: 'CAT001',
+    maxLength: 50,
+  })
+  @IsOptional()
+  @IsString()
+  productCategoryNumber?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by category type',
+    enum: ECategoryType,
+    example: ECategoryType.LIVESTOCK,
+  })
+  @IsOptional()
+  @IsEnum(ECategoryType)
+  categoryType?: ECategoryType;
 
   @ApiPropertyOptional({
     description: 'Search by title or badge text (case-insensitive)',

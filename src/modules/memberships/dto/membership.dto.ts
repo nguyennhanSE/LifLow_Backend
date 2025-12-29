@@ -86,8 +86,8 @@ export class UpdateMembershipDto {
 // ============= ASSIGN MEMBERSHIP TO USER DTO =============
 export enum MembershipStatus {
   NORMAL = 'normal',
-  SUSPENDED = 'suspended',
-  EXPIRED = 'expired',
+  INACTIVE = 'inactive',
+  STOPPED = 'stop',
 }
 
 export class AssignMembershipDto {
@@ -153,6 +153,17 @@ export class UpdateUserMembershipDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Membership name',
+    example: 'VIP',
+    maxLength: 100
+  })
+  @IsOptional()
+  @IsString()
+  @trim()
+  @MaxLength(100)
+  membershipLevel?: string;
 
   @ApiPropertyOptional({
     description: 'Membership status',

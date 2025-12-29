@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Query } from "@nestjs/common";
+import { Controller, Get, Param, Post, Query, UploadedFile, UseInterceptors } from "@nestjs/common";
 import { Body } from "@nestjs/common";
 import { AwsService } from "./aws.service";
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from "@nestjs/swagger";
 import { Public } from "src/libs/decorator";
 import { UploadDto } from "./dto/aws.dto";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { File } from "buffer";
 
 @Controller('aws')
 @ApiTags('AWS')
@@ -12,15 +14,12 @@ export class AwsController {
     constructor(private readonly awsService: AwsService) {}
 
     @Post('upload')
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({ type: File })
+    @UseInterceptors(FileInterceptor('file'))
     @Public()
-    async upload(@Body() body: UploadDto) {
-        return this.awsService.uploadObject({
-            key: body.key,
-            body: body.body,
-            contentType: body.contentType,
-            isPublic: body.isPublic,
-            cacheControl: body.cacheControl,
-        });
+    async upload(@Body('prefix') prefix: string, @Body('id') id: string, @UploadedFile() file: Express.Multer.File) {
+        return this.awsService.uploadFile(prefix, id, file);
     }
     @Get('delete')
     @Public()

@@ -73,6 +73,20 @@ export class UserService {
   }
 
   /**
+   * Get paginated admin users
+   */
+  async getAdminPaginate(
+    paginateRequest: PaginateOptions,
+    filter: UserFilterDto,
+    options: { counted?: boolean }
+  ): Promise<IPaginate<UserEntity>> {
+    return this.userRepository.getAdminPaginate(filter, {
+      ...paginateRequest,
+      counted: options.counted,
+    });
+  }
+
+  /**
    * Find one user by id
    */
   async findOne(id: string): Promise<UserEntity> {

@@ -5,6 +5,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { config, NODE_ENV } from './libs/config';
 import { TransformInterceptor } from './libs/interceptor/response.interceptor';
 
+// Patch JSON.stringify to handle BigInt values
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 

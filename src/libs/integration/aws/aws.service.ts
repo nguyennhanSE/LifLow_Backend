@@ -1,8 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { IAwsService } from './aws.interface';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { config } from '../../config';
 import { AppLogger } from 'src/libs/logger/logger.service';
+import { RequestInvalidError } from 'src/libs/errors/error-base';
 
 @Injectable()
 export class AwsService implements IAwsService {
@@ -26,12 +27,37 @@ export class AwsService implements IAwsService {
             Key: key,
             Body: body,
             ContentType: contentType,
-            ACL: 'public-read',
+            // ACL: 'public-read',
             // ACL disabled for buckets with Object Ownership: Bucket owner enforced
             CacheControl: cacheControl,
         });
         await this.s3.send(command);
-        return { key, url: isPublic ? this.getPublicUrl(key) : undefined };
+        return { key, url: isPublic ? this.getPublicUrl(key) : undefined } as { key: string; url: string | undefined };
+    }
+
+    async uploadFile(prefix: string, id: string, file: Express.Multer.File) {
+        const meta = { file: { originalname: file?.originalname, size: file?.size } };
+        this.logger.debug(`upload file start`, meta);
+        try {
+            if (!file?.buffer) {
+                throw new InternalServerErrorException('File is required', { cause: new Error('File is required') });
+            }
+            const ext = (file.originalname || '').split('.').pop()?.toLowerCase() || 'bin';
+            const key = `${prefix}/${id}/${Date.now()}.${ext}`;
+            const { url } = await this.uploadObject({
+                key,
+                body: file.buffer,
+                contentType: file.mimetype,
+                isPublic: true,
+                cacheControl: 'public, max-age=31536000',
+            });
+            this.logger.debug(`upload file done, prefix: ${prefix}, id: ${id}`);
+            this.logger.debug(`url: ${url}`);
+            return url;
+        } catch (error) {
+            this.logger.error(`upload file failed`, { ...meta, error });
+            throw error;
+        }
     }
 
     async deleteObject(key: string): Promise<void> {
@@ -40,7 +66,7 @@ export class AwsService implements IAwsService {
     }
 
     getPublicUrl(key: string): string {
-        return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${encodeURIComponent(key)}`;
+        return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
     }
 }
 

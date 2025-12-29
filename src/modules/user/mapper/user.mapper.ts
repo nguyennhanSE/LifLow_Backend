@@ -1,6 +1,7 @@
 import { UserEntity, RoleInfo, PermissionInfo, MembershipInfo } from '../entities/user.entity';
 import { User, UserRole, Role,  Membership, UserMembership } from '@prisma/client';
 import { CreateUserDto } from '../dto/user.dto';
+import { EPermissions } from '../../permissions/enum/permissions.enum';
 
 type UserWithRelations = User & {
   userRole?: (UserRole & {
@@ -8,7 +9,7 @@ type UserWithRelations = User & {
   })[];
   userMembership?: (UserMembership & {
     membership: Membership;
-  })[];
+  }) | null;
 };
 
 export interface UserMembershipInfo extends MembershipInfo {
@@ -57,7 +58,8 @@ export function toUserEntity(user: User): UserEntity {
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     situation: calculateSituation(user.withdrawalDate, user.dormancyDate),
-    memberships: [],
+    membership: null,
+    totalPurchaseAmount: user.totalPurchaseAmount,
   };
 }
 
@@ -70,51 +72,62 @@ export function toUserEntityWithRelations(user: UserWithRelations): UserEntity {
   const roles: RoleInfo[] = [];
   const roleMap = new Map<string, RoleInfo>();
   
-  // Build permissions from boolean flags on user
+  // Build permissions from boolean flags on user using EPermissions enum
   const permissions: PermissionInfo[] = [];
   
-  if (user.dashboardAccess) {
-    permissions.push({
-      id: 'dashboard',
+  const permissionMapping: Array<{
+    flag: boolean;
+    permission: EPermissions;
+    name: string;
+    description: string;
+  }> = [
+    {
+      flag: user.dashboardAccess,
+      permission: EPermissions.DASHBOARD_ACCESS,
       name: 'Dashboard Access',
       description: 'Access to dashboard and analytics',
-    });
-  }
-  if (user.memberAccess) {
-    permissions.push({
-      id: 'member',
+    },
+    {
+      flag: user.memberAccess,
+      permission: EPermissions.MEMBER_MANAGEMENT,
       name: 'Member Management',
-      description: 'Access to member management',
-    });
-  }
-  if (user.productAccess) {
-    permissions.push({
-      id: 'product',
+      description: 'Manage member information (view, create, update, delete)',
+    },
+    {
+      flag: user.productAccess,
+      permission: EPermissions.PRODUCT_MANAGEMENT,
       name: 'Product Management',
-      description: 'Access to product management',
-    });
-  }
-  if (user.orderAccess) {
-    permissions.push({
-      id: 'order',
+      description: 'Manage product information (view, create, update, delete)',
+    },
+    {
+      flag: user.orderAccess,
+      permission: EPermissions.ORDER_MANAGEMENT,
       name: 'Order Management',
-      description: 'Access to order management',
-    });
-  }
-  if (user.recipeAccess) {
-    permissions.push({
-      id: 'recipe',
+      description: 'Manage order information (view, create, update, delete)',
+    },
+    {
+      flag: user.recipeAccess,
+      permission: EPermissions.RECIPE_MANAGEMENT,
       name: 'Recipe Management',
-      description: 'Access to recipe management',
-    });
-  }
-  if (user.bannerAccess) {
-    permissions.push({
-      id: 'banner',
+      description: 'Manage recipe information (view, create, update, delete)',
+    },
+    {
+      flag: user.bannerAccess,
+      permission: EPermissions.BANNER_MANAGEMENT,
       name: 'Banner Management',
-      description: 'Access to banner management',
-    });
-  }
+      description: 'Manage banner information (view, create, update, delete)',
+    },
+  ];
+
+  permissionMapping.forEach(({ flag, permission, name, description }) => {
+    if (flag) {
+      permissions.push({
+        id: permission,
+        name,
+        description,
+      });
+    }
+  });
 
   // Extract roles
   if (user.userRole) {
@@ -129,21 +142,6 @@ export function toUserEntityWithRelations(user: UserWithRelations): UserEntity {
           description: role.description,
         });
       }
-    });
-  }
-
-  // Extract memberships
-  const memberships: MembershipInfo[] = [];
-  if (user.userMembership) {
-    user.userMembership.forEach((userMembership) => {
-      const membership = userMembership.membership;
-      
-      // Add membership with basic info
-      memberships.push({
-        id: membership.id,
-        name: membership.name,
-        description: membership.description,
-      });
     });
   }
 
@@ -166,8 +164,9 @@ export function toUserEntityWithRelations(user: UserWithRelations): UserEntity {
     updatedAt: user.updatedAt,
     roles: Array.from(roleMap.values()),
     permissions: permissions,
-    memberships: memberships,
+    membership: user.userMembership ? toUserMembershipInfo(user.userMembership) : null,
     situation: calculateSituation(user.withdrawalDate, user.dormancyDate),
+    totalPurchaseAmount: user.totalPurchaseAmount ?? 0,
   };
 }
 
@@ -191,6 +190,7 @@ export function toPrismaUserCreateInput(dto: CreateUserDto & {password?: string;
     withdrawalDate: null,
     withdrawalType: null,
     reasonForWithdrawal: null,
+    totalPurchaseAmount: 0,
   };
 }
 

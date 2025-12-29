@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Patch, Delete, Query, Param, Body, UseInterceptors, UploadedFiles, Res } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Query, Param, Body, UseInterceptors, UploadedFiles, Res, Put, UploadedFile } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiConsumes, ApiBearerAuth } from '@nestjs/swagger';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { ProductService } from './product.service';
-import { ProductListQueryDto, CreateProductDto, UpdateProductDto, BulkDeleteProductDto, UpdateProductStatusDto, ProductBulkUpdateStatusDto } from './dto/product.dto';
+import { ProductListQueryDto, CreateProductDto, UpdateProductDto, BulkDeleteProductDto, UpdateProductStatusDto, ProductBulkUpdateStatusDto,CreateProductSpecialOfferDto } from './dto/product.dto';
 import { successResponse, paginationResponse } from '../../utils/responseFormatter';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
@@ -11,12 +11,12 @@ import { uploadProductImages } from '../../middlewares/uploadMiddleware';
 import { ResponseModel } from '../../libs/models/response/response.model';
 
 @ApiTags('Product Management')
-@Controller('product')
+@Controller('products')
 @ApiBearerAuth()
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
-  @Get()
+  @Get('/list')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
   @ApiOperation({ summary: 'Get paginated list of products with filters' })
   @ApiResponse({ status: 200, description: 'Products retrieved successfully' })
@@ -33,6 +33,32 @@ export class ProductController {
         result.pagination.page,
         result.pagination.limit,
         'Products retrieved successfully'
+      );
+      responseModel.setData(data);
+    } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  @Get('special-offers')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Get paginated list of products with active special offers' })
+  @ApiResponse({ status: 200, description: 'Special offers retrieved successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid query parameters' })
+  async getSpecialOffers(@Query() query: ProductListQueryDto) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const result = await this.productService.getSpecialOffers(query);
+      
+      const data = paginationResponse(
+        result.products,
+        result.pagination.total,
+        result.pagination.page,
+        result.pagination.limit,
+        'Special offers retrieved successfully'
       );
       responseModel.setData(data);
     } catch (error) {
@@ -63,16 +89,158 @@ export class ProductController {
 
   @Post()
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD)
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'imageRegistrationThumbnail', maxCount: 1 },
+      { name: 'imageRegistrationDetail', maxCount: 1 },
+    ])
+  )
   @ApiOperation({ summary: 'Create a new product' })
-  @ApiBody({ type: CreateProductDto })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Create product with optional thumbnail image',
+    schema: {
+      type: 'object',
+      properties: {
+        productName: {
+          type: 'string',
+          description: 'Product name (required)',
+          example: 'Organic Apple',
+          maxLength: 128,
+        },
+        productCode: {
+          type: 'string',
+          description: 'Product code',
+          example: 'PROD001',
+        },
+        categories: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Categories',
+          example: ['CAT001', 'CAT002'],
+        },
+        brand: {
+          type: 'string',
+          description: 'Brand name',
+          example: 'Juwangsan',
+        },
+        manufacturer: {
+          type: 'string',
+          description: 'Manufacturer',
+          example: 'ABC Company',
+        },
+        origin: {
+          type: 'string',
+          description: 'Origin',
+          example: 'Korea',
+        },
+        productVolume: {
+          type: 'string',
+          description: 'Product volume',
+          example: '100ml',
+        },
+        consumerPrice: {
+          type: 'number',
+          description: 'Consumer price (원)',
+          example: 15000,
+          minimum: 0,
+        },
+        supplyPrice: {
+          type: 'number',
+          description: 'Supply price (원)',
+          example: 12000,
+          minimum: 0,
+        },
+        productPrice: {
+          type: 'number',
+          description: 'Product price (원)',
+          example: 13000,
+          minimum: 0,
+        },
+        salePrice: {
+          type: 'number',
+          description: 'Sale price (원)',
+          example: 10000,
+          minimum: 0,
+        },
+        discountRate: {
+          type: 'number',
+          description: 'Discount rate',
+          example: 10,
+          minimum: 0,
+        },
+        discountStartDate: {
+          type: 'string',
+          format: 'date',
+          description: 'Discount start date',
+          example: '2025-01-01',
+        },
+        discountEndDate: {
+          type: 'string',
+          format: 'date',
+          description: 'Discount end date',
+          example: '2025-01-01',
+        },
+        deliveryMethod: {
+          type: 'string',
+          description: 'Delivery method',
+          example: '택배',
+        },
+        deliveryFeeInput: {
+          type: 'string',
+          description: 'Delivery fee input',
+          example: '10000',
+        },
+        productBriefExplanation: {
+          type: 'string',
+          description: 'Brief explanation',
+          example: 'This is a brief explanation of the product',
+        },
+        seoDescription: {
+          type: 'string',
+          description: 'Seo description',
+          example: 'This is a seo description of the product',
+        },
+        seoKeywords: {
+          type: 'string',
+          description: 'Seo keywords',
+          example: 'This is a list of seo keywords for the product',
+        },
+        saleStatus: {
+          type: 'string',
+          description: 'Sale status',
+          example: '판매중',
+        },
+        imageRegistrationThumbnail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image registration thumbnail (max 5MB, jpg/jpeg/png/webp)',
+        },
+        imageRegistrationDetail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image registration detail (max 5MB, jpg/jpeg/png/webp)',
+        },
+      },
+      required: ['productName'],
+    },
+  })
   @ApiResponse({ status: 201, description: 'Product created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   @ApiResponse({ status: 409, description: 'Conflict - duplicate product code' })
-  async createProduct(@Body() createProductDto: CreateProductDto) {
+  async createProduct(
+    @Body() createProductDto: CreateProductDto, 
+    @UploadedFiles() files: {
+      imageRegistrationThumbnail?: Express.Multer.File[];
+      imageRegistrationDetail?: Express.Multer.File[];
+    },
+  ) {
     const responseModel = new ResponseModel();
 
     try {
-      const product = await this.productService.createProduct(createProductDto);
+      const imageRegistrationThumbnail = files?.imageRegistrationThumbnail?.[0];
+      const imageRegistrationDetail = files?.imageRegistrationDetail?.[0];
+      const product = await this.productService.createProduct(createProductDto, imageRegistrationThumbnail, imageRegistrationDetail);
       const result = successResponse(product, 'Product created successfully');
       responseModel.setData(result);
     } catch (error) {
@@ -296,5 +464,39 @@ export class ProductController {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename=products-${new Date().toISOString().split('T')[0]}.csv`);
     res.send('\uFEFF' + csv); // Add BOM for Excel UTF-8 support
+  }
+
+  @Put(':id/special-offer')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiOperation({ summary: 'Update product special offer' })
+  @ApiBody({ type: CreateProductSpecialOfferDto })
+  @ApiResponse({ status: 200, description: 'Product special offer updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  async updateProductSpecialOffer(@Param('id') id: string, @Body() createProductSpecialOfferDto: CreateProductSpecialOfferDto) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const product = await this.productService.updateProductSpecialOffer(id, createProductSpecialOfferDto);
+      const result = successResponse(product, 'Product special offer updated successfully');
+      responseModel.setData(result);
+      return responseModel;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  @Get('brands/list')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Get all brands' })
+  @ApiResponse({ status: 200, description: 'Brands retrieved successfully' })
+  async getBrands() {
+    const responseModel = new ResponseModel();
+    try {
+      const result = await this.productService.getBrands();
+      responseModel.setData(result);
+    } catch (error) {
+      throw error;
+    }
   }
 }

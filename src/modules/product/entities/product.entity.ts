@@ -1,3 +1,6 @@
+import { ProductCategoryBannerRelation } from "@prisma/client";
+import { CategoryEntity } from "src/modules/categories/entities/category.entity";
+
 export class ProductEntity {
   id!: string;
   productCode?: string | null;
@@ -85,7 +88,7 @@ export class ProductEntity {
   productDeliveryTypeCode?: string | null;
   storePickupSetting?: string | null;
   productTotalWeight?: number | null;
-  hsCode?: bigint | null;
+  hsCode?: string | null;
   additionalItem01TodayDepartureDeliveryUsage?: string | null;
   additionalItem02TodayDepartureDeliveryTime?: string | null;
   additionalItem03StorageMethod?: string | null;
@@ -94,4 +97,20 @@ export class ProductEntity {
   additionalItem06ParcelDelivery?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
+  // extension
+  ctaButtonUrl?: string | null;
+  // relation
+  categories?: CategoryEntity[] | null;
+  productSpecialOffer?: ProductSpecialOfferEntity | null;
+  productCategoryBannerRelations?: ProductCategoryBannerRelation[] | null;
+}
+
+
+export type ProductSpecialOfferEntity = {
+  id: string;
+  status: boolean;
+  discountAmount: number;
+  specialPriceApplied: number;
+  startDate?: Date | null;
+  endDate?: Date | null;
 }

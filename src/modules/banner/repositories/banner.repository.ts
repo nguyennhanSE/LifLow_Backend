@@ -8,16 +8,21 @@ import { Prisma, Banner } from '@prisma/client';
 import { CreateBannerDto } from '../dto/create-banner.dto';
 import { UpdateBannerDto } from '../dto/update-banner.dto';
 import { QueryBannerDto } from '../dto/query-banner.dto';
-import { EBannerType, EBannerStatus } from '../enums/banner.enum';
+import { EBannerType, EBannerStatus, ECategoryType } from '../enums/banner.enum';
 import { BannerEntity } from '../entities/banner.entity';
 import { BannerMapper } from '../mappers/banner.mapper';
+import { plainToInstance } from 'class-transformer';
 
-interface ProductFields {
-  productName: string | null;
-  productPrice: number | null;
-  productBrand: string | null;
-  productExplanation: string | null;
-}
+type BannerWithRelations = Prisma.BannerGetPayload<{
+  include: {
+    productCategoryBannerRelations: {
+      include: {
+        product: true;
+        category: true;
+      };
+    };
+  };
+}>;
 
 @Injectable()
 export class BannerRepository {
@@ -25,13 +30,38 @@ export class BannerRepository {
 
   /**
    * Create a new banner
-   * If productId is provided, fetch and populate denormalized product fields
+   * If productId and productCategoryNumber are provided, create ProductCategoryBannerRelation
    */
   async create(createBannerDto: CreateBannerDto): Promise<BannerEntity> {
     try {
+      // Validate that if productId is provided, productCategoryNumber must also be provided
+      if (createBannerDto.productId && !createBannerDto.productCategoryNumber) {
+        throw new BadRequestException(
+          'productCategoryNumber is required when productId is provided',
+        );
+      }
+
+      // If productId is provided, check if product already has a banner for this category
+      if (createBannerDto.productId && createBannerDto.productCategoryNumber) {
+        const existingRelation = await this.prisma.productCategoryBannerRelation.findFirst({
+          where: {
+            productId: createBannerDto.productId,
+            productCategoryNumber: createBannerDto.productCategoryNumber,
+          },
+          include: {
+            banner: true,
+          },
+        });
+        if (existingRelation && existingRelation.banner) {
+          throw new BadRequestException(
+            `Product with ID ${createBannerDto.productId} already has a banner for category ${createBannerDto.productCategoryNumber}`,
+          );
+        }
+      }
+
       // Build base data object
       const data: Prisma.BannerCreateInput = {
-        type: createBannerDto.type ,
+        type: createBannerDto.type,
         status: createBannerDto.status || EBannerStatus.ACTIVE,
         title: createBannerDto.title,
         badgeText: createBannerDto.badgeText,
@@ -47,73 +77,41 @@ export class BannerRepository {
         endDate: createBannerDto.endDate
           ? new Date(createBannerDto.endDate)
           : null,
-        productName: createBannerDto.productName,
-        productPrice: createBannerDto.productPrice,
-        productBrand: createBannerDto.productBrand,
-        productExplanation: createBannerDto.productExplanation,
+        // Create ProductCategoryBannerRelation if productId and productCategoryNumber are provided
+        productCategoryBannerRelations: createBannerDto.productId && createBannerDto.productCategoryNumber
+          ? {
+              create: {
+                productId: createBannerDto.productId,
+                productCategoryNumber: createBannerDto.productCategoryNumber,
+              },
+            }
+          : undefined,
       };
 
-      // If productId is provided, connect product and populate denormalized fields
-      if (createBannerDto.productId) {
-        // Check if product already has a banner (unique constraint)
-        const existingBanner = await this.findByProductId(
-          createBannerDto.productId,
-        );
-        if (existingBanner) {
-          throw new BadRequestException(
-            `Product with ID ${createBannerDto.productId} already has a banner`,
-          );
-        }
-
-        // Use transaction to fetch product and create banner
-        const banner = await this.prisma.$transaction(async (tx) => {
-          // Fetch product fields
-          const productFields = await this.populateProductFields(
-            createBannerDto.productId!,
-            tx,
-          );
-
-          // Merge product fields into data
-          data.productName = productFields.productName;
-          data.productPrice = productFields.productPrice;
-          data.productBrand = productFields.productBrand;
-          data.productExplanation = productFields.productExplanation;
-
-          // Connect product relation
-          data.product = {
-            connect: { id: createBannerDto.productId },
-          };
-
-          // Create banner with product relation included
-          return tx.banner.create({
-            data,
-            include: {
-              product: true,
-            },
-          });
-        });
-        return BannerMapper.toEntity(banner);
-      }
-
-      // Create banner without product
+      // Create banner with relations included
       const banner = await this.prisma.banner.create({
         data,
         include: {
-          product: true,
+          productCategoryBannerRelations: {
+            include: {
+              product: true,
+              category: true,
+            },
+          },
         },
       });
-      return BannerMapper.toEntity(banner);
+      return BannerMapper.toEntityWithProduct(banner);
     } catch (error) {
       // Handle Prisma unique constraint violations
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
           throw new BadRequestException(
-            'A banner with this productId already exists',
+            'A banner with this configuration already exists',
           );
         }
         if (error.code === 'P2025') {
           throw new NotFoundException(
-            `Product with ID ${createBannerDto.productId} not found`,
+            `Product or Category not found`,
           );
         }
       }
@@ -135,6 +133,7 @@ export class BannerRepository {
       type,
       status,
       productId,
+      productCategoryNumber,
       search,
       startDateFrom,
       startDateTo,
@@ -158,9 +157,24 @@ export class BannerRepository {
       where.status = status;
     }
 
-    // Filter by productId
+    // Filter by productId through ProductCategoryBannerRelation
     if (productId) {
-      where.productId = productId;
+      where.productCategoryBannerRelations = {
+        some: {
+          productId: productId,
+        },
+      };
+    }
+
+    // Filter by productCategoryNumber through ProductCategoryBannerRelation
+    if (productCategoryNumber) {
+      where.productCategoryBannerRelations = {
+        ...where.productCategoryBannerRelations,
+        some: {
+          ...(where.productCategoryBannerRelations?.some || {}),
+          productCategoryNumber: productCategoryNumber,
+        },
+      };
     }
 
     // Search by title or badgeText
@@ -206,13 +220,18 @@ export class BannerRepository {
         take,
         orderBy,
         include: {
-          product: true,
+          productCategoryBannerRelations: {
+            include: {
+              product: true,
+              category: true,
+            },
+          },
         },
       }),
       this.prisma.banner.count({ where }),
     ]);
 
-    const data = banners.map(banner => BannerMapper.toEntity(banner));
+    const data = banners.map(banner => BannerMapper.toEntityWithProduct(banner));
     return { data, total };
   }
 
@@ -223,27 +242,90 @@ export class BannerRepository {
     const banner = await this.prisma.banner.findUnique({
       where: { id },
       include: {
-        product: true,
+        productCategoryBannerRelations: {
+          include: {
+            product: true,
+            category: true,
+          },
+        },
       },
     });
     
-    return banner ? BannerMapper.toEntity(banner) : null;
+    return banner ? BannerMapper.toEntityWithProduct(banner) : null;
   }
 
   /**
-   * Find banner by productId (useful for checking if product already has a banner)
+   * Find banner by productId through ProductCategoryBannerRelation
+   * Returns the first banner found for this product
    */
   async findByProductId(productId: string): Promise<BannerEntity | null> {
-    const banner = await this.prisma.banner.findUnique({
-      where: { productId },
+    const relation = await this.prisma.productCategoryBannerRelation.findFirst({
+      where: { productId: productId },
+      include: {
+        banner: {
+          include: {
+            productCategoryBannerRelations: {
+              include: {
+                product: true,
+                category: true,
+              },
+            },
+          },
+        },
+        product: true,
+        category: true,
+      },
     });
     
-    return banner ? BannerMapper.toEntity(banner) : null;
+    if (!relation || !relation.banner) {
+      return null;
+    }
+    
+    // Type assertion: banner from relation has the same structure as BannerWithRelations
+    const banner = relation.banner as BannerWithRelations;
+    return BannerMapper.toEntityWithProduct(banner);
+  }
+
+  /**
+   * Find banner by productId and productCategoryNumber through ProductCategoryBannerRelation
+   */
+  async findByProductIdAndCategory(
+    productId: string,
+    productCategoryNumber: string,
+  ): Promise<BannerEntity | null> {
+    const relation = await this.prisma.productCategoryBannerRelation.findFirst({
+      where: {
+        productId: productId,
+        productCategoryNumber: productCategoryNumber,
+      },
+      include: {
+        banner: {
+          include: {
+            productCategoryBannerRelations: {
+              include: {
+                product: true,
+                category: true,
+              },
+            },
+          },
+        },
+        product: true,
+        category: true,
+      },
+    });
+    
+    if (!relation || !relation.banner) {
+      return null;
+    }
+    
+    // Type assertion: banner from relation has the same structure as BannerWithRelations
+    const banner = relation.banner as BannerWithRelations;
+    return BannerMapper.toEntityWithProduct(banner);
   }
 
   /**
    * Update a banner
-   * If productId is changed, update denormalized product fields
+   * If productId or productCategoryNumber is changed, update ProductCategoryBannerRelation
    */
   async update(id: string, updateBannerDto: UpdateBannerDto): Promise<BannerEntity> {
     try {
@@ -253,10 +335,22 @@ export class BannerRepository {
         throw new NotFoundException(`Banner with ID ${id} not found`);
       }
 
+      // Validate that if productId is provided, productCategoryNumber must also be provided
+      if (updateBannerDto.productId && !updateBannerDto.productCategoryNumber) {
+        throw new BadRequestException(
+          'productCategoryNumber is required when productId is provided',
+        );
+      }
+
+      // Get existing relations
+      const existingRelations = await this.prisma.productCategoryBannerRelation.findMany({
+        where: { bannerId: id },
+      });
+
       // Build update data object
       const data: Prisma.BannerUpdateInput = {
         type: updateBannerDto.type,
-        status: updateBannerDto.status,
+        status: updateBannerDto.status || EBannerStatus.ACTIVE,
         title: updateBannerDto.title,
         badgeText: updateBannerDto.badgeText,
         mainText: updateBannerDto.mainText,
@@ -271,65 +365,47 @@ export class BannerRepository {
         endDate: updateBannerDto.endDate
           ? new Date(updateBannerDto.endDate)
           : undefined,
-        productName: updateBannerDto.productName,
-        productPrice: updateBannerDto.productPrice,
-        productBrand: updateBannerDto.productBrand,
-        productExplanation: updateBannerDto.productExplanation,
       };
 
-      // If productId is being changed
-      if (
-        updateBannerDto.productId !== undefined &&
-        updateBannerDto.productId !== existingBanner.productId
-      ) {
-        // If setting a new productId
-        if (updateBannerDto.productId) {
-          // Check if new product already has a banner
-          const existingProductBanner = await this.findByProductId(
-            updateBannerDto.productId,
-          );
-          if (existingProductBanner && existingProductBanner.id !== id) {
+      // Handle ProductCategoryBannerRelation updates
+      if (updateBannerDto.productId !== undefined || updateBannerDto.productCategoryNumber !== undefined) {
+        // If both productId and productCategoryNumber are provided, create/update relation
+        if (updateBannerDto.productId && updateBannerDto.productCategoryNumber) {
+          // Check if another banner already has this product-category combination
+          const existingRelation = await this.prisma.productCategoryBannerRelation.findFirst({
+            where: {
+              productId: updateBannerDto.productId,
+              productCategoryNumber: updateBannerDto.productCategoryNumber,
+              bannerId: { not: id }, // Exclude current banner
+            },
+          });
+          if (existingRelation) {
             throw new BadRequestException(
-              `Product with ID ${updateBannerDto.productId} already has a banner`,
+              `Product ${updateBannerDto.productId} already has a banner for category ${updateBannerDto.productCategoryNumber}`,
             );
           }
 
-          // Use transaction to fetch product and update banner
-          const banner = await this.prisma.$transaction(async (tx) => {
-            // Fetch product fields
-            const productFields = await this.populateProductFields(
-              updateBannerDto.productId!,
-              tx,
-            );
-
-            // Merge product fields into data
-            data.productName = productFields.productName;
-            data.productPrice = productFields.productPrice;
-            data.productBrand = productFields.productBrand;
-            data.productExplanation = productFields.productExplanation;
-
-            // Connect new product
-            data.product = {
-              connect: { id: updateBannerDto.productId },
-            };
-
-            // Update banner with product relation included
-            return tx.banner.update({
-              where: { id },
-              data,
-              include: {
-                product: true,
-              },
+          // Delete all existing relations for this banner
+          if (existingRelations.length > 0) {
+            await this.prisma.productCategoryBannerRelation.deleteMany({
+              where: { bannerId: id },
             });
-          });
-          return BannerMapper.toEntity(banner);
-        } else {
-          // If removing product (set to null)
-          data.product = { disconnect: true };
-          data.productName = null;
-          data.productPrice = null;
-          data.productBrand = null;
-          data.productExplanation = null;
+          }
+
+          // Create new relation
+          data.productCategoryBannerRelations = {
+            create: {
+              productId: updateBannerDto.productId,
+              productCategoryNumber: updateBannerDto.productCategoryNumber,
+            },
+          };
+        } else if (updateBannerDto.productId === null || (updateBannerDto.productId === undefined && updateBannerDto.productCategoryNumber === null)) {
+          // If removing product (both null or productId is null), delete all relations
+          if (existingRelations.length > 0) {
+            await this.prisma.productCategoryBannerRelation.deleteMany({
+              where: { bannerId: id },
+            });
+          }
         }
       }
 
@@ -338,16 +414,21 @@ export class BannerRepository {
         where: { id },
         data,
         include: {
-          product: true,
+          productCategoryBannerRelations: {
+            include: {
+              product: true,
+              category: true,
+            },
+          },
         },
       });
-      return BannerMapper.toEntity(banner);
+      return BannerMapper.toEntityWithProduct(banner);
     } catch (error) {
       // Handle Prisma errors
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
           throw new BadRequestException(
-            'A banner with this productId already exists',
+            'A banner with this configuration already exists',
           );
         }
         if (error.code === 'P2025') {
@@ -391,11 +472,39 @@ export class BannerRepository {
         displayOrder: 'asc',
       },
       include: {
-        product: true,
+        productCategoryBannerRelations: {
+          include: {
+            product: true,
+            category: true,
+          },
+        },
       },
     });
+    if (banners.some(banner => banner.productCategoryBannerRelations.some(relation => relation.category?.name))) {
+      banners.sort((a, b) => {
+        const categoryOrder: Record<string, number> = {
+          [ECategoryType.ALL]: 0,
+          [ECategoryType.LIVESTOCK]: 1,
+          [ECategoryType.CONVENIENCE_FOOD]: 2,
+          [ECategoryType.FISHERIES]: 3,
+          [ECategoryType.SIDE_DISH]: 4,
+        };
+        
+        // Find first relation with category for banner A
+        const relationA = a.productCategoryBannerRelations.find(relation => relation.category?.name);
+        const categoryNameA = relationA?.category?.name as string;
+        const orderA = categoryNameA ? (categoryOrder[categoryNameA] ?? 999) : 999;
+        
+        // Find first relation with category for banner B
+        const relationB = b.productCategoryBannerRelations.find(relation => relation.category?.name);
+        const categoryNameB = relationB?.category?.name as string;
+        const orderB = categoryNameB ? (categoryOrder[categoryNameB] ?? 999) : 999;
+        
+        return orderA - orderB;
+      });
+    }
     
-    return banners.map(banner => BannerMapper.toEntity(banner));
+    return banners.map(banner => BannerMapper.toEntityWithProduct(banner));
   }
 
   /**
@@ -447,36 +556,42 @@ export class BannerRepository {
     return result.count;
   }
 
-  /**
-   * Helper method to populate product fields from product ID
-   * Used when creating/updating banner with productId
-   */
-  private async populateProductFields(
-    productId: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<ProductFields> {
-    const prismaClient = tx || this.prisma;
-
-    const product = await prismaClient.product.findUnique({
-      where: { id: productId },
-      select: {
-        productName: true,
-        productPrice: true,
-        brand: true,
-        productSummaryDescription: true,
+  async getBannersByCategory(category: ECategoryType): Promise<BannerEntity[]> {
+    const banners = await this.prisma.productCategoryBannerRelation.findMany({
+      where: {
+        category: {
+          name: category,
+        },
+      },
+      include: {
+        banner: true,
       },
     });
+    const bannersData = banners.map(relation => plainToInstance(BannerEntity, relation.banner));
+    return bannersData;
+  }
 
-    if (!product) {
-      throw new NotFoundException(`Product with ID ${productId} not found`);
-    }
-
-    return {
-      productName: product.productName,
-      productPrice: product.productPrice,
-      productBrand: product.brand,
-      productExplanation: product.productSummaryDescription,
-    };
+  async updateWithImageUrl(id: string, imageUrl: string): Promise<BannerEntity> {
+    const transaction = await this.prisma.$transaction(async (tx) => {
+      const banner = await tx.banner.findUnique({
+        where: { id },
+      });
+      if (!banner) {
+        throw new NotFoundException(`Banner with ID ${id} not found`);
+      }
+      const updatedBanner = await tx.banner.update({
+        where: { id },
+        data: { imageUrl, status: EBannerStatus.ACTIVE, updatedAt: new Date() },
+      });
+      return BannerMapper.toEntity(updatedBanner);
+    });
+    return transaction;
+  }
+  async deleteFieldById(id: string, field: string): Promise<void> {
+    await this.prisma.banner.update({
+      where: { id },
+      data: { [field]: null },
+    });
   }
 }
 

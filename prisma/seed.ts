@@ -1,5 +1,5 @@
 // Import PrismaClient from generated location
-import { PrismaClient, CouponType, CouponTargetGrade, OrderSituation, BannerType, BannerStatus } from '@prisma/client';
+import { PrismaClient, CouponType, CouponTargetGrade, OrderSituation, BannerType, BannerStatus, CategoryType } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
@@ -172,17 +172,17 @@ const MEMBERSHIPS: MembershipEntity[] = [
     minPrice: 500000
   },
   { 
-    name: 'Gold', 
+    name: 'GOLD', 
     description: 'Gold membership - Enhanced benefits and rewards',
     minPrice: 300000
   },
   { 
-    name: 'Silver', 
+    name: 'SILVER', 
     description: 'Silver membership - Standard benefits package',
     minPrice: 150000
   },
   { 
-    name: 'General', 
+    name: 'GENERAL', 
     description: 'General membership - Entry level membership for users with less than 150000',
     minPrice: 0
   },
@@ -412,6 +412,8 @@ async function resetAllData() {
     () => prisma.user.deleteMany(),
     () => prisma.role.deleteMany(),
     () => prisma.membership.deleteMany(),
+    () => prisma.productCategoryBannerRelation.deleteMany(), // Delete ProductCategoryBannerRelation before Category
+    () => prisma.category.deleteMany(),
     () => prisma.product.deleteMany(),
   ];
 
@@ -601,7 +603,11 @@ async function assignMembershipsToUsers(
   // Sort memberships by minPrice descending for proper level determination
   const sortedMemberships = [...memberships].sort((a, b) => b.minPrice - a.minPrice);
 
-  const userMemberships = users.map(user => {
+  let assignedCount = 0;
+  const membershipStats: Record<string, number> = {};
+
+  // Process each user individually to ensure one-to-one relationship
+  for (const user of users) {
     // Determine membership based on total purchase amount
     const appropriateMembership = sortedMemberships.find(
       m => user.totalPurchaseAmount >= m.minPrice
@@ -614,35 +620,124 @@ async function assignMembershipsToUsers(
     const rand = Math.random();
     const status = rand < 0.8 ? 'normal' : rand < 0.9 ? 'expired' : 'suspended';
 
-    return {
-      userId: user.id,
-      membershipId: appropriateMembership.id,
-      membershipName: appropriateMembership.name,
-      updatedByAdmin: false,
-      membershipDescription: appropriateMembership.description || '',
-      status,
-      startDate,
-      endDate,
-    };
-  });
-
-  if (userMemberships.length > 0) {
-    await prisma.userMembership.createMany({
-      data: userMemberships,
-      skipDuplicates: true,
+    // Use upsert to ensure each user has exactly one membership
+    await prisma.userMembership.upsert({
+      where: { userId: user.id },
+      update: {
+        membershipId: appropriateMembership.id,
+        membershipName: appropriateMembership.name,
+        membershipDescription: appropriateMembership.description || '',
+        status,
+        startDate,
+        endDate,
+        updatedByAdmin: false,
+      },
+      create: {
+        userId: user.id,
+        membershipId: appropriateMembership.id,
+        membershipName: appropriateMembership.name,
+        membershipDescription: appropriateMembership.description || '',
+        status,
+        startDate,
+        endDate,
+        updatedByAdmin: false,
+      },
     });
+
+    // Track statistics
+    const membershipName = appropriateMembership.name;
+    membershipStats[membershipName] = (membershipStats[membershipName] || 0) + 1;
+    assignedCount++;
   }
 
-  console.log(`✅ Assigned ${userMemberships.length} user-membership relationships\n`);
+  // Display statistics
+  console.log(`   ✓ Assigned ${assignedCount} user-membership relationships`);
+  console.log('   📊 Membership distribution:');
+  for (const [membershipName, count] of Object.entries(membershipStats)) {
+    console.log(`      • ${membershipName}: ${count} users`);
+  }
+
+  console.log(`✅ All users have been assigned memberships (one per user)\n`);
+}
+
+async function seedCategories() {
+  console.log('📂 Creating categories...');
+
+  const categoriesData = [
+    {
+      productCategoryNumber: 'CAT001',
+      name: CategoryType.ALL,
+      description: 'All products - Complete catalog of all available products',
+    },
+    {
+      productCategoryNumber: 'CAT002',
+      name: CategoryType.LIVESTOCK,
+      description: 'Livestock products - Fresh premium meats and livestock products',
+    },
+    {
+      productCategoryNumber: 'CAT003',
+      name: CategoryType.CONVENIENCE_FOOD,
+      description: 'Convenience food - Quick and ready-to-eat meals for busy lifestyles',
+    },
+    {
+      productCategoryNumber: 'CAT004',
+      name: CategoryType.FISHERIES,
+      description: 'Fisheries - Fresh seafood and premium fish products',
+    },
+    {
+      productCategoryNumber: 'CAT005',
+      name: CategoryType.SIDE_DISH,
+      description: 'Side dish - Premium oils, condiments, and side dish ingredients',
+    },
+  ];
+
+  const createdCategories: Array<{ productCategoryNumber: string }> = [];
+  for (const category of categoriesData) {
+    const createdCategory = await prisma.category.upsert({
+      where: { productCategoryNumber: category.productCategoryNumber },
+      update: {
+        name: category.name,
+        description: category.description,
+      },
+      create: {
+        productCategoryNumber: category.productCategoryNumber,
+        name: category.name,
+        description: category.description,
+      },
+    });
+    createdCategories.push({ productCategoryNumber: createdCategory.productCategoryNumber });
+    console.log(`   ✓ ${category.name} (${category.productCategoryNumber}) - ${category.description}`);
+  }
+
+  console.log(`✅ Created ${createdCategories.length} categories\n`);
+  return createdCategories;
+}
+
+// Note: Product categories are now managed through ProductCategoryBannerRelation
+// This function is kept for reference but product-category relationships should be created
+// through ProductCategoryBannerRelation when banners are created
+function seedProductCategories(
+  products: Array<{ id: string; productCode: string | null; productName: string | null; salePrice: number | null; productCategoryNumber: string | null }>,
+) {
+  console.log('🔗 Product-category relationships are now managed through ProductCategoryBannerRelation');
+  console.log('   Relationships will be created when banners are linked to products and categories\n');
+  return [];
 }
 
 async function seedProducts() {
   console.log('📦 Creating products...');
 
-  const createdProducts: Array<{ id: string; productCode: string | null; productName: string | null; salePrice: number | null }> = [];
+  const createdProducts: Array<{ id: string; productCode: string | null; productName: string | null; salePrice: number | null; productCategoryNumber: string | null }> = [];
   for (const product of PRODUCTS) {
     const createdProduct = await prisma.product.create({
       data: product,
+      select: {
+        id: true,
+        productCode: true,
+        productName: true,
+        salePrice: true,
+        productCategoryNumber: true,
+      },
     });
     createdProducts.push(createdProduct);
     console.log(`   ✓ ${product.productName} (₩${product.salePrice?.toLocaleString()})`);
@@ -687,9 +782,6 @@ async function seedOrders(
 
   for (let i = 0; i < 25; i++) {
     const user = regularUsers[Math.floor(Math.random() * regularUsers.length)];
-    const product = products[Math.floor(Math.random() * products.length)];
-    const quantity = Math.floor(Math.random() * 5) + 1;
-    const salePrice = product.salePrice ?? 0;
 
     const userMembership = await prisma.userMembership.findFirst({
       where: { userId: user.id },
@@ -699,23 +791,31 @@ async function seedOrders(
     const situation = orderSituations[Math.floor(Math.random() * orderSituations.length)];
     const courierCompany = courierCompanies[Math.floor(Math.random() * courierCompanies.length)];
 
+    // Each order has exactly 1 product
+    const product = products[Math.floor(Math.random() * products.length)];
+    const quantity = Math.floor(Math.random() * 5) + 1;
+    const salePrice = product.salePrice ?? 0;
+    const totalOrderAmount = salePrice * quantity;
+
+    // Create order with direct product relation
     const order = await prisma.order.create({
       data: {
         orderNumber: `ORD${(i + 1).toString().padStart(6, '0')}`,
-        itemWiseOrderNumber: `ITEM${(i + 1).toString().padStart(6, '0')}`,
-        totalOrderAmount: salePrice * quantity,
-        totalPaymentAmount: salePrice * quantity,
-        productNumber: parseInt(product.productCode?.replace('PROD', '') || '0', 10),
+        itemWiseOrderNumber: `ITEM${(i + 1).toString().padStart(6, '0')}-01`,
+        totalOrderAmount,
+        totalPaymentAmount: totalOrderAmount, // Assuming no discount for now
+        productId: product.id, // Required field: 상품번호 (Product ID) - direct relation to Product
         productName: product.productName || '',
         productNameWithOptions: product.productName || '',
         quantity,
+        salePrice,
+        // Common order fields
         recipient: user.name,
         recipientAddressFull: `Seoul, Gangnam-gu, Teheran-ro ${100 + i}`,
         recipientPostalCode: 10000 + Math.floor(Math.random() * 90000),
         recipientMobilePhone: user.phoneNumber,
         recipientPhoneNumber: user.phoneNumber,
         deliveryMessage: i % 3 === 0 ? 'Please leave at the door' : '',
-        salePrice,
         paymentType: 'ONLINE',
         paymentMethod: ['CARD', 'BANK_TRANSFER', 'KAKAO_PAY'][Math.floor(Math.random() * 3)],
         orderDate: generateRandomDateString(180),
@@ -723,13 +823,14 @@ async function seedOrders(
         ordererMobilePhone: user.phoneNumber,
         ordererId: user.id,
         desiredDeliveryDate: new Date(Date.now() + Math.random() * 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        membershipLevelAtOrderTime: userMembership?.membershipName || 'General',
+        membershipLevelAtOrderTime: userMembership?.membershipName || 'GENERAL',
         situation,
         courierCompany,
       },
     });
 
     orders.push(order);
+    console.log(`   ✓ ${order.orderNumber} - Product: ${product.productName} - Total: ₩${totalOrderAmount.toLocaleString()}`);
   }
 
   console.log(`✅ Created ${orders.length} orders\n`);
@@ -761,7 +862,7 @@ async function seedPoints(
       data: {
         date: generateRandomDateString(180),
         userId: user.id,
-        membershipLevel: userMembership?.membershipName || 'General',
+        membershipLevel: userMembership?.membershipName || 'GENERAL',
         content: isEarned ? `Order reward points` : `Points redemption`,
         orderNumber: order.orderNumber,
         pointsType: isEarned ? 'EARNED' : 'USED',
@@ -1048,81 +1149,127 @@ async function seedCouponHistories(
   return couponHistories;
 }
 
-async function seedBanners(products: Array<{ id: string; productName: string | null; salePrice: number | null; productCode: string | null }>) {
+async function seedBanners(
+  products: Array<{ id: string; productName: string | null; salePrice: number | null; productCode: string | null; productCategoryNumber: string | null }>,
+  categories: Array<{ productCategoryNumber: string }>,
+) {
   console.log('🎨 Creating banners...');
 
-  const banners: any[] = [];
+  const banners: Array<{ id: string; title: string; type: BannerType; status: BannerStatus; linkedProductId?: string }> = [];
+  let relationsCount = 0;
   
-  // Select some products for product banners
-  const productForMainBanner = products[0]; // Premium Organic Olive Oil
-  const productForSpecialPrice = products[2]; // Wild Caught Salmon Fillet
+  // Map products by category for easy access
+  const productsByCategory = new Map<string, typeof products>();
+  products.forEach(product => {
+    if (product.productCategoryNumber) {
+      if (!productsByCategory.has(product.productCategoryNumber)) {
+        productsByCategory.set(product.productCategoryNumber, []);
+      }
+      productsByCategory.get(product.productCategoryNumber)!.push(product);
+    }
+  });
   
+  // Get all products for ALL category type
+  const allProducts = products;
+  
+  // 1 MAIN_PRODUCTS, 6 CATEGORY (5 CategoryType + 1 extra), 3 FOOTER, 1 CONTENT_HERO, 1 SPECIAL_PRICE = 12 banners
   const bannersData = [
-    // Main Product Banner - Linked to actual product
+    // 1. MAIN_PRODUCTS Banner
     {
       type: BannerType.MAIN_PRODUCTS,
+      productCategoryNumber: 'CAT001',
+      categoryType: null,
       status: BannerStatus.ACTIVE,
-      productId: productForMainBanner.id,
       title: 'Premium Quality for Your Kitchen',
       badgeText: 'Best Seller',
       mainText: 'Discover our finest selection of premium organic olive oil',
       ctaButtonText: 'Shop Now',
-      ctaButtonUrl: `/products/${productForMainBanner.id}`,
+      ctaButtonUrl: `/products/${products[0].id}`,
       imageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=1200',
       mobileImageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=800',
       displayOrder: 1,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productName: productForMainBanner.productName,
-      productPrice: productForMainBanner.salePrice,
-      productBrand: 'Organic Foods Co.',
-      productExplanation: 'Premium quality olive oil sourced from the finest Mediterranean groves',
+      productId: products[0].id, // CAT001
     },
-    // Special Price Banner - Linked to product
-    {
-      type: BannerType.SPECIAL_PRICE,
-      status: BannerStatus.ACTIVE,
-      productId: productForSpecialPrice.id,
-      title: 'This Week\'s Special Offer',
-      badgeText: '30% OFF',
-      mainText: 'Wild Caught Salmon - Limited Time Only!',
-      ctaButtonText: 'Get Discount',
-      ctaButtonUrl: `/products/${productForSpecialPrice.id}`,
-      imageUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=1200',
-      mobileImageUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800',
-      displayOrder: 2,
-      startDate: new Date('2025-01-01'),
-      endDate: new Date('2025-01-31'),
-      productName: productForSpecialPrice.productName,
-      productPrice: productForSpecialPrice.salePrice,
-      productBrand: 'Ocean Fresh Co.',
-      productExplanation: 'Fresh wild-caught salmon, rich in omega-3',
-    },
-    // Category Banner - No product link
+    // 2. CATEGORY Banner - ALL
     {
       type: BannerType.CATEGORY,
+      productCategoryNumber: 'CAT001', // Using CAT001 for ALL type
+      categoryType: CategoryType.ALL,
       status: BannerStatus.ACTIVE,
-      productId: null,
-      title: 'Explore Fresh Seafood',
+      title: 'Shop Everything You Need',
+      badgeText: 'All Products',
+      mainText: 'Browse our complete catalog of premium products',
+      ctaButtonText: 'Shop All',
+      ctaButtonUrl: '/products',
+      imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800',
+      displayOrder: 2,
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      productId: products[0].id, // CAT001
+    },
+    // 3. CATEGORY Banner - LIVESTOCK
+    {
+      type: BannerType.CATEGORY,
+      productCategoryNumber: 'CAT003',
+      categoryType: CategoryType.LIVESTOCK,
+      status: BannerStatus.ACTIVE,
+      title: 'Explore Fresh Meats',
       badgeText: 'New Arrivals',
-      mainText: 'Browse our complete collection of fresh, sustainable seafood',
+      mainText: 'Browse our complete collection of fresh, premium meats',
       ctaButtonText: 'View Collection',
-      ctaButtonUrl: '/categories/seafood',
+      ctaButtonUrl: '/categories/meats',
       imageUrl: 'https://images.unsplash.com/photo-1535473895227-bdecb20fb157?w=1200',
       mobileImageUrl: 'https://images.unsplash.com/photo-1535473895227-bdecb20fb157?w=800',
       displayOrder: 3,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productName: null,
-      productPrice: null,
-      productBrand: null,
-      productExplanation: null,
+      productId: products[3].id, // CAT003 - Premium Wagyu Beef Set
     },
-    // Content Hero Banner - No product link
+    // 4. CATEGORY Banner - CONVENIENCE_FOOD
     {
-      type: BannerType.CONTENT_HERO,
+      type: BannerType.CATEGORY,
+      productCategoryNumber: 'CAT002',
+      categoryType: CategoryType.CONVENIENCE_FOOD,
       status: BannerStatus.ACTIVE,
-      productId: null,
+      title: 'Quick & Convenient Meals',
+      badgeText: 'Ready to Eat',
+      mainText: 'Discover our range of delicious convenience foods for your busy lifestyle',
+      ctaButtonText: 'Explore Convenience Foods',
+      ctaButtonUrl: '/categories/convenience-food',
+      imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=1200',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800',
+      displayOrder: 4,
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      productId: products[1].id, // CAT002
+    },
+    // 5. CATEGORY Banner - FISHERIES
+    {
+      type: BannerType.CATEGORY,
+      productCategoryNumber: 'CAT003',
+      categoryType: CategoryType.FISHERIES,
+      status: BannerStatus.ACTIVE,
+      title: 'Fresh Seafood Collection',
+      badgeText: 'Premium Quality',
+      mainText: 'Discover our premium selection of fresh seafood',
+      ctaButtonText: 'Explore Seafood',
+      ctaButtonUrl: '/categories/seafood',
+      imageUrl: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?w=1200',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?w=800',
+      displayOrder: 5,
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      productId: products[2].id, // CAT003 - Wild Caught Salmon Fillet
+    },
+    // 6. CATEGORY Banner - SIDE_DISH
+    {
+      type: BannerType.CATEGORY,
+      productCategoryNumber: 'CAT004',
+      categoryType: CategoryType.SIDE_DISH,
+      status: BannerStatus.ACTIVE,
       title: 'Fresh From Farm to Table',
       badgeText: 'Farm Fresh',
       mainText: 'Experience the difference of locally sourced, organic ingredients delivered daily',
@@ -1130,19 +1277,35 @@ async function seedBanners(products: Array<{ id: string; productName: string | n
       ctaButtonUrl: '/about/farm-fresh',
       imageUrl: 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1200',
       mobileImageUrl: 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=800',
-      displayOrder: 4,
+      displayOrder: 6,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productName: null,
-      productPrice: null,
-      productBrand: null,
-      productExplanation: null,
+      productId: products[4].id, // CAT004
     },
-    // Footer Banner - No product link
+    // 7. CATEGORY Banner - SIDE_DISH (extra one to make 6 CATEGORY banners)
+    {
+      type: BannerType.CATEGORY,
+      productCategoryNumber: 'CAT001',
+      categoryType: CategoryType.SIDE_DISH,
+      status: BannerStatus.ACTIVE,
+      title: 'Premium Oils & Condiments',
+      badgeText: 'Organic',
+      mainText: 'Discover our premium selection of organic oils and condiments',
+      ctaButtonText: 'Shop Now',
+      ctaButtonUrl: '/categories/oils',
+      imageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=1200',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=800',
+      displayOrder: 7,
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      productId: products[0].id, // CAT001
+    },
+    // 8. FOOTER Banner 1
     {
       type: BannerType.FOOTER,
+      productCategoryNumber: 'CAT002',
+      categoryType: null,
       status: BannerStatus.ACTIVE,
-      productId: null,
       title: 'Join Our Newsletter',
       badgeText: null,
       mainText: 'Get exclusive deals and recipes delivered to your inbox',
@@ -1150,69 +1313,206 @@ async function seedBanners(products: Array<{ id: string; productName: string | n
       ctaButtonUrl: '/newsletter/subscribe',
       imageUrl: 'https://images.unsplash.com/photo-1505935428862-770b6f24f629?w=1200',
       mobileImageUrl: 'https://images.unsplash.com/photo-1505935428862-770b6f24f629?w=800',
-      displayOrder: 5,
+      displayOrder: 8,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productName: null,
-      productPrice: null,
-      productBrand: null,
-      productExplanation: null,
+      productId: products[1].id, // CAT002
     },
-    // Scheduled Banner - Future activation
+    // 9. FOOTER Banner 2
     {
-      type: BannerType.MAIN_PRODUCTS,
-      status: BannerStatus.SCHEDULED,
-      productId: products[1]?.id, // Artisan Whole Grain Bread
+      type: BannerType.FOOTER,
+      productCategoryNumber: 'CAT003',
+      categoryType: null,
+      status: BannerStatus.ACTIVE,
+      title: 'Follow Us on Social Media',
+      badgeText: 'Connect',
+      mainText: 'Stay updated with our latest products and special offers',
+      ctaButtonText: 'Follow',
+      ctaButtonUrl: '/social',
+      imageUrl: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=1200',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800',
+      displayOrder: 9,
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      productId: products[2].id, // CAT003
+    },
+    // 10. FOOTER Banner 3
+    {
+      type: BannerType.FOOTER,
+      productCategoryNumber: 'CAT004',
+      categoryType: null,
+      status: BannerStatus.ACTIVE,
+      title: 'Customer Support',
+      badgeText: '24/7',
+      mainText: 'We are here to help you with any questions or concerns',
+      ctaButtonText: 'Contact Us',
+      ctaButtonUrl: '/support',
+      imageUrl: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1200',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800',
+      displayOrder: 10,
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      productId: products[4].id, // CAT004
+    },
+    // 11. CONTENT_HERO Banner
+    {
+      type: BannerType.CONTENT_HERO,
+      productCategoryNumber: 'CAT002',
+      categoryType: null,
+      status: BannerStatus.ACTIVE,
       title: 'Valentine\'s Day Special',
       badgeText: 'Coming Soon',
       mainText: 'Celebrate with our artisan bakery collection',
       ctaButtonText: 'Notify Me',
-      ctaButtonUrl: `/products/${products[1]?.id}`,
+      ctaButtonUrl: `/products/${products[1].id}`,
       imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1200',
       mobileImageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800',
-      displayOrder: 6,
-      startDate: new Date('2025-02-01'),
-      endDate: new Date('2025-02-14'),
-      productName: products[1]?.productName,
-      productPrice: products[1]?.salePrice,
-      productBrand: 'Artisan Bakery',
-      productExplanation: 'Handcrafted breads baked fresh daily',
+      displayOrder: 11,
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      productId: products[1].id, // CAT002
     },
-    // Inactive Banner
+    // 12. SPECIAL_PRICE Banner
     {
       type: BannerType.SPECIAL_PRICE,
-      status: BannerStatus.INACTIVE,
-      productId: null,
-      title: 'Holiday Sale 2024',
-      badgeText: 'Ended',
-      mainText: 'Thanks for participating in our holiday sale!',
-      ctaButtonText: null,
-      ctaButtonUrl: null,
-      imageUrl: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?w=1200',
-      mobileImageUrl: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?w=800',
-      displayOrder: 7,
-      startDate: new Date('2024-12-01'),
-      endDate: new Date('2024-12-31'),
-      productName: null,
-      productPrice: null,
-      productBrand: null,
-      productExplanation: null,
+      productCategoryNumber: 'CAT003',
+      categoryType: CategoryType.FISHERIES,
+      status: BannerStatus.ACTIVE,
+      title: 'This Week\'s Special Offer',
+      badgeText: '30% OFF',
+      mainText: 'Wild Caught Salmon - Limited Time Only!',
+      ctaButtonText: 'Get Discount',
+      ctaButtonUrl: `/products/${products[2].id}`,
+      imageUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=1200',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800',
+      displayOrder: 12,
+      startDate: new Date('2025-01-01'),
+      endDate: new Date('2025-12-31'),
+      productId: products[2].id, // CAT003
     },
   ];
 
   for (const data of bannersData) {
     const banner = await prisma.banner.create({
       data: {
-        ...data
+        type: data.type,
+        productCategoryNumber: data.productCategoryNumber,
+        status: data.status,
+        title: data.title,
+        badgeText: data.badgeText,
+        mainText: data.mainText,
+        ctaButtonText: data.ctaButtonText,
+        ctaButtonUrl: data.ctaButtonUrl,
+        imageUrl: data.imageUrl,
+        mobileImageUrl: data.mobileImageUrl,
+        displayOrder: data.displayOrder,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        productId: data.productId,
       },
     });
-    banners.push(banner);
-    console.log(`   ✓ ${data.title} (${data.type}, ${data.status})`);
+    
+    // Create ProductCategoryBannerRelation for ALL banners (all have productId and productCategoryNumber)
+    if (data.productId && data.productCategoryNumber) {
+      try {
+        await prisma.productCategoryBannerRelation.create({
+          data: {
+            productId: data.productId,
+            bannerId: banner.id,
+            productCategoryNumber: data.productCategoryNumber,
+          },
+        });
+        relationsCount++;
+        console.log(`   ✓ Created relation: Product ${data.productId} - Banner ${banner.id} - Category ${data.productCategoryNumber}`);
+      } catch (error: any) {
+        // Skip if relation already exists or category doesn't exist
+        if (error?.code !== 'P2002' && error?.code !== 'P2003') {
+          console.warn(`   ⚠ Could not create relation for banner ${banner.id}: ${error.message}`);
+        }
+      }
+    }
+    
+    banners.push({ 
+      id: banner.id, 
+      title: data.title, 
+      type: data.type, 
+      status: data.status,
+      linkedProductId: data.productId || undefined 
+    });
+    console.log(`   ✓ ${data.title} (${data.type}, ${data.status}, categoryType: ${data.categoryType || 'N/A'})`);
   }
 
-  console.log(`✅ Created ${banners.length} banners\n`);
+  console.log(`✅ Created ${banners.length} banners (all ACTIVE)`);
+  console.log(`✅ Created ${relationsCount} ProductCategoryBannerRelations\n`);
   return banners;
 }
+
+// async function seedBannerProducts(
+//   banners: Array<{ id: string; type: BannerType; status: BannerStatus; linkedProductId?: string }>,
+//   products: Array<{ id: string; productName: string | null }>,
+// ) {
+//   console.log('🔗 Creating banner-product relationships...');
+
+//   const bannerProducts: Array<{ id: string; bannerId: string; productId: string }> = [];
+  
+//   // Create relationships for banners that have linked products
+//   for (const banner of banners) {
+//     if (banner.linkedProductId) {
+//       const bannerProduct = await prisma.bannerProduct.create({
+//         data: {
+//           bannerId: banner.id,
+//           productId: banner.linkedProductId,
+//           type: banner.type,
+//           status: banner.status,
+//         },
+//       });
+//       bannerProducts.push({
+//         id: bannerProduct.id,
+//         bannerId: bannerProduct.bannerId,
+//         productId: bannerProduct.productId,
+//       });
+//       const product = products.find(p => p.id === banner.linkedProductId);
+//       console.log(`   ✓ Linked banner "${banner.id}" to product "${product?.productName || banner.linkedProductId}" (${banner.type}, ${banner.status})`);
+//     }
+//   }
+
+//   // Create some additional many-to-many relationships
+//   // Example: Link multiple products to a banner, or multiple banners to a product
+//   if (banners.length > 0 && products.length > 0) {
+//     // Link first banner to multiple products (if we have enough products)
+//     if (products.length >= 3) {
+//       const firstBanner = banners[0];
+//       const additionalProducts = products.slice(1, 3); // Link to products 2 and 3
+      
+//       for (const product of additionalProducts) {
+//         try {
+//           const bannerProduct = await prisma.bannerProduct.create({
+//             data: {
+//               bannerId: firstBanner.id,
+//               productId: product.id,
+//               type: firstBanner.type,
+//               status: firstBanner.status,
+//             },
+//           });
+//           bannerProducts.push({
+//             id: bannerProduct.id,
+//             bannerId: bannerProduct.bannerId,
+//             productId: bannerProduct.productId,
+//           });
+//           console.log(`   ✓ Linked banner "${firstBanner.id}" to additional product "${product.productName}" (${firstBanner.type}, ${firstBanner.status})`);
+//         } catch (error: any) {
+//           // Skip if relationship already exists (unique constraint)
+//           if (error?.code !== 'P2002') {
+//             throw error;
+//           }
+//         }
+//       }
+//     }
+//   }
+
+//   console.log(`✅ Created ${bannerProducts.length} banner-product relationships\n`);
+//   return bannerProducts;
+// }
 
 // ========================================
 // Main Seed Function
@@ -1232,14 +1532,16 @@ async function main() {
     await assignRolesToUsers(users, roles);
     await assignMembershipsToUsers(users, memberships);
     
+    const categories = await seedCategories();
     const products = await seedProducts();
+    const productCategories = seedProductCategories(products);
     const orders = await seedOrders(users, products);
     const points = await seedPoints(users, orders);
     const recipeCategories = await seedRecipeCategories();
     const recipes = await seedRecipes(users, recipeCategories);
     const coupons = await seedCoupons();
     const couponHistories = await seedCouponHistories(users, coupons, orders);
-    const banners = await seedBanners(products);
+    const banners = await seedBanners(products, categories);
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     console.log('🎉 Database seeding completed successfully!\n');
@@ -1249,14 +1551,16 @@ async function main() {
     console.log(`   • ${users.length} users`);
     console.log(`   • ${users.length} user-role assignments`);
     console.log(`   • ${users.length} user-membership assignments`);
+    console.log(`   • ${categories.length} categories`);
     console.log(`   • ${products.length} products`);
+    console.log(`   • ${productCategories.length} product-category relationships`);
     console.log(`   • ${orders.length} orders`);
     console.log(`   • ${points.length} point transactions`);
     console.log(`   • ${recipeCategories.length} recipe categories`);
     console.log(`   • ${recipes.length} recipes`);
     console.log(`   • ${coupons.length} coupons`);
     console.log(`   • ${couponHistories.length} coupon histories`);
-    console.log(`   • ${banners.length} banners\n`);
+    console.log(`   • ${banners.length} banners`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
     console.log('💡 Default login credentials:');

@@ -13,6 +13,9 @@ import {
   UsePipes,
   ValidationPipe,
   ParseEnumPipe,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,6 +25,7 @@ import {
   ApiQuery,
   ApiBody,
   ApiBearerAuth,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { BannerService } from './banner.service';
 import { CreateBannerDto } from './dto/create-banner.dto';
@@ -30,11 +34,21 @@ import { QueryBannerDto } from './dto/query-banner.dto';
 import { BannerBulkUpdateStatusDto } from './dto/bulk-update-status.dto';
 import { ReorderBannersDto } from './dto/reorder-banners.dto';
 import { PaginatedResponseDto } from './dto/paginated-response.dto';
-import { EBannerType } from './enums/banner.enum';
+import { PaginatedBannerResponseDto } from './dto/paginated-banner-response.dto';
+import { BulkUpdateStatusResponseDto } from './dto/bulk-update-status-response.dto';
+import { ReorderBannersResponseDto } from './dto/reorder-banners-response.dto';
+import { ActivateScheduledResponseDto } from './dto/activate-scheduled-response.dto';
+import { DeactivateExpiredResponseDto } from './dto/deactivate-expired-response.dto';
+import { SyncProductDataResponseDto } from './dto/sync-product-data-response.dto';
+import { TasksStatusResponseDto } from './dto/tasks-status-response.dto';
+import { DeleteBannerResponseDto } from './dto/delete-banner-response.dto';
+import { EBannerType, ECategoryType } from './enums/banner.enum';
 import { BannerTasksService } from './tasks/banner-tasks.service';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { BannerEntity } from './entities/banner.entity';
+import { ResponseModel } from 'src/libs/models/response';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Banners')
 @Controller('banners')
@@ -60,39 +74,6 @@ export class BannerController {
   @ApiBody({
     type: CreateBannerDto,
     description: 'Banner creation data',
-    examples: {
-      productBanner: {
-        summary: 'Product Banner Example',
-        value: {
-          type: 'MAIN_PRODUCTS',
-          status: 'ACTIVE',
-          productId: '123e4567-e89b-12d3-a456-426614174000',
-          title: 'Summer Sale Banner',
-          badgeText: 'New Member Special',
-          mainText: 'Get 20% off on your first purchase',
-          ctaButtonText: 'Shop Now',
-          ctaButtonUrl: '/products/summer-collection',
-          imageUrl: 'https://example.com/banner.jpg',
-          mobileImageUrl: 'https://example.com/banner-mobile.jpg',
-          displayOrder: 1,
-          startDate: '2024-06-01T00:00:00Z',
-          endDate: '2024-08-31T23:59:59Z',
-        },
-      },
-      simpleBanner: {
-        summary: 'Simple Banner (No Product)',
-        value: {
-          type: 'FOOTER',
-          status: 'ACTIVE',
-          title: 'Subscribe to Newsletter',
-          mainText: 'Get 10% off your next order',
-          ctaButtonText: 'Subscribe',
-          ctaButtonUrl: '/newsletter',
-          imageUrl: 'https://example.com/newsletter-banner.jpg',
-          displayOrder: 0,
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 201,
@@ -116,8 +97,11 @@ export class BannerController {
   // @Roles('admin')
   async create(
     @Body() createBannerDto: CreateBannerDto,
-  ): Promise<BannerEntity> {
-    return await this.bannerService.create(createBannerDto);
+  ) {
+    const responseModel = new ResponseModel();
+    const result = await this.bannerService.create(createBannerDto);
+    responseModel.setData(result);
+    return responseModel;
   }
 
   /**
@@ -207,36 +191,15 @@ export class BannerController {
   @ApiResponse({
     status: 200,
     description: 'Paginated list of banners retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        data: {
-          type: 'array',
-          items: { $ref: '#/components/schemas/BannerEntity' },
-        },
-        total: {
-          type: 'number',
-          example: 100,
-        },
-        page: {
-          type: 'number',
-          example: 1,
-        },
-        limit: {
-          type: 'number',
-          example: 10,
-        },
-        totalPages: {
-          type: 'number',
-          example: 10,
-        },
-      },
-    },
+    type: PaginatedBannerResponseDto,
   })
   async findAll(
     @Query() queryDto: QueryBannerDto,
-  ): Promise<PaginatedResponseDto<BannerEntity>> {
-    return await this.bannerService.findAll(queryDto);
+  ) {
+    const responseModel = new ResponseModel();
+    const result = await this.bannerService.findAll(queryDto);
+    responseModel.setData(result);
+    return responseModel;
   }
 
   /**
@@ -268,8 +231,11 @@ export class BannerController {
   async findActiveByType(
     @Param('type', new ParseEnumPipe(EBannerType))
     type: EBannerType,
-  ): Promise<BannerEntity[]> {
-    return await this.bannerService.findActiveByType(type);
+  ) {
+    const responseModel = new ResponseModel();
+    const result = await this.bannerService.findActiveByType(type);
+    responseModel.setData(result);
+    return responseModel;
   }
 
   /**
@@ -303,8 +269,11 @@ export class BannerController {
   })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<BannerEntity> {
-    return await this.bannerService.findOne(id);
+  ) {
+    const responseModel = new ResponseModel();
+    const result = await this.bannerService.findOne(id);
+    responseModel.setData(result);
+    return responseModel;
   }
 
   /**
@@ -325,25 +294,7 @@ export class BannerController {
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @ApiBody({
-    type: UpdateBannerDto,
-    description: 'Banner update data (all fields optional)',
-    examples: {
-      updateStatus: {
-        summary: 'Update Status',
-        value: {
-          status: 'INACTIVE',
-        },
-      },
-      updateContent: {
-        summary: 'Update Content',
-        value: {
-          title: 'New Banner Title',
-          mainText: 'Updated promotional text',
-          ctaButtonText: 'Learn More',
-          displayOrder: 5,
-        },
-      },
-    },
+    type: CreateBannerDto,
   })
   @ApiResponse({
     status: 200,
@@ -368,8 +319,11 @@ export class BannerController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateBannerDto: UpdateBannerDto,
-  ): Promise<BannerEntity> {
-    return await this.bannerService.update(id, updateBannerDto);
+  ) {
+    const responseModel = new ResponseModel();
+    const result = await this.bannerService.update(id, updateBannerDto);
+    responseModel.setData(result);
+    return responseModel;
   }
 
   /**
@@ -407,8 +361,11 @@ export class BannerController {
   // @Roles('admin')
   async syncProductData(
     @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<BannerEntity> {
-    return await this.bannerService.syncProductData(id);
+    ) {
+    const responseModel = new ResponseModel();
+    const result = await this.bannerService.syncProductData(id);
+    responseModel.setData(result);
+    return responseModel;
   }
 
   /**
@@ -452,19 +409,7 @@ export class BannerController {
   @ApiResponse({
     status: 200,
     description: 'Banners updated successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        updated: {
-          type: 'number',
-          example: 3,
-        },
-        message: {
-          type: 'string',
-          example: 'Successfully updated 3 banners',
-        },
-      },
-    },
+    type: BulkUpdateStatusResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -479,12 +424,15 @@ export class BannerController {
   // @Roles('admin')
   async bulkUpdateStatus(
     @Body() dto: BannerBulkUpdateStatusDto,
-  ): Promise<{ updated: number; message: string }> {
+  ) {
+    const responseModel = new ResponseModel();
     const result = await this.bannerService.bulkUpdateStatus(dto);
-    return {
+    const responseData = {
       updated: result.updated,
       message: `Successfully updated ${result.updated} banner${result.updated !== 1 ? 's' : ''}`,
     };
+    responseModel.setData(responseData);
+    return responseModel;
   }
 
   /**
@@ -526,15 +474,7 @@ export class BannerController {
   @ApiResponse({
     status: 200,
     description: 'Banners reordered successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        message: {
-          type: 'string',
-          example: 'Banners reordered successfully',
-        },
-      },
-    },
+    type: ReorderBannersResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -549,11 +489,14 @@ export class BannerController {
   // @Roles('admin')
   async reorderBanners(
     @Body() dto: ReorderBannersDto,
-  ): Promise<{ message: string }> {
+  ) {
+    const responseModel = new ResponseModel();
     await this.bannerService.reorderBanners(dto);
-    return {
+    const responseData = {
       message: 'Banners reordered successfully',
     };
+    responseModel.setData(responseData);
+    return responseModel;
   }
 
   /**
@@ -570,42 +513,21 @@ export class BannerController {
   @ApiResponse({
     status: 200,
     description: 'Task executed successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        activated: {
-          type: 'number',
-          example: 3,
-        },
-        bannerIds: {
-          type: 'array',
-          items: { type: 'string' },
-          example: [
-            '123e4567-e89b-12d3-a456-426614174000',
-            '123e4567-e89b-12d3-a456-426614174001',
-          ],
-        },
-        message: {
-          type: 'string',
-          example: 'Activated 3 scheduled banner(s)',
-        },
-      },
-    },
+    type: ActivateScheduledResponseDto,
   })
   // TODO: Add authentication guard
   // @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles('admin')
-  async triggerActivateScheduled(): Promise<{
-    activated: number;
-    bannerIds: string[];
-    message: string;
-  }> {
+  async triggerActivateScheduled() {
+    const responseModel = new ResponseModel();
     const result =
       await this.bannerTasksService.manualActivateScheduledBanners();
-    return {
+    const responseData = {
       ...result,
       message: `Activated ${result.activated} scheduled banner${result.activated !== 1 ? 's' : ''}`,
     };
+    responseModel.setData(responseData);
+    return responseModel;
   }
 
   /**
@@ -622,39 +544,21 @@ export class BannerController {
   @ApiResponse({
     status: 200,
     description: 'Task executed successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        deactivated: {
-          type: 'number',
-          example: 2,
-        },
-        bannerIds: {
-          type: 'array',
-          items: { type: 'string' },
-          example: ['123e4567-e89b-12d3-a456-426614174000'],
-        },
-        message: {
-          type: 'string',
-          example: 'Deactivated 2 expired banner(s)',
-        },
-      },
-    },
+    type: DeactivateExpiredResponseDto,
   })
   // TODO: Add authentication guard
   // @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles('admin')
-  async triggerDeactivateExpired(): Promise<{
-    deactivated: number;
-    bannerIds: string[];
-    message: string;
-  }> {
+  async triggerDeactivateExpired() {
+    const responseModel = new ResponseModel();
     const result =
       await this.bannerTasksService.manualDeactivateExpiredBanners();
-    return {
+    const responseData = {
       ...result,
       message: `Deactivated ${result.deactivated} expired banner${result.deactivated !== 1 ? 's' : ''}`,
     };
+    responseModel.setData(responseData);
+    return responseModel;
   }
 
   /**
@@ -671,46 +575,20 @@ export class BannerController {
   @ApiResponse({
     status: 200,
     description: 'Task executed successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        synced: {
-          type: 'number',
-          example: 15,
-        },
-        failed: {
-          type: 'number',
-          example: 0,
-        },
-        bannerIds: {
-          type: 'array',
-          items: { type: 'string' },
-          example: [
-            '123e4567-e89b-12d3-a456-426614174000',
-            '123e4567-e89b-12d3-a456-426614174001',
-          ],
-        },
-        message: {
-          type: 'string',
-          example: 'Synced 15 banner(s), 0 failed',
-        },
-      },
-    },
+    type: SyncProductDataResponseDto,
   })
   // TODO: Add authentication guard
   // @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles('admin')
-  async triggerSyncProductData(): Promise<{
-    synced: number;
-    failed: number;
-    bannerIds: string[];
-    message: string;
-  }> {
+  async triggerSyncProductData() {
+    const responseModel = new ResponseModel();
     const result = await this.bannerTasksService.manualSyncAllProductBanners();
-    return {
+    const responseData = {
       ...result,
       message: `Synced ${result.synced} banner${result.synced !== 1 ? 's' : ''}, ${result.failed} failed`,
     };
+    responseModel.setData(responseData);
+    return responseModel;
   }
 
   /**
@@ -727,39 +605,16 @@ export class BannerController {
   @ApiResponse({
     status: 200,
     description: 'Task status retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        tasksEnabled: {
-          type: 'boolean',
-          example: true,
-        },
-        tasks: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              description: { type: 'string' },
-              schedule: { type: 'string' },
-            },
-          },
-        },
-      },
-    },
+    type: TasksStatusResponseDto,
   })
   // TODO: Add authentication guard
   // @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles('admin')
-  async getTasksStatus(): Promise<{
-    tasksEnabled: boolean;
-    tasks: {
-      name: string;
-      description: string;
-      schedule: string;
-    }[];
-  }> {
-    return await this.bannerTasksService.getTasksStatus();
+  async getTasksStatus() {
+    const responseModel = new ResponseModel();
+    const result = await this.bannerTasksService.getTasksStatus();
+    responseModel.setData(result);
+    return responseModel;
   }
 
   /**
@@ -783,15 +638,7 @@ export class BannerController {
   @ApiResponse({
     status: 200,
     description: 'Banner deleted successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        message: {
-          type: 'string',
-          example: 'Banner deleted successfully',
-        },
-      },
-    },
+    type: DeleteBannerResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -806,10 +653,88 @@ export class BannerController {
   // @Roles('admin')
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<{ message: string }> {
+  ) {
+    const responseModel = new ResponseModel();
     await this.bannerService.remove(id);
-    return {
+    const responseData = {
       message: 'Banner deleted successfully',
     };
+    responseModel.setData(responseData);
+    return responseModel;
+  }
+
+  @Get('category/:category')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiOperation({
+    summary: 'Get banners by category',
+    description: 'Retrieve banners by category',
+  })
+  @ApiParam({
+    name: 'category',
+    type: String,
+    description: 'Category',
+    example: ECategoryType.LIVESTOCK,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Banners retrieved successfully',
+    type: [BannerEntity],
+  })
+  async getBannersByCategory(@Param('category', new ParseEnumPipe(ECategoryType)) category: ECategoryType) {
+    const responseModel = new ResponseModel();
+    const result = await this.bannerService.getBannersByCategory(category);
+    responseModel.setData(result);
+    return responseModel;
+  }
+
+  // Update banner imageUrl by banner type, using file interceptor
+  // use multipart/form-data
+  @Patch('update-image-url/:id')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiOperation({
+    summary: 'Update banner imageUrl by banner type',
+    description: 'Update banner imageUrl by banner type',
+  })
+  @ApiConsumes('multipart/form-data') 
+  @ApiBody({
+    type: 'multipart/form-data',
+    description: 'Banner image file',
+    examples: {
+      updateImageUrlExample: {
+        summary: 'Update banner imageUrl',
+        value: {
+          file: 'file',
+        },
+      },
+    },
+  })
+
+  @UseInterceptors(FileInterceptor('file'))
+  async updateBannerImageUrl(
+    @Param('id', ParseUUIDPipe) id: string, 
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    console.log('=== Update Banner Image URL ===');
+    console.log('Banner ID:', id);
+    console.log('File received:', file ? { 
+      fieldname: file.fieldname, 
+      originalname: file.originalname, 
+      mimetype: file.mimetype, 
+      size: file.size 
+    } : 'No file');
+    
+    const responseModel = new ResponseModel();
+    
+    if (!file) {
+      console.log('Error: No file provided');
+      throw new BadRequestException('File is required');
+    }
+    
+    console.log('Processing file upload...');
+    const result = await this.bannerService.updateBannerImageUrl(id, file);
+    console.log('Upload successful, banner updated:', result.id);
+    
+    responseModel.setData(result);
+    return responseModel;
   }
 }

@@ -10,7 +10,8 @@ import { AppLogger } from 'libs/logger';
 import { Request } from 'express';
 import { TokenPayload } from 'libs/constants/interface';
 import { PERMISSIONS_KEY } from 'libs/decorator/permissions.decorator';
-import { ALL_PERMISSIONS, EPermissions } from 'src/modules/permissions/enum/permissions.enum';
+import { EPermissions } from 'src/modules/permissions/enum/permissions.enum';
+import { PermissionsService } from 'src/modules/permissions/permissions.service';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -19,9 +20,10 @@ export class PermissionsGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly logger: AppLogger,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -42,18 +44,45 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    try {   
-        if (!ALL_PERMISSIONS.some((permission) => requiredPermissions.includes(permission))) {
-            this.logger.warn(`[${this.context}] User does not have required permissions`, {
-                userId: user.sub,
-                requiredPermissions,
-            });
-            throw new ForbiddenException('User does not have required permissions');    
-        }
+    try {
+      // Validate that all required permissions are valid EPermissions values
+      const invalidPermissions = requiredPermissions.filter(
+        perm => !Object.values(EPermissions).includes(perm as EPermissions)
+      );
+
+      if (invalidPermissions.length > 0) {
+        this.logger.warn(`[${this.context}] Invalid permissions specified`, {
+          invalidPermissions,
+        });
+        throw new ForbiddenException(`Invalid permissions: ${invalidPermissions.join(', ')}`);
+      }
+
+      // Check if user has any of the required permissions (OR logic)
+      const hasPermission = await this.permissionsService.userHasAnyPermission(
+        user.sub,
+        requiredPermissions as EPermissions[]
+      );
+
+      if (!hasPermission) {
+        this.logger.warn(`[${this.context}] User does not have required permissions`, {
+          userId: user.sub,
+          requiredPermissions,
+        });
+        throw new ForbiddenException('User does not have required permissions');
+      }
+
+      this.logger.debug(`[${this.context}] User has required permissions`, {
+        userId: user.sub,
+        requiredPermissions,
+      });
+
+      return true;
     } catch (error) {
-        this.logger.error(`[${this.context}] Error checking permissions`, { error: error.message });
-        throw new InternalServerErrorException('Error checking permissions');
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      this.logger.error(`[${this.context}] Error checking permissions`, { error: error.message });
+      throw new InternalServerErrorException('Error checking permissions');
     }
-    return true;
   }
 }

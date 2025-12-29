@@ -10,6 +10,15 @@ CREATE TYPE "CouponTargetGrade" AS ENUM ('VIP', 'VVIP');
 -- CreateEnum
 CREATE TYPE "CouponHistoryStatus" AS ENUM ('ISSUED', 'USED', 'EXPIRED', 'CANCELLED');
 
+-- CreateEnum
+CREATE TYPE "BannerType" AS ENUM ('ALL', 'MAIN_PRODUCTS', 'CATEGORY', 'FOOTER', 'CONTENT_HERO', 'SPECIAL_PRICE');
+
+-- CreateEnum
+CREATE TYPE "BannerStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'SCHEDULED');
+
+-- CreateEnum
+CREATE TYPE "CategoryType" AS ENUM ('ALL', 'LIVESTOCK', 'CONVENIENCE_FOOD', 'FISHERIES', 'SIDE_DISH');
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
@@ -115,7 +124,7 @@ CREATE TABLE "orders" (
     "item_wise_order_number" TEXT NOT NULL DEFAULT '',
     "total_order_amount" INTEGER NOT NULL,
     "total_payment_amount" INTEGER NOT NULL,
-    "product_number" INTEGER NOT NULL,
+    "product_id" TEXT NOT NULL,
     "product_name" TEXT NOT NULL DEFAULT '',
     "product_name_with_options" TEXT NOT NULL DEFAULT '',
     "quantity" INTEGER NOT NULL,
@@ -138,8 +147,27 @@ CREATE TABLE "orders" (
     "updated_at" TIMESTAMP(3) NOT NULL,
     "situation" "OrderSituation",
     "courier_company" TEXT,
+    "invoice_number" TEXT,
 
     CONSTRAINT "orders_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "points" (
+    "id" TEXT NOT NULL,
+    "date" VARCHAR(50),
+    "user_id" VARCHAR(50),
+    "membership_level" VARCHAR(50),
+    "content" VARCHAR(50),
+    "order_number" VARCHAR(50),
+    "points_type" VARCHAR(50),
+    "available_points_increase" INTEGER,
+    "available_points_deduction" INTEGER,
+    "available_points_balance" INTEGER,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "points_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -147,7 +175,7 @@ CREATE TABLE "products" (
     "id" TEXT NOT NULL,
     "product_code" TEXT,
     "own_product_code" TEXT,
-    "display_status" TEXT,
+    "display_status" TEXT DEFAULT 'ACTIVE',
     "sale_status" TEXT,
     "product_category_number" TEXT,
     "product_category_new_product_area" TEXT,
@@ -239,26 +267,61 @@ CREATE TABLE "products" (
     "additional_item_06_parcel_delivery" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
+    "cta_button_url" VARCHAR(500),
 
     CONSTRAINT "products_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "points" (
+CREATE TABLE "product_discounts" (
     "id" TEXT NOT NULL,
-    "date" VARCHAR(50),
-    "user_id" VARCHAR(50),
-    "membership_level" VARCHAR(50),
-    "content" VARCHAR(50),
-    "order_number" VARCHAR(50),
-    "points_type" VARCHAR(50),
-    "available_points_increase" INTEGER,
-    "available_points_deduction" INTEGER,
-    "available_points_balance" INTEGER,
+    "status" BOOLEAN NOT NULL DEFAULT false,
+    "product_id" TEXT NOT NULL,
+    "discount_rate" INTEGER NOT NULL,
+    "discount_start_date" TIMESTAMP(3),
+    "discount_end_date" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "points_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "product_discounts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "product_special_offers" (
+    "id" TEXT NOT NULL,
+    "status" BOOLEAN NOT NULL DEFAULT false,
+    "product_id" TEXT NOT NULL,
+    "discount_amount" INTEGER NOT NULL,
+    "special_price_applied" INTEGER,
+    "start_date" TIMESTAMP(3),
+    "end_date" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3),
+    "updated_at" TIMESTAMP(3),
+
+    CONSTRAINT "product_special_offers_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "product_category_banner_relations" (
+    "id" TEXT NOT NULL,
+    "product_id" TEXT,
+    "banner_id" TEXT,
+    "product_category_number" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "product_category_banner_relations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "categories" (
+    "product_category_number" VARCHAR(50) NOT NULL,
+    "name" "CategoryType" NOT NULL,
+    "description" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "categories_pkey" PRIMARY KEY ("product_category_number")
 );
 
 -- CreateTable
@@ -268,6 +331,7 @@ CREATE TABLE "recipes" (
     "authorId" TEXT,
     "authorName" VARCHAR(100) NOT NULL,
     "category" VARCHAR(50) NOT NULL,
+    "recipe_category_id" TEXT,
     "date_of_writing" TIMESTAMP(3) NOT NULL,
     "views" INTEGER NOT NULL DEFAULT 0,
     "status" TEXT NOT NULL DEFAULT 'active',
@@ -284,8 +348,8 @@ CREATE TABLE "recipes" (
 -- CreateTable
 CREATE TABLE "recipe_categories" (
     "id" TEXT NOT NULL,
-    "recipe_id" TEXT NOT NULL,
     "name" VARCHAR(50) NOT NULL,
+    "description" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -334,6 +398,30 @@ CREATE TABLE "coupon_histories" (
     CONSTRAINT "coupon_histories_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "banners" (
+    "id" TEXT NOT NULL,
+    "product_category_number" TEXT,
+    "product_id" TEXT,
+    "category_type" "CategoryType",
+    "type" "BannerType" NOT NULL,
+    "status" "BannerStatus" NOT NULL DEFAULT 'ACTIVE',
+    "title" VARCHAR(255),
+    "badge_text" VARCHAR(100),
+    "main_text" TEXT,
+    "cta_button_text" VARCHAR(100),
+    "cta_button_url" VARCHAR(500),
+    "image_url" TEXT NOT NULL,
+    "mobile_image_url" TEXT,
+    "display_order" INTEGER NOT NULL DEFAULT 0,
+    "start_date" TIMESTAMP(3),
+    "end_date" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "banners_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_id_key" ON "users"("id");
 
@@ -341,13 +429,16 @@ CREATE UNIQUE INDEX "users_id_key" ON "users"("id");
 CREATE UNIQUE INDEX "user_memberships_id_key" ON "user_memberships"("id");
 
 -- CreateIndex
-CREATE INDEX "user_memberships_userId_membershipId_idx" ON "user_memberships"("userId", "membershipId");
+CREATE UNIQUE INDEX "user_memberships_userId_key" ON "user_memberships"("userId");
 
 -- CreateIndex
 CREATE INDEX "user_memberships_membershipId_idx" ON "user_memberships"("membershipId");
 
 -- CreateIndex
 CREATE INDEX "user_memberships_userId_idx" ON "user_memberships"("userId");
+
+-- CreateIndex
+CREATE INDEX "user_memberships_userId_membershipId_idx" ON "user_memberships"("userId", "membershipId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "memberships_name_key" ON "memberships"("name");
@@ -383,6 +474,30 @@ CREATE INDEX "refresh_token_used_sessionId_idx" ON "refresh_token_used"("session
 CREATE UNIQUE INDEX "points_user_id_key" ON "points"("user_id");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "product_discounts_product_id_key" ON "product_discounts"("product_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "product_special_offers_product_id_key" ON "product_special_offers"("product_id");
+
+-- CreateIndex
+CREATE INDEX "product_category_banner_relations_product_id_idx" ON "product_category_banner_relations"("product_id");
+
+-- CreateIndex
+CREATE INDEX "product_category_banner_relations_product_category_number_idx" ON "product_category_banner_relations"("product_category_number");
+
+-- CreateIndex
+CREATE INDEX "product_category_banner_relations_banner_id_idx" ON "product_category_banner_relations"("banner_id");
+
+-- CreateIndex
+CREATE INDEX "product_category_banner_relations_product_id_product_catego_idx" ON "product_category_banner_relations"("product_id", "product_category_number", "banner_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "categories_product_category_number_key" ON "categories"("product_category_number");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "categories_name_key" ON "categories"("name");
+
+-- CreateIndex
 CREATE INDEX "recipes_status_idx" ON "recipes"("status");
 
 -- CreateIndex
@@ -392,10 +507,7 @@ CREATE INDEX "recipes_authorId_idx" ON "recipes"("authorId");
 CREATE INDEX "recipes_date_of_writing_idx" ON "recipes"("date_of_writing");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "recipe_categories_recipe_id_key" ON "recipe_categories"("recipe_id");
-
--- CreateIndex
-CREATE INDEX "recipe_categories_recipe_id_idx" ON "recipe_categories"("recipe_id");
+CREATE INDEX "recipe_categories_name_idx" ON "recipe_categories"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "coupons_code_key" ON "coupons"("code");
@@ -424,6 +536,18 @@ CREATE INDEX "coupon_histories_status_idx" ON "coupon_histories"("status");
 -- CreateIndex
 CREATE INDEX "coupon_histories_issued_at_idx" ON "coupon_histories"("issued_at");
 
+-- CreateIndex
+CREATE INDEX "banners_type_idx" ON "banners"("type");
+
+-- CreateIndex
+CREATE INDEX "banners_status_idx" ON "banners"("status");
+
+-- CreateIndex
+CREATE INDEX "banners_display_order_idx" ON "banners"("display_order");
+
+-- CreateIndex
+CREATE INDEX "banners_start_date_end_date_idx" ON "banners"("start_date", "end_date");
+
 -- AddForeignKey
 ALTER TABLE "user_memberships" ADD CONSTRAINT "user_memberships_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -446,13 +570,31 @@ ALTER TABLE "refresh_token_used" ADD CONSTRAINT "refresh_token_used_sessionId_fk
 ALTER TABLE "orders" ADD CONSTRAINT "orders_orderer_id_fkey" FOREIGN KEY ("orderer_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "orders" ADD CONSTRAINT "orders_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "points" ADD CONSTRAINT "points_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_discounts" ADD CONSTRAINT "product_discounts_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_special_offers" ADD CONSTRAINT "product_special_offers_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_category_banner_relations" ADD CONSTRAINT "product_category_banner_relations_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_category_banner_relations" ADD CONSTRAINT "product_category_banner_relations_product_category_number_fkey" FOREIGN KEY ("product_category_number") REFERENCES "categories"("product_category_number") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "product_category_banner_relations" ADD CONSTRAINT "product_category_banner_relations_banner_id_fkey" FOREIGN KEY ("banner_id") REFERENCES "banners"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "recipes" ADD CONSTRAINT "recipes_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "recipe_categories" ADD CONSTRAINT "recipe_categories_recipe_id_fkey" FOREIGN KEY ("recipe_id") REFERENCES "recipes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "recipes" ADD CONSTRAINT "recipes_recipe_category_id_fkey" FOREIGN KEY ("recipe_category_id") REFERENCES "recipe_categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "coupon_histories" ADD CONSTRAINT "coupon_histories_coupon_id_fkey" FOREIGN KEY ("coupon_id") REFERENCES "coupons"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -101,7 +101,8 @@ export class AuthService {
                     email: user.email, 
                     name: user.name, 
                     id: user.id, 
-                    account: account
+                    account: account,
+                    roles: roles
                 }, 
                 accessToken, 
                 refreshToken 

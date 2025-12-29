@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 import { Transform } from "class-transformer";
 import { trim, toLower } from "../../../utils/helper";
 import { ERoleName } from "../../roles/enums/role.enum";
@@ -7,7 +7,9 @@ import { ERoleName } from "../../roles/enums/role.enum";
 // Role filter options including 'ALL' for filtering by any role
 const RoleFilterOptions = [...Object.values(ERoleName), 'ALL'] as const;
 type RoleFilterType = ERoleName | 'ALL';
-
+type AdminListFilterType = Exclude<ERoleName, ERoleName.USER> | 'ALL';
+// Admin list filter options (excludes USER role)
+const AdminListFilterOptions = [...Object.values(ERoleName).filter(role => role !== ERoleName.USER), 'ALL'] as const;
 export class CreateUserDto {
     @ApiProperty({
         description: 'User full name',
@@ -40,7 +42,6 @@ export class CreateUserDto {
     })
     @IsOptional() @IsString() @trim()
     phoneNumber?: string;
-
 }
 export class CreateUser extends CreateUserDto {
 }
@@ -108,8 +109,10 @@ export class UpdateUserDto {
     @IsString()
     reasonForWithdrawal?: string | null;
 
-    @ApiPropertyOptional({ description: 'Total purchase amount', example: 100000 })
+    @ApiPropertyOptional({ description: 'Total purchase amount (in Korean Won)', example: 100000 })
     @IsOptional()
+    @IsNumber()
+    @Min(0)
     totalPurchaseAmount?: number;
 
     @ApiPropertyOptional({ description: 'New password (will be hashed)', example: 'newPassword123' })
@@ -249,4 +252,61 @@ export class GetUsersQueryDto {
     @IsString()
     @trim()
     searchField?: string;
+}
+
+export class GetAdminListQueryDto {
+    @ApiPropertyOptional({
+        description: 'Page number for pagination (starts at 1)',
+        example: '1',
+        type: String
+    })
+    @IsOptional()
+    @IsString()
+    page?: string;
+
+    @ApiPropertyOptional({
+        description: 'Number of items per page',
+        example: '10',
+        type: String
+    })
+    @IsOptional()
+    @IsString()
+    limit?: string;
+
+    @ApiPropertyOptional({
+        description: 'Sort order',
+        example: 'asc',
+        enum: ['asc', 'desc']
+    })
+    @IsOptional()
+    @IsString()
+    sort?: 'asc' | 'desc';
+
+    @ApiPropertyOptional({
+        description: 'Field to sort by',
+        example: 'createdAt',
+        type: String
+    })
+    @IsOptional()
+    @IsString()
+    sortBy?: string;
+
+    @ApiPropertyOptional({
+        description: 'Filter by role (excludes USER)',
+        example: 'ADMIN',
+        enum: AdminListFilterOptions
+    })
+    @IsOptional()
+    @IsEnum(AdminListFilterOptions, { message: 'Role must be one of: ADMIN, GENERAL_MANAGER, MANAGER, MD, CS_MANAGER, ALL' })
+    role?: AdminListFilterType;
+
+    @ApiPropertyOptional({
+        description: 'Search query string',
+        example: 'john',
+        type: String
+    })
+    @IsOptional()
+    @IsString()
+    @trim()
+    q?: string;
 }

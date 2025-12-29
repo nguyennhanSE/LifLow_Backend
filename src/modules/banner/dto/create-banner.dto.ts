@@ -12,7 +12,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EBannerType, EBannerStatus } from '../enums/banner.enum';
+import { EBannerType, EBannerStatus, ECategoryType } from '../enums/banner.enum';
 
 export class CreateBannerDto {
   @ApiProperty({
@@ -32,6 +32,16 @@ export class CreateBannerDto {
   @IsOptional()
   @IsEnum(EBannerStatus)
   status?: EBannerStatus;
+
+  @ApiPropertyOptional({
+    description: 'Product category number',
+    example: 'CAT001',
+    maxLength: 50,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  productCategoryNumber?: string;
 
   @ApiPropertyOptional({
     description: 'Product ID (UUID) for product banners',
@@ -85,7 +95,7 @@ export class CreateBannerDto {
     maxLength: 500,
   })
   @IsOptional()
-  @IsUrl({}, { message: 'ctaButtonUrl must be a valid URL' })
+  @IsString({ message: 'ctaButtonUrl must be a valid URL' })
   @MaxLength(500)
   ctaButtonUrl?: string;
 
@@ -131,41 +141,4 @@ export class CreateBannerDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
-
-  @ApiPropertyOptional({
-    description: 'Product name (denormalized field, auto-populated from product)',
-    example: 'Premium Coffee Beans',
-    maxLength: 255,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  productName?: string;
-
-  @ApiPropertyOptional({
-    description: 'Product price (denormalized field, auto-populated from product)',
-    example: 29000,
-  })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  productPrice?: number;
-
-  @ApiPropertyOptional({
-    description: 'Product brand (denormalized field, auto-populated from product)',
-    example: 'Liflow',
-    maxLength: 255,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  productBrand?: string;
-
-  @ApiPropertyOptional({
-    description: 'Product explanation (denormalized field, auto-populated from product)',
-    example: 'High-quality organic coffee beans sourced from Colombia',
-  })
-  @IsOptional()
-  @IsString()
-  productExplanation?: string;
 }

@@ -11,6 +11,7 @@ import {
 } from './dto/membership.dto';
 import { MembershipEntity, UserMembershipEntity } from './entities/membership.entity';
 import { IPaginate } from '../../libs/models/paginate/pagimate.model';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class MembershipsService {
@@ -66,7 +67,9 @@ export class MembershipsService {
   async update(id: string, updateMembershipDto: UpdateMembershipDto): Promise<MembershipEntity> {
     // Check if membership exists
     const existingMembership = await this.findOne(id);
-
+    if (!existingMembership) {
+      throw new NotFoundException(`Membership with id "${id}" not found`);
+    }
     // If updating name, check it doesn't conflict with existing
     if (updateMembershipDto.name) {
       const existing = await this.membershipRepository.getMembershipByName(
@@ -129,7 +132,6 @@ export class MembershipsService {
     // Check if user already has this membership
     const existing = await this.membershipRepository.getUserMembership(
       assignDto.userId,
-      assignDto.membershipId
     );
     if (existing) {
       throw new BadRequestException(
@@ -193,17 +195,15 @@ export class MembershipsService {
 
   async updateUserMembership(
     userId: string,
-    membershipId: string,
     updateDto: UpdateUserMembershipDto
   ): Promise<UserMembershipEntity> {
     // Check if user membership exists
     const existing = await this.membershipRepository.getUserMembership(
-      userId,
-      membershipId
+      userId
     );
     if (!existing) {
       throw new NotFoundException(
-        `User membership not found for user "${userId}" and membership "${membershipId}"`
+        `User membership not found for user "${userId}"`
       );
     }
 
@@ -216,22 +216,30 @@ export class MembershipsService {
       }
     }
 
-    const updateData: any = {};
+    const updateData: Prisma.UserMembershipUpdateInput= {};
+
+    if (updateDto.membershipLevel) {
+      const membership = await this.membershipRepository.getMembershipByName(updateDto.membershipLevel);
+      if (!membership) {
+        throw new NotFoundException(`Membership with name "${updateDto.membershipLevel}" not found`);
+      }
+      updateData.membership = {
+        connect: {
+          id: membership.id,
+        },
+      };
+    }
     if (updateDto.startDate) {
       updateData.startDate = new Date(updateDto.startDate);
     }
     if (updateDto.endDate) {
       updateData.endDate = new Date(updateDto.endDate);
     }
-    if (updateDto.status) {
-      updateData.status = updateDto.status;
-    }
+    updateData.updatedAt = new Date();
+    updateData.status = updateDto.status ?? 'normal';
+    updateData.updatedByAdmin = true;
 
-    return this.membershipRepository.updateUserMembership(
-      userId,
-      membershipId,
-      updateData
-    );
+    return await this.membershipRepository.updateUserMembership(userId, updateData);
   }
 
   async removeUserMembership(
@@ -241,7 +249,6 @@ export class MembershipsService {
     // Check if user membership exists
     const existing = await this.membershipRepository.getUserMembership(
       userId,
-      membershipId
     );
     if (!existing) {
       throw new NotFoundException(

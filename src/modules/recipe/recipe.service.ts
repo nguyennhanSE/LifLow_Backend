@@ -15,10 +15,16 @@ import {
 } from './repositories/recipe.repository';
 import { RecipeEntityWithAuthor } from './entities/recipe.entity';
 import { toRecipeEntityWithAuthor } from './mapper/recipe.mapper';
+import { AwsService } from 'src/libs/integration/aws/aws.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class RecipeService {
-  constructor(private readonly recipeRepository: RecipeRepository) {}
+  constructor(
+    private readonly recipeRepository: RecipeRepository,
+    private readonly awsService: AwsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * Create a new recipe
@@ -30,6 +36,7 @@ export class RecipeService {
     userId: string,
     userName: string,
     createRecipeDto: CreateRecipeDto,
+    thumbnail?: Express.Multer.File,
   ): Promise<RecipeEntityWithAuthor> {
     try {
       // Validate user exists
@@ -38,26 +45,64 @@ export class RecipeService {
         throw new BadRequestException('Author user not found');
       }
 
-      // Create recipe with auto-populated fields
-      const recipe = await this.recipeRepository.create(
-        {
-          title: createRecipeDto.title,
-          category: createRecipeDto.category,
-          thumbnailUrl: createRecipeDto.thumbnailUrl || null,
-          content: createRecipeDto.content,
-          ingredients: createRecipeDto.ingredients,
-          authorName: userName,
-          dateOfWriting: new Date(),
-          views: 0,
-          status: 'active',
-          author: {
-            connect: { id: userId },
-          },
-        },
-        true,
-      );
+      // Validate required fields
+      if (!createRecipeDto.title) {
+        throw new BadRequestException('Title is required');
+      }
+      if (!createRecipeDto.category) {
+        throw new BadRequestException('Category is required');
+      }
 
-      return toRecipeEntityWithAuthor(recipe);
+      // Extract validated fields
+      const title = createRecipeDto.title;
+      const category = createRecipeDto.category;
+
+      // Use transaction to create recipe and upload thumbnail atomically
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Create recipe with auto-populated fields
+        const recipe = await tx.recipe.create({
+          data: {
+            title,
+            category,
+            thumbnailUrl: null,
+            content: createRecipeDto.content || '',
+            ingredients: createRecipeDto.ingredients || [],
+            authorName: userName,
+            dateOfWriting: new Date(),
+            views: 0,
+            status: 'active',
+            author: {
+              connect: { id: userId },
+            },
+          },
+          include: {
+            author: true,
+          },
+        });
+
+        // Upload thumbnail if provided
+        if (thumbnail) {
+          try {
+            const thumbnailUrl = await this.awsService.uploadFile('recipes', recipe.id, thumbnail);
+            const updatedRecipe = await tx.recipe.update({
+              where: { id: recipe.id },
+              data: { thumbnailUrl },
+              include: {
+                author: true,
+              },
+            });
+            return updatedRecipe;
+          } catch (error) {
+            throw new BadRequestException(
+              `Failed to upload thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+          }
+        }
+
+        return recipe;
+      });
+
+      return toRecipeEntityWithAuthor(result);
     } catch (error: any) {
       this.handleError(error, 'Failed to create recipe');
     }
@@ -117,6 +162,7 @@ export class RecipeService {
     id: string,
     userId: string,
     updateRecipeDto: UpdateRecipeDto,
+    thumbnail?: Express.Multer.File,
   ): Promise<RecipeEntityWithAuthor> {
     try {
       // Validate UUID format
@@ -137,22 +183,55 @@ export class RecipeService {
         );
       }
 
-      // Update recipe (only provided fields)
-      const updatedRecipe = await this.recipeRepository.update(
-        id,
-        {
-          ...(updateRecipeDto.title && { title: updateRecipeDto.title }),
-          ...(updateRecipeDto.category && { category: updateRecipeDto.category }),
-          ...(updateRecipeDto.thumbnailUrl !== undefined && {
-            thumbnailUrl: updateRecipeDto.thumbnailUrl || null,
-          }),
-          ...(updateRecipeDto.content && { content: updateRecipeDto.content }),
-          ...(updateRecipeDto.ingredients && { ingredients: updateRecipeDto.ingredients }),
-        },
-        true,
-      );
+      // Use transaction to update recipe and upload thumbnail atomically
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Prepare update data
+        const updateData: any = {};
+        if (updateRecipeDto.title !== undefined) {
+          updateData.title = updateRecipeDto.title;
+        }
+        if (updateRecipeDto.category !== undefined) {
+          updateData.category = updateRecipeDto.category;
+        }
+        if (updateRecipeDto.content !== undefined) {
+          updateData.content = updateRecipeDto.content;
+        }
+        if (updateRecipeDto.ingredients !== undefined) {
+          updateData.ingredients = updateRecipeDto.ingredients;
+        }
 
-      return toRecipeEntityWithAuthor(updatedRecipe);
+        // Update recipe (only provided fields)
+        const updatedRecipe = await tx.recipe.update({
+          where: { id },
+          data: updateData,
+          include: {
+            author: true,
+          },
+        });
+
+        // Upload thumbnail if provided
+        if (thumbnail) {
+          try {
+            const thumbnailUrl = await this.awsService.uploadFile('recipes', id, thumbnail);
+            const finalRecipe = await tx.recipe.update({
+              where: { id },
+              data: { thumbnailUrl },
+              include: {
+                author: true,
+              },
+            });
+            return finalRecipe;
+          } catch (error) {
+            throw new BadRequestException(
+              `Failed to upload thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+          }
+        }
+
+        return updatedRecipe;
+      });
+
+      return toRecipeEntityWithAuthor(result);
     } catch (error: any) {
       this.handleError(error, `Failed to update recipe ${id}`);
     }
@@ -378,5 +457,23 @@ export class RecipeService {
 
     // Throw generic error
     throw new InternalServerErrorException(defaultMessage);
+  }
+
+  async deactivate(id: string): Promise<{ message: string }> {
+    try {
+      await this.recipeRepository.deactivate(id);
+      return { message: `Recipe ${id} deactivated successfully` };
+    } catch (error: any) {
+      this.handleError(error, 'Failed to deactivate recipe');
+    }
+  }
+
+  async activate(id: string): Promise<{ message: string }> {
+    try {
+      await this.recipeRepository.activate(id);
+      return { message: `Recipe ${id} activated successfully` };
+    } catch (error: any) {
+      this.handleError(error, 'Failed to activate recipe');
+    }
   }
 }

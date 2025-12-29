@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { AuthGuard } from './auth.guard';
 import { RolesGuard } from './role.guard';
+import { PermissionsGuard } from './permission.guard';
 import { LoggerModule } from 'libs/logger/logger.module';
+import { PermissionsModule } from 'src/modules/permissions/permissions.module';
 import { config } from 'libs/config';
 
 @Module({
@@ -15,8 +17,9 @@ import { config } from 'libs/config';
       global: true,
     }),
     LoggerModule,
+    PermissionsModule,
   ],
-  providers: [AuthGuard, RolesGuard],
-  exports: [AuthGuard, RolesGuard],
+  providers: [AuthGuard, RolesGuard, PermissionsGuard],
+  exports: [AuthGuard, RolesGuard, PermissionsGuard],
 })
 export class GuardModule {}

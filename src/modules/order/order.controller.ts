@@ -59,7 +59,7 @@ export class OrdersController {
     return responseModel;
   }
 
-  @Get()
+  @Get('/list')
   @Roles(ERoleName.ADMIN)
   @ApiOperation({ summary: 'Get paginated list of orders with filters' })
   @ApiResponse({ status: 200, description: 'Orders retrieved successfully' })

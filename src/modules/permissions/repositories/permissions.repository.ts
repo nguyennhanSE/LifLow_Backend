@@ -42,9 +42,18 @@ export class PermissionsRepository {
   }
 
   async updateUserPermissions(userId: string, permissions: UserPermissionsDto) {
+    console.log('permissions', permissions);
     return this.prisma.user.update({
       where: { id: userId },
-      data: permissions,
+      data: 
+      {
+        dashboardAccess: permissions.DASHBOARD_ACCESS ?? false,
+        memberAccess: permissions.MEMBER_MANAGEMENT ?? false,
+        productAccess: permissions.PRODUCT_MANAGEMENT ?? false,
+        orderAccess: permissions.ORDER_MANAGEMENT ?? false,
+        recipeAccess: permissions.RECIPE_MANAGEMENT ?? false,
+        bannerAccess: permissions.BANNER_MANAGEMENT ?? false,
+      },
       select: {
         id: true,
         name: true,

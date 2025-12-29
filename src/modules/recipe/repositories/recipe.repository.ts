@@ -351,5 +351,19 @@ export class RecipeRepository {
     }
     throw error;
   }
+  async deactivate(id: string): Promise<void> {
+    try {
+      await this.prisma.recipe.update({ where: { id }, data: { status: 'inactive', updatedAt: new Date(), isActive: false } });
+    } catch (error: any) {
+      this.handlePrismaError(error, id);
+    }
+  }
+  async activate(id: string): Promise<void> {
+    try {
+      await this.prisma.recipe.update({ where: { id }, data: { status: 'active', updatedAt: new Date(), isActive: true } });
+    } catch (error: any) {
+      this.handlePrismaError(error, id);
+    }
+  }
 }
 

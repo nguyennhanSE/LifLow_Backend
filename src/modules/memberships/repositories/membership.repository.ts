@@ -187,12 +187,10 @@ export class MembershipRepository {
 
   async getUserMembership(
     userId: string,
-    membershipId: string
   ): Promise<UserMembershipEntity | null> {
     const userMembership = await this.prisma.userMembership.findFirst({
       where: {
         userId,
-        membershipId,
       },
       include: {
         membership: true,
@@ -378,14 +376,12 @@ export class MembershipRepository {
 
   async updateUserMembership(
     userId: string,
-    membershipId: string,
     data: Prisma.UserMembershipUpdateInput
   ): Promise<UserMembershipEntity> {
     // First find the user membership to get its ID
     const existing = await this.prisma.userMembership.findFirst({
       where: {
         userId,
-        membershipId,
       },
     });
 

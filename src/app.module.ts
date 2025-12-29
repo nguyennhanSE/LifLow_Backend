@@ -23,6 +23,8 @@ import { CouponsModule } from './modules/coupons/coupons.module';
 import { CouponHistoryModule } from './modules/coupon-history/coupon-history.module';
 import { BannerModule } from './modules/banner/banner.module';
 import { AwsModule } from './libs/integration/aws/aws.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { ProductDiscountModule } from './modules/product-discount/product-discount.module';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { AwsModule } from './libs/integration/aws/aws.module';
     CouponHistoryModule,
     BannerModule,
     AwsModule,
+    CategoriesModule,
+    ProductDiscountModule,
   ],
   controllers: [AppController],
   providers: [

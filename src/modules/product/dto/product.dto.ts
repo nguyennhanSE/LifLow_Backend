@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, Min, IsNotEmpty, MaxLength, ValidateIf, IsArray, IsUUID, ArrayMinSize, IsEnum, ValidateNested } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, IsNotEmpty, MaxLength, ValidateIf, IsArray, IsUUID, ArrayMinSize, IsEnum, ValidateNested, IsBoolean, IsNumber, IsDate, IsObject,  } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Enums for status fields
@@ -15,110 +15,42 @@ export enum SaleStatus {
 
 // Create Product DTO
 export class CreateProductDto {
-  @ApiProperty({ description: 'Product name (required)', example: 'Organic Apple', maxLength: 128 })
-  @IsNotEmpty({ message: 'Product name is required' })
-  @IsString()
-  @MaxLength(128, { message: 'Product name must not exceed 128 characters' })
-  productName!: string;
-
-  @ApiPropertyOptional({ description: 'Product code', example: 'PROD001' })
+  @ApiPropertyOptional({ description: 'Product name (required)', example: 'Organic Apple' })
   @IsOptional()
   @IsString()
-  productCode?: string;
-
-  @ApiPropertyOptional({ description: 'Brand name', example: 'Juwangsan' })
-  @IsOptional()
-  @IsString()
-  brand?: string;
-
-  @ApiPropertyOptional({ description: 'Consumer price (원)', example: 15000, minimum: 0 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0, { message: 'Consumer price must be a positive number' })
-  consumerPrice?: number;
-
-  @ApiPropertyOptional({ description: 'Supply price (원)', example: 12000, minimum: 0 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0, { message: 'Supply price must be a positive number' })
-  supplyPrice?: number;
-
-  @ApiPropertyOptional({ description: 'Product price (원)', example: 13000, minimum: 0 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0, { message: 'Product price must be a positive number' })
-  productPrice?: number;
-
-  @ApiPropertyOptional({ description: 'Sale price (원)', example: 10000, minimum: 0 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0, { message: 'Sale price must be a positive number' })
-  salePrice?: number;
-
-  @ApiPropertyOptional({ description: 'Minimum order quantity', example: 1, minimum: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1, { message: 'Minimum order quantity must be at least 1' })
-  minOrderQuantity?: number;
-
-  @ApiPropertyOptional({ description: 'Maximum order quantity', example: 100, minimum: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1, { message: 'Maximum order quantity must be at least 1' })
-  maxOrderQuantity?: number;
-
-  @ApiPropertyOptional({ description: 'Category number', example: 'CAT001' })
-  @IsOptional()
-  @IsString()
-  productCategoryNumber?: string;
-
-  @ApiPropertyOptional({ description: 'Sale status', example: '판매중' })
-  @IsOptional()
-  @IsString()
-  saleStatus?: string;
-
-  @ApiPropertyOptional({ description: 'Display status', example: '진열함' })
-  @IsOptional()
-  @IsString()
-  displayStatus?: string;
-
-  @ApiPropertyOptional({ description: 'Manufacturer', example: 'ABC Company' })
-  @IsOptional()
-  @IsString()
-  manufacturer?: string;
-
-  @ApiPropertyOptional({ description: 'Supplier', example: 'XYZ Supplier' })
-  @IsOptional()
-  @IsString()
-  supplier?: string;
-
-  // Additional optional fields can be added here as needed
-  [key: string]: any;
-}
-
-// Update Product DTO - all fields optional
-export class UpdateProductDto {
-  @ApiPropertyOptional({ description: 'Product name', example: 'Organic Apple', maxLength: 128 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(128, { message: 'Product name must not exceed 128 characters' })
   productName?: string;
 
   @ApiPropertyOptional({ description: 'Product code', example: 'PROD001' })
   @IsOptional()
   @IsString()
-  productCode?: string;
+  @IsNotEmpty({ message: 'Product code is required' })
+  productCode!: string;
+  
+  // categories[]
+  @ApiPropertyOptional({ description: 'Categories', example: ['CAT001', 'CAT002'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  categories?: string[];
 
   @ApiPropertyOptional({ description: 'Brand name', example: 'Juwangsan' })
   @IsOptional()
   @IsString()
   brand?: string;
+
+  // manufacturer
+  @ApiPropertyOptional({ description: 'Manufacturer', example: 'ABC Company' })
+  @IsOptional()
+  @IsString()
+  manufacturer?: string;
+
+  //origin
+  @ApiPropertyOptional({ description: 'Origin', example: 10000 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0, { message: 'Origin must be a positive number' })
+  origin?: number;
 
   @ApiPropertyOptional({ description: 'Consumer price (원)', example: 15000, minimum: 0 })
   @IsOptional()
@@ -134,6 +66,7 @@ export class UpdateProductDto {
   @Min(0, { message: 'Supply price must be a positive number' })
   supplyPrice?: number;
 
+  //product price
   @ApiPropertyOptional({ description: 'Product price (원)', example: 13000, minimum: 0 })
   @IsOptional()
   @Type(() => Number)
@@ -141,6 +74,7 @@ export class UpdateProductDto {
   @Min(0, { message: 'Product price must be a positive number' })
   productPrice?: number;
 
+  //sale price
   @ApiPropertyOptional({ description: 'Sale price (원)', example: 10000, minimum: 0 })
   @IsOptional()
   @Type(() => Number)
@@ -148,48 +82,69 @@ export class UpdateProductDto {
   @Min(0, { message: 'Sale price must be a positive number' })
   salePrice?: number;
 
-  @ApiPropertyOptional({ description: 'Minimum order quantity', example: 1, minimum: 1 })
+  //discount rate
+  @ApiPropertyOptional({ description: 'Discount rate', example: 10, minimum: 0 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1, { message: 'Minimum order quantity must be at least 1' })
-  minOrderQuantity?: number;
+  @Min(0, { message: 'Discount rate must be a positive number' })
+  discountRate?: number;
 
-  @ApiPropertyOptional({ description: 'Maximum order quantity', example: 100, minimum: 1 })
+  //discount start date
+  @ApiPropertyOptional({ description: 'Discount start date', example: '2025-01-01' })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1, { message: 'Maximum order quantity must be at least 1' })
-  maxOrderQuantity?: number;
+  @Type(() => Date)
+  @IsDate()
+  discountStartDate?: Date;
 
-  @ApiPropertyOptional({ description: 'Category number', example: 'CAT001' })
+  //discount end date
+  @ApiPropertyOptional({ description: 'Discount end date', example: '2025-01-01' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  discountEndDate?: Date;
+
+  //delivery method
+  @ApiPropertyOptional({ description: 'Delivery method', example: '택배' })
   @IsOptional()
   @IsString()
-  productCategoryNumber?: string;
+  deliveryMethod?: string;
 
+  //delivery fee
+  @ApiPropertyOptional({ description: 'Delivery fee input', example: '10000' })
+  @IsOptional()
+  @IsString()
+  deliveryFeeInput?: string;
+
+  //brief explanation
+  @ApiPropertyOptional({ description: 'Brief explanation', example: 'This is a brief explanation of the product' })
+  @IsOptional()
+  @IsString()
+  productBriefDescription?: string;
+
+  // seo description
+  @ApiPropertyOptional({ description: 'Seo description', example: 'This is a seo description of the product' })
+  @IsOptional()
+  @IsString()
+  seoDescription?: string;
+
+  //seo keywords
+  @ApiPropertyOptional({ description: 'Seo keywords', example: 'This is a list of seo keywords for the product' })
+  @IsOptional()
+  @IsString()
+  seoKeywords?: string;
+
+  // sale status
   @ApiPropertyOptional({ description: 'Sale status', example: '판매중' })
   @IsOptional()
   @IsString()
   saleStatus?: string;
-
-  @ApiPropertyOptional({ description: 'Display status', example: '진열함' })
-  @IsOptional()
-  @IsString()
-  displayStatus?: string;
-
-  @ApiPropertyOptional({ description: 'Manufacturer', example: 'ABC Company' })
-  @IsOptional()
-  @IsString()
-  manufacturer?: string;
-
-  @ApiPropertyOptional({ description: 'Supplier', example: 'XYZ Supplier' })
-  @IsOptional()
-  @IsString()
-  supplier?: string;
-
-  // Additional optional fields
+  // Additional optional fields can be added here as needed
   [key: string]: any;
 }
+
+// Update Product DTO - all fields optional
+export class UpdateProductDto extends CreateProductDto {}
 
 // Query DTO for listing products
 export class ProductListQueryDto {
@@ -347,3 +302,32 @@ export interface ProductStats {
   averageSalePrice: number;
 }
 
+export class CreateProductSpecialOfferDto {
+  @ApiPropertyOptional({ description: 'Special offer status', example: true })
+  @IsOptional()
+  @IsBoolean()
+  status?: boolean;
+
+  @ApiPropertyOptional({ description: 'Special offer discount amount', example: 10000 })
+  @IsOptional()
+  @IsInt()
+  @Min(0, { message: 'Special offer discount amount must be a positive number' })
+  discountAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Special offer price applied', example: 10000 })
+  @IsOptional()
+  @IsInt()
+  specialPriceApplied?: number;
+
+  @ApiPropertyOptional({ description: 'Special offer start date', example: '2025-01-01' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  startDate?: Date;
+
+  @ApiPropertyOptional({ description: 'Special offer end date', example: '2025-01-01' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  endDate?: Date;
+}

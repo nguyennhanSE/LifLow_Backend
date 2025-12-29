@@ -26,7 +26,7 @@ export class OrderRepository {
     try {
       return (await this.prisma.order.create({
         data,
-        include: includeUser ? { user: true } : undefined,
+        include: includeUser ? { user: true, product: true } : undefined,
       })) as OrderWithUser;
     } catch (error: any) {
       this.handlePrismaError(error);
@@ -46,14 +46,14 @@ export class OrderRepository {
       orderBy,
       skip,
       take,
-      include: includeUser ? { user: true } : undefined,
+      include: includeUser ? { user: true, product: true } : undefined,
     })) as OrderWithUser[];
   }
 
   async findById(id: string, includeUser = true): Promise<OrderWithUser | null> {
     return (await this.prisma.order.findUnique({
       where: { id },
-      include: includeUser ? { user: true } : undefined,
+      include: includeUser ? { user: true, product: true } : undefined,
     })) as OrderWithUser | null;
   }
 
@@ -66,7 +66,7 @@ export class OrderRepository {
       return (await this.prisma.order.update({
         where: { id },
         data,
-        // include: includeUser ? { user: true } : undefined,
+        include: includeUser ? { user: true, product: true } : undefined,
       })) as OrderEntity;
     } catch (error: any) {
       this.handlePrismaError(error, id);
@@ -157,6 +157,10 @@ export class OrderRepository {
       throw new OrderValidationException(`Order with this ${field} already exists`);
     }
     throw error;
+  }
+  async getOrderNumber(userId: string): Promise<number> {
+    const order = await this.prisma.order.findMany({ where: { user: { id: userId } } });
+    return order.length ?? 0;
   }
 }
 

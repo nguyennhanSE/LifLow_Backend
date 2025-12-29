@@ -1,13 +1,24 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ProductRepository, ProductFilters, ProductPagination } from './repositories/product.repository';
 import { ProductEntity } from './entities/product.entity';
-import { ProductListQueryDto, ProductListResponse, PaginationMeta, CreateProductDto, UpdateProductDto, BulkDeleteProductDto, UpdateProductStatusDto, ProductBulkUpdateStatusDto, ProductStats } from './dto/product.dto';
+import { ProductListQueryDto, ProductListResponse, PaginationMeta, CreateProductDto, UpdateProductDto, BulkDeleteProductDto, UpdateProductStatusDto, ProductBulkUpdateStatusDto, ProductStats, CreateProductSpecialOfferDto } from './dto/product.dto';
 import { validatePriceHierarchy, validateOrderQuantity } from '../../utils/customValidators';
 import { DuplicateError } from '../../utils/customErrors';
+import { ProductDiscountService } from '../product-discount/product-discount.service';
+import { CreateProductDiscountDto } from '../product-discount/dto/create-product-discount.dto';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { toProductEntity } from './mapper/product.mapper';
+import { AwsService } from 'src/libs/integration/aws/aws.service';
 
 @Injectable()
 export class ProductService {
-  constructor(private readonly productRepository: ProductRepository) {}
+  constructor(
+    private readonly productRepository: ProductRepository,
+    private readonly productDiscountService: ProductDiscountService,
+    private readonly prisma: PrismaService,
+    private readonly awsService: AwsService,
+  ) {}
 
   /**
    * Get products with filtering, pagination, and sorting
@@ -78,10 +89,10 @@ export class ProductService {
   /**
    * Create a new product
    */
-  async createProduct(data: CreateProductDto): Promise<ProductEntity> {
+  async createProduct(data: CreateProductDto, imageRegistrationThumbnail?: Express.Multer.File, imageRegistrationDetail?: Express.Multer.File): Promise<ProductEntity> {
     // Validate business rules
     validatePriceHierarchy(data);
-    validateOrderQuantity(data);
+    // validateOrderQuantity(data);
 
     // Check for duplicate productCode
     if (data.productCode) {
@@ -91,8 +102,102 @@ export class ProductService {
       }
     }
 
-    // Create product
-    return await this.productRepository.create(data);
+    // Extract discount data from product data
+    const {
+      hsCode,
+      categories,
+      discountRate,
+      discountStartDate,
+      discountEndDate,
+      ...productData
+    } = data;
+    const hasDiscountData = discountRate !== undefined && discountRate !== null;
+
+    // Use transaction to create product and discount atomically
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Prepare product data
+        const createProductData: Prisma.ProductCreateInput = productData as Prisma.ProductCreateInput;
+        if (hsCode !== undefined) {
+          createProductData.hsCode = hsCode !== null ? BigInt(String(hsCode)) : null;
+        }
+
+        // Create product
+        const product = await tx.product.create({
+          data: createProductData,
+        });
+
+        // Note: Product categories are now managed through ProductCategoryBannerRelation
+        // If you need to create product-category relations without banners,
+        // you may need to create a separate join table or use ProductCategoryBannerRelation with a null bannerId
+        // For now, categories are handled through ProductCategoryBannerRelation
+
+        // Create discount if discount data is provided
+        if (hasDiscountData && discountRate !== undefined && discountRate !== null) {
+          await tx.productDiscount.create({
+            data: {
+              productId: product.id,
+              discountRate: discountRate,
+              status: true, // Default to active
+              discountStartDate: discountStartDate ?? null,
+              discountEndDate: discountEndDate ?? null,
+            },
+          });
+        }
+
+        if (categories && categories.length > 0) {
+          await tx.productCategoryBannerRelation.createMany({
+            data: categories.map(categoryNumber => ({
+              productId: product.id,
+              productCategoryNumber: categoryNumber,
+            })),
+          });
+        }
+        // Upload image registration thumbnail
+        if (imageRegistrationThumbnail) {
+          const imageRegistrationThumbnailUrl = await this.awsService.uploadFile('products', product.id, imageRegistrationThumbnail);
+          try {
+            await tx.product.update({
+              where: { id: product.id },
+              data: { imageRegistrationThumbnail: imageRegistrationThumbnailUrl },
+            });
+          } catch (error) {
+            throw new BadRequestException(`Failed to upload image registration thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+        // Upload image registration detail
+        if (imageRegistrationDetail) {
+          const imageRegistrationDetailUrl = await this.awsService.uploadFile('products', product.id, imageRegistrationDetail);
+          try {
+            await tx.product.update({
+              where: { id: product.id },
+              data: { imageRegistrationDetail: imageRegistrationDetailUrl },
+            });
+          } catch (error) {
+            throw new BadRequestException(`Failed to upload image registration detail: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+        return product;
+      });
+
+      // Return product entity
+      return toProductEntity(result);
+    } catch (error: any) {
+      // Handle Prisma unique constraint violation
+      if (error.code === 'P2002') {
+        const field = error.meta?.target?.[0] || 'field';
+        if (field === 'productId') {
+          throw new DuplicateError(`Product discount for this product already exists`);
+        }
+        throw new DuplicateError(`Product with this ${field} already exists`);
+      }
+      // Handle foreign key constraint violation
+      if (error.code === 'P2003') {
+        throw new NotFoundException(`Related record not found`);
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   /**
@@ -351,5 +456,73 @@ export class ProductService {
 
       stream.end();
     });
+  }
+
+  async updateProductSpecialOffer(id: string, data: CreateProductSpecialOfferDto): Promise<ProductEntity> {
+    // Verify product and product special offer exists
+    const product = await this.productRepository.findById(id);
+    if (!product) {
+      throw new NotFoundException(`Product with id ${id} not found`);
+    }
+    const productSpecialOffer = await this.productRepository.getProductSpecialOfferByProductId(id);
+    if (!productSpecialOffer) {
+      return await this.productRepository.createProductSpecialOffer(id, data);
+    }
+    // Update product special offer
+    return await this.productRepository.updateProductSpecialOffer(id, data);
+  }
+
+  /**
+   * Get products with active special offers
+   */
+  async getSpecialOffers(query: ProductListQueryDto): Promise<ProductListResponse> {
+    // Process query parameters
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const sortBy = query.sortBy || 'createdAt';
+    const sortOrder = query.sortOrder || 'desc';
+
+    // Build pagination
+    const pagination: ProductPagination = {
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    };
+
+    // Get products and count
+    const [products, total] = await Promise.all([
+      this.productRepository.findManyWithSpecialOffer(pagination),
+      this.productRepository.countWithSpecialOffer(),
+    ]);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    const paginationMeta: PaginationMeta = {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNext,
+      hasPrev,
+    };
+
+    return {
+      products,
+      pagination: paginationMeta,
+    };
+  }
+
+  async getBrands(): Promise<string[]> {
+    const brands = await this.prisma.product.findMany({
+      select: {
+        brand: true,
+      },
+      distinct: ['brand'],
+    });
+    return brands.map(brand => brand.brand ?? '').filter(brand => brand !== null);
   }
 }

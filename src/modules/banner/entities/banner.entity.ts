@@ -1,6 +1,7 @@
 import { Expose, Type } from 'class-transformer';
-import { EBannerType, EBannerStatus } from '../enums/banner.enum';
+import { EBannerType, EBannerStatus, ECategoryType } from '../enums/banner.enum';
 import { ProductEntity } from '../../product/entities/product.entity';
+import { ProductCategoryBannerRelation } from '@prisma/client';
 
 export class BannerEntity {
   @Expose()
@@ -14,6 +15,12 @@ export class BannerEntity {
 
   @Expose()
   productId?: string | null;
+
+  @Expose()
+  productCategoryNumber?: string | null;
+
+  @Expose()
+  categoryType?: ECategoryType | null;
 
   @Expose()
   title?: string | null;
@@ -46,18 +53,6 @@ export class BannerEntity {
   endDate?: Date | null;
 
   @Expose()
-  productName?: string | null;
-
-  @Expose()
-  productPrice?: number | null;
-
-  @Expose()
-  productBrand?: string | null;
-
-  @Expose()
-  productExplanation?: string | null;
-
-  @Expose()
   createdAt!: Date;
 
   @Expose()
@@ -67,4 +62,7 @@ export class BannerEntity {
   @Expose()
   @Type(() => ProductEntity)
   product?: ProductEntity | null;
+
+  @Expose()
+  productCategoryBannerRelations?: ProductCategoryBannerRelation[] | null;
 }

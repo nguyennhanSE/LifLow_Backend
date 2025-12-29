@@ -1,55 +1,49 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
-  IsNotEmpty,
   MaxLength,
   IsOptional,
   IsArray,
 } from 'class-validator';
 
 export class CreateRecipeDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Recipe title',
     example: 'Delicious Homemade Pasta Recipe',
     maxLength: 255,
   })
-  @IsNotEmpty({ message: 'Title is required' })
+  @IsOptional()
   @IsString({ message: 'Title must be a string' })
   @MaxLength(255, { message: 'Title must not exceed 255 characters' })
-  title!: string;
+  title?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Recipe category',
     example: 'Italian',
     maxLength: 50,
   })
-  @IsNotEmpty({ message: 'Category is required' })
+  @IsOptional()
   @IsString({ message: 'Category must be a string' })
   @MaxLength(50, { message: 'Category must not exceed 50 characters' })
-  category!: string;
+  category?: string;
 
   @ApiPropertyOptional({
-    description: 'Recipe thumbnail URL',
-    example: 'https://example.com/images/pasta.jpg',
-  })
-  @IsOptional()
-  @IsString({ message: 'Thumbnail URL must be a string' })
-  thumbnailUrl?: string;
-
-  @ApiProperty({
     description: 'Recipe content (detailed instructions and ingredients)',
     example: 'This is the full recipe content with ingredients and instructions...',
   })
-  @IsNotEmpty({ message: 'Content is required' })
+  @IsOptional()
   @IsString({ message: 'Content must be a string' })
-  content!: string;
+  content?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Recipe ingredients',
     example: ['Pasta', 'Tomato', 'Garlic', 'Cheese'],
   })
-  @IsNotEmpty({ message: 'Ingredients are required' })
+  @IsOptional()
   @IsArray({ message: 'Ingredients must be an array' })
-  @IsString({ each: true, message: 'Ingredients must be a string' })
-  ingredients!: string[];
+  @IsString({ each: true, message: 'Each ingredient must be a string' })
+  ingredients?: string[];
+
+  // Additional optional fields can be added here as needed
+  [key: string]: any;
 }

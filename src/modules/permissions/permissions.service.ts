@@ -7,33 +7,40 @@ import { PermissionsRepository } from './repositories/permissions.repository';
 export class PermissionsService {
   constructor(private readonly permissionsRepository: PermissionsRepository) {}
 
-  private readonly permissionMap = {
-    [EPermissions.DASHBOARD_ACCESS]: 'dashboardAccess',
-    [EPermissions.MEMBER_MANAGEMENT_READ]: 'memberAccess',
-    [EPermissions.MEMBER_MANAGEMENT_WRITE]: 'memberAccess',
-    [EPermissions.MEMBER_MANAGEMENT_DELETE]: 'memberAccess',
-    [EPermissions.PRODUCT_MANAGEMENT_READ]: 'productAccess',
-    [EPermissions.PRODUCT_MANAGEMENT_WRITE]: 'productAccess',
-    [EPermissions.PRODUCT_MANAGEMENT_DELETE]: 'productAccess',
-    [EPermissions.ORDER_MANAGEMENT_READ]: 'orderAccess',
-    [EPermissions.ORDER_MANAGEMENT_WRITE]: 'orderAccess',
-    [EPermissions.ORDER_MANAGEMENT_DELETE]: 'orderAccess',
-    [EPermissions.RECIPE_MANAGEMENT_READ]: 'recipeAccess',
-    [EPermissions.RECIPE_MANAGEMENT_WRITE]: 'recipeAccess',
-    [EPermissions.RECIPE_MANAGEMENT_DELETE]: 'recipeAccess',
-    [EPermissions.BANNER_MANAGEMENT_READ]: 'bannerAccess',
-    [EPermissions.BANNER_MANAGEMENT_WRITE]: 'bannerAccess',
-    [EPermissions.BANNER_MANAGEMENT_DELETE]: 'bannerAccess',
+  /**
+   * Maps EPermissions enum values to User model boolean fields
+   */
+  private readonly permissionMap: Record<keyof UserPermissionsDto, EPermissions> = {
+    [EPermissions.DASHBOARD_ACCESS]: EPermissions.DASHBOARD_ACCESS,
+    [EPermissions.MEMBER_MANAGEMENT]: EPermissions.MEMBER_MANAGEMENT,
+    [EPermissions.PRODUCT_MANAGEMENT]: EPermissions.PRODUCT_MANAGEMENT,
+    [EPermissions.ORDER_MANAGEMENT]: EPermissions.ORDER_MANAGEMENT,
+    [EPermissions.RECIPE_MANAGEMENT]: EPermissions.RECIPE_MANAGEMENT,
+    [EPermissions.BANNER_MANAGEMENT]: EPermissions.BANNER_MANAGEMENT,
   };
 
+  /**
+   * Reverse map: User boolean field to EPermissions enum
+   */
+  private readonly fieldToPermissionMap: Record<EPermissions, keyof UserPermissionsDto> = {
+    [EPermissions.DASHBOARD_ACCESS]: EPermissions.DASHBOARD_ACCESS,
+    [EPermissions.MEMBER_MANAGEMENT]: EPermissions.MEMBER_MANAGEMENT,
+    [EPermissions.PRODUCT_MANAGEMENT]: EPermissions.PRODUCT_MANAGEMENT,
+    [EPermissions.ORDER_MANAGEMENT]: EPermissions.ORDER_MANAGEMENT,
+    [EPermissions.RECIPE_MANAGEMENT]: EPermissions.RECIPE_MANAGEMENT,
+    [EPermissions.BANNER_MANAGEMENT]: EPermissions.BANNER_MANAGEMENT,
+  };
+
+  /**
+   * Get all available permissions from EPermissions enum
+   */
   getAllPermissions() {
     const permissions = Object.values(EPermissions).map(key => {
-      const category = key.split('_').slice(0, -1).join('_');
       return {
         key,
-        name: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        name: this.getPermissionDisplayName(key),
         description: this.getPermissionDescription(key),
-        category
+        category: this.getPermissionCategory(key),
       };
     });
 
@@ -42,32 +49,54 @@ export class PermissionsService {
     return { permissions, categories };
   }
 
-  private getPermissionDescription(permission: string): string {
-    const descriptions: Record<string, string> = {
+  /**
+   * Get display name for a permission
+   */
+  private getPermissionDisplayName(permission: EPermissions): string {
+    const displayNames: Record<EPermissions, string> = {
+      [EPermissions.DASHBOARD_ACCESS]: 'Dashboard Access',
+      [EPermissions.MEMBER_MANAGEMENT]: 'Member Management',
+      [EPermissions.PRODUCT_MANAGEMENT]: 'Product Management',
+      [EPermissions.ORDER_MANAGEMENT]: 'Order Management',
+      [EPermissions.RECIPE_MANAGEMENT]: 'Recipe Management',
+      [EPermissions.BANNER_MANAGEMENT]: 'Banner Management',
+    };
+    return displayNames[permission] || permission;
+  }
+
+  /**
+   * Get description for a permission
+   */
+  private getPermissionDescription(permission: EPermissions): string {
+    const descriptions: Record<EPermissions, string> = {
       [EPermissions.DASHBOARD_ACCESS]: 'Access to dashboard and analytics',
-      [EPermissions.MEMBER_MANAGEMENT_READ]: 'View member information',
-      [EPermissions.MEMBER_MANAGEMENT_WRITE]: 'Create and update member information',
-      [EPermissions.MEMBER_MANAGEMENT_DELETE]: 'Delete member information',
-      [EPermissions.PRODUCT_MANAGEMENT_READ]: 'View product information',
-      [EPermissions.PRODUCT_MANAGEMENT_WRITE]: 'Create and update product information',
-      [EPermissions.PRODUCT_MANAGEMENT_DELETE]: 'Delete product information',
-      [EPermissions.ORDER_MANAGEMENT_READ]: 'View order information',
-      [EPermissions.ORDER_MANAGEMENT_WRITE]: 'Create and update order information',
-      [EPermissions.ORDER_MANAGEMENT_DELETE]: 'Delete order information',
-      [EPermissions.RECIPE_MANAGEMENT_READ]: 'View recipe information',
-      [EPermissions.RECIPE_MANAGEMENT_WRITE]: 'Create and update recipe information',
-      [EPermissions.RECIPE_MANAGEMENT_DELETE]: 'Delete recipe information',
-      [EPermissions.BANNER_MANAGEMENT_READ]: 'View banner information',
-      [EPermissions.BANNER_MANAGEMENT_WRITE]: 'Create and update banner information',
-      [EPermissions.BANNER_MANAGEMENT_DELETE]: 'Delete banner information',
+      [EPermissions.MEMBER_MANAGEMENT]: 'Manage member information (view, create, update, delete)',
+      [EPermissions.PRODUCT_MANAGEMENT]: 'Manage product information (view, create, update, delete)',
+      [EPermissions.ORDER_MANAGEMENT]: 'Manage order information (view, create, update, delete)',
+      [EPermissions.RECIPE_MANAGEMENT]: 'Manage recipe information (view, create, update, delete)',
+      [EPermissions.BANNER_MANAGEMENT]: 'Manage banner information (view, create, update, delete)',
     };
     return descriptions[permission] || '';
+  }
+
+  /**
+   * Get category for a permission (e.g., "DASHBOARD", "MEMBER", "PRODUCT")
+   */
+  private getPermissionCategory(permission: EPermissions): string {
+    if (permission === EPermissions.DASHBOARD_ACCESS) {
+      return 'DASHBOARD';
+    }
+    // Extract category from permission (e.g., MEMBER_MANAGEMENT -> MEMBER)
+    return permission.split('_')[0];
   }
 
   getPermissionEnum() {
     return { enum: EPermissions };
   }
 
+  /**
+   * Get user permissions mapped to EPermissions enum
+   */
   async getUserPermissions(userId: string) {
     const user = await this.permissionsRepository.getUserWithPermissions(userId);
 
@@ -77,10 +106,20 @@ export class PermissionsService {
 
     const roles = user.userRole.map(ur => ur.role.name);
 
+    // Map boolean flags to EPermissions array
+    const permissions: EPermissions[] = [];
+    if (user.dashboardAccess) permissions.push(EPermissions.DASHBOARD_ACCESS);
+    if (user.memberAccess) permissions.push(EPermissions.MEMBER_MANAGEMENT);
+    if (user.productAccess) permissions.push(EPermissions.PRODUCT_MANAGEMENT);
+    if (user.orderAccess) permissions.push(EPermissions.ORDER_MANAGEMENT);
+    if (user.recipeAccess) permissions.push(EPermissions.RECIPE_MANAGEMENT);
+    if (user.bannerAccess) permissions.push(EPermissions.BANNER_MANAGEMENT);
+
     return {
       userId: user.id,
       userName: user.name,
-      permissions: {
+      permissions,
+      permissionsFlags: {
         dashboardAccess: user.dashboardAccess,
         memberAccess: user.memberAccess,
         productAccess: user.productAccess,
@@ -92,6 +131,9 @@ export class PermissionsService {
     };
   }
 
+  /**
+   * Update user permissions using boolean flags
+   */
   async updateUserPermissions(userId: string, permissionsDto: UserPermissionsDto) {
     // Verify user exists
     const userExists = await this.permissionsRepository.userExists(userId);
@@ -100,8 +142,8 @@ export class PermissionsService {
     }
 
     // Validate permission keys
-    const validKeys = ['dashboardAccess', 'memberAccess', 'productAccess', 'orderAccess', 'recipeAccess', 'bannerAccess'];
-    const providedKeys = Object.keys(permissionsDto);
+    const validKeys: Array<EPermissions> = [EPermissions.DASHBOARD_ACCESS, EPermissions.MEMBER_MANAGEMENT, EPermissions.PRODUCT_MANAGEMENT, EPermissions.ORDER_MANAGEMENT, EPermissions.RECIPE_MANAGEMENT, EPermissions.BANNER_MANAGEMENT];
+    const providedKeys = Object.keys(permissionsDto) as Array<EPermissions>;
     const invalidKeys = providedKeys.filter(key => !validKeys.includes(key));
     
     if (invalidKeys.length > 0) {
@@ -111,10 +153,20 @@ export class PermissionsService {
     // Update permissions
     const updated = await this.permissionsRepository.updateUserPermissions(userId, permissionsDto);
 
+    // Map boolean flags to EPermissions array
+    const permissions: EPermissions[] = [];
+    if (updated.dashboardAccess) permissions.push(EPermissions.DASHBOARD_ACCESS);
+    if (updated.memberAccess) permissions.push(EPermissions.MEMBER_MANAGEMENT);
+    if (updated.productAccess) permissions.push(EPermissions.PRODUCT_MANAGEMENT);
+    if (updated.orderAccess) permissions.push(EPermissions.ORDER_MANAGEMENT);
+    if (updated.recipeAccess) permissions.push(EPermissions.RECIPE_MANAGEMENT);
+    if (updated.bannerAccess) permissions.push(EPermissions.BANNER_MANAGEMENT);
+
     return {
       userId: updated.id,
       userName: updated.name,
-      updatedPermissions: {
+      permissions,
+      permissionsFlags: {
         dashboardAccess: updated.dashboardAccess,
         memberAccess: updated.memberAccess,
         productAccess: updated.productAccess,
@@ -158,6 +210,9 @@ export class PermissionsService {
     };
   }
 
+  /**
+   * Check if user has a specific permission
+   */
   async checkPermission(checkDto: CheckPermissionDto) {
     const { userId, permission } = checkDto;
 
@@ -169,18 +224,67 @@ export class PermissionsService {
     }
 
     // Map permission enum to boolean field
-    const field = this.permissionMap[permission as EPermissions];
+    const field = this.permissionMap[permission];
     if (!field) {
-      throw new BadRequestException(`Invalid permission: ${permission}`);
+      throw new BadRequestException(`Permission mapping not found for: ${permission}`);
     }
 
-    const hasPermission = user[field as keyof typeof user];
+    const hasPermission = user[this.fieldToPermissionMap[field]];
 
     return {
       userId,
       permission,
-      hasPermission,
+      hasPermission: Boolean(hasPermission),
       grantedVia: 'direct'
     };
+  }
+
+  /**
+   * Check if user has any of the required permissions
+   * This is used by the PermissionsGuard
+   */
+  async userHasPermission(userId: string, requiredPermission: EPermissions): Promise<boolean> {
+    const user = await this.permissionsRepository.getUserPermissionFlags(userId);
+    
+    if (!user) {
+      return false;
+    }
+
+    const field = this.permissionMap[requiredPermission];
+    if (!field) {
+      return false;
+    }
+
+    return Boolean(user[this.fieldToPermissionMap[field]]);
+  }
+
+  /**
+   * Check if user has all of the required permissions
+   */
+  async userHasAllPermissions(userId: string, requiredPermissions: EPermissions[]): Promise<boolean> {
+    if (requiredPermissions.length === 0) {
+      return true;
+    }
+
+    const checks = await Promise.all(
+      requiredPermissions.map(permission => this.userHasPermission(userId, permission))
+    );
+
+    return checks.every(hasPermission => hasPermission);
+  }
+
+  /**
+   * Check if user has any of the required permissions
+   */
+  async userHasAnyPermission(userId: string, requiredPermissions: EPermissions[]): Promise<boolean> {
+    if (requiredPermissions.length === 0) {
+      return true;
+    }
+
+    const checks = await Promise.all(
+      requiredPermissions.map(permission => this.userHasPermission(userId, permission))
+    );
+
+    return checks.some(hasPermission => hasPermission);
   }
 }

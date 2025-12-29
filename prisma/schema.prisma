@@ -43,7 +43,7 @@ model User {
   
   // Relations
   userRole UserRole[]
-  userMembership UserMembership[]
+  userMembership UserMembership?
   point Point?
   session Session[]
   orders Order[]
@@ -54,7 +54,7 @@ model User {
 
 model UserMembership {
   id String @id @default(uuid()) @unique
-  userId String
+  userId String @unique
   membershipId String
   membershipName String @map("membership_name")
   membershipDescription String @map("membership_description")
@@ -65,15 +65,15 @@ model UserMembership {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
 
-  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
   // extension
   updatedByAdmin Boolean @default(false) @map("updated_by_admin")
 
-  @@index([userId, membershipId])
   @@index([membershipId])
   @@index([userId])
+  @@index([userId, membershipId])
   @@map("user_memberships")
 }
 
@@ -192,7 +192,7 @@ model Order {
   itemWiseOrderNumber String @default("") @map("item_wise_order_number") // 2. 품목별 주문번호 (Item-wise Order Number) - text, default
   totalOrderAmount Int @map("total_order_amount") // 3. 총 주문금액 (Total Order Amount) - int4
   totalPaymentAmount Int @map("total_payment_amount") // 4. 총 결제금액 (Total Payment Amount) - int4
-  productNumber Int @map("product_number") // 5. 상품번호 (Product Number) - int4
+  productId String @map("product_id") // 5. 상품번호 (Product Number) - int4
   productName String @default("") @map("product_name") // 6. 주문상품명 (Ordered Product Name) - text, default
   productNameWithOptions String @default("") @map("product_name_with_options") // 7. 주문상품명(옵션포) (Ordered Product Name with Options) - text, default
   quantity Int @map("quantity") // 8. 수량 (Quantity) - int4
@@ -217,19 +217,40 @@ model Order {
   // Extension
   situation OrderSituation? @map("situation") // 상황
   courierCompany String? @map("courier_company") // 택배사
+  invoiceNumber String? @map("invoice_number") // 송장번호
   // Relation to User (optional, handles null ordererId)
   user User? @relation(fields: [ordererId], references: [id], onDelete: SetNull)
   couponHistories CouponHistory[]
-
+  // Relation to OrderItems (one order can have many items)
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
   @@map("orders")
 }
 
+// Point
+model Point {
+  id String @id @default(uuid())
+  date String? @db.VarChar(50) @map("date") // 일자 (Date) - character varying(50)
+  userId String? @unique @db.VarChar(50) @map("user_id") // 아이디 (ID) - character varying(50)
+  membershipLevel String? @db.VarChar(50) @map("membership_level") // 회원등급 (Membership Level) - character varying(50)
+  content String? @db.VarChar(50) @map("content") // 내용 (Content/Details) - character varying(50)
+  orderNumber String? @db.VarChar(50) @map("order_number") // 주문번호 (Order Number) - character varying(50)
+  pointsType String? @db.VarChar(50) @map("points_type") // 적립금 유형 (Accumulated Points Type) - character varying(50)
+  availablePointsIncrease Int? @map("available_points_increase") // 가용적립금 증가 (Available Points Increase) - integer
+  availablePointsDeduction Int? @map("available_points_deduction") // 가용적립금 차감 (Available Points Deduction) - integer
+  availablePointsBalance Int? @map("available_points_balance") // 가용적립금 잔액 (Available Points Balance) - integer
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relation to User (1-1 relationship) - set to null when user is deleted
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@map("points")
+}
 // Product
 model Product {
   id String @id @default(uuid())
   productCode String? @map("product_code") // 상품코드
   ownProductCode String? @map("own_product_code") // 자체 상품코드
-  displayStatus String? @map("display_status") // 진열상태
+  displayStatus String? @default("ACTIVE") @map("display_status") // 진열상태
   saleStatus String? @map("sale_status") // 판매상태
   productCategoryNumber String? @map("product_category_number") // 상품분류 번호
   productCategoryNewProductArea String? @map("product_category_new_product_area") // 상품분류 신상품영역
@@ -322,33 +343,85 @@ model Product {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // relation
-  banners Banner?
-
+  // extension
+  ctaButtonUrl String? @db.VarChar(500) @map("cta_button_url")
+  // relation 
+  order Order[]
+  productCategoryBannerRelations ProductCategoryBannerRelation[]
+  // productRecipes ProductRecipe[]
+  productSpecialOffer ProductSpecialOffer?
+  productDiscount ProductDiscount?
   @@map("products")
 }
 
-// Point
-model Point {
+model ProductDiscount{
   id String @id @default(uuid())
-  date String? @db.VarChar(50) @map("date") // 일자 (Date) - character varying(50)
-  userId String? @unique @db.VarChar(50) @map("user_id") // 아이디 (ID) - character varying(50)
-  membershipLevel String? @db.VarChar(50) @map("membership_level") // 회원등급 (Membership Level) - character varying(50)
-  content String? @db.VarChar(50) @map("content") // 내용 (Content/Details) - character varying(50)
-  orderNumber String? @db.VarChar(50) @map("order_number") // 주문번호 (Order Number) - character varying(50)
-  pointsType String? @db.VarChar(50) @map("points_type") // 적립금 유형 (Accumulated Points Type) - character varying(50)
-  availablePointsIncrease Int? @map("available_points_increase") // 가용적립금 증가 (Available Points Increase) - integer
-  availablePointsDeduction Int? @map("available_points_deduction") // 가용적립금 차감 (Available Points Deduction) - integer
-  availablePointsBalance Int? @map("available_points_balance") // 가용적립금 잔액 (Available Points Balance) - integer
+  status Boolean @default(false) @map("status")
+  productId String @map("product_id") @unique 
+
+  discountRate Int @map("discount_rate")
+
+  discountStartDate DateTime? @map("discount_start_date")
+  discountEndDate DateTime? @map("discount_end_date")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relation to User (1-1 relationship) - set to null when user is deleted
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-  @@map("points")
+  // relation
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@map("product_discounts")
+}
+model ProductSpecialOffer {
+  id String @id @default(uuid())
+  status Boolean @default(false) @map("status")
+  productId String @map("product_id") @unique 
+
+  discountAmount Int @map("discount_amount")
+  specialPriceApplied Int? @map("special_price_applied")
+
+  startDate DateTime? @map("start_date")
+  endDate DateTime? @map("end_date")
+  createdAt DateTime? @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  // relation
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@map("product_special_offers")
 }
 
+model ProductCategoryBannerRelation {
+  id String @id @default(uuid())
 
+  productId String? @map("product_id")
+  bannerId String? @map("banner_id")
+  productCategoryNumber String? @map("product_category_number")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+
+  // relation
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  category Category? @relation(fields: [productCategoryNumber], references: [productCategoryNumber], onDelete: SetNull)
+  banner Banner? @relation(fields: [bannerId], references: [id], onDelete: SetNull)
+  @@index([productId])
+  @@index([productCategoryNumber])
+  @@index([bannerId])
+  @@index([productId, productCategoryNumber, bannerId])
+  @@map("product_category_banner_relations")
+}
+
+model Category {
+  productCategoryNumber String @id @unique @db.VarChar(50) @map("product_category_number")
+  name CategoryType @unique @map("name")
+  description String? @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // relation
+  productCategoryBannerRelations ProductCategoryBannerRelation[]
+  @@map("categories")
+}
 // Recipe
 model Recipe {
   id             String   @id @default(uuid())
@@ -372,7 +445,7 @@ model Recipe {
   // Relations
   author         User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
   recipeCategory RecipeCategory? @relation(fields: [recipeCategoryId], references: [id], onDelete: SetNull) // Back-reference (RecipeCategory owns the relation)
-
+  // productRecipes ProductRecipe[]
   @@index([status])
   @@index([authorId])
   @@index([dateOfWriting])
@@ -392,6 +465,7 @@ model RecipeCategory {
   @@index([name])
   @@map("recipe_categories")
 }
+
 // Coupon
 enum CouponType {
   PERCENT // 정률 할인 (Discount rate %)
@@ -487,6 +561,7 @@ model CouponHistory {
 }
 // Banner
 enum BannerType {
+  ALL               // All (모든 배너)
   MAIN_PRODUCTS      // Main Products (메인 상품)
   CATEGORY          // Category (카테고리)
   FOOTER            // Footer
@@ -499,14 +574,22 @@ enum BannerStatus {
   SCHEDULED // 예약됨
 }
 
+enum CategoryType {        
+    ALL                // 모든 배너
+    LIVESTOCK          // 라이브스톡
+    CONVENIENCE_FOOD   // 편의점 음식
+    FISHERIES          // 수산물
+    SIDE_DISH          // 사이드 요리
+}
+
 model Banner {
   id String @id @default(uuid())
 
+  productCategoryNumber String? @map("product_category_number")
+  productId String? @map("product_id")
+  // categoryType CategoryType? @map("category_type") // 카테고리 타입
   type BannerType @map("type") // 배너 타입
   status BannerStatus @default(ACTIVE) @map("status") // 배너 상태
-
-  // Product relation (optional - only for product banners)
-  productId String? @unique @map("product_id") // 1-1 relation with Product
   
   // Banner content
   title String? @db.VarChar(255) @map("title") // 배너 제목
@@ -526,23 +609,35 @@ model Banner {
   startDate DateTime? @map("start_date") // 시작일 (optional for scheduling)
   endDate DateTime? @map("end_date") // 종료일 (optional for scheduling)
   
-  // Additional product info (denormalized for performance)
-  // These are automatically populated from Product when productId is set
-  productName String? @db.VarChar(255) @map("product_name")
-  productPrice Int? @map("product_price")
-  productBrand String? @db.VarChar(255) @map("product_brand")
-  productExplanation String? @db.Text @map("product_explanation")
-
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relations
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-
+  // Relations - Many-to-Many with Product
+  productCategoryBannerRelations ProductCategoryBannerRelation[]
   @@index([type])
   @@index([status])
   @@index([displayOrder])
   @@index([startDate, endDate])
-  @@index([productId])
-  @@map("banners")
+  @@map("banners") 
 }
+
+// Join table for Banner-Product many-to-many relation
+// model BannerProduct {
+//   id String @id @default(uuid())
+//   bannerId String @map("banner_id")
+//   productId String @map("product_id")
+//   createdAt DateTime @default(now()) @map("created_at")
+//   updatedAt DateTime @updatedAt @map("updated_at")
+
+//   type BannerType @map("type") // 배너 타입
+//   status BannerStatus @default(ACTIVE) @map("status") // 배너 상태
+
+//   // Relations
+//   banner Banner? @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+//   product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+//   @@unique([bannerId, productId])
+//   @@index([bannerId])
+//   @@index([productId])
+//   @@map("banners_products")
+// }

@@ -580,6 +580,16 @@ export class UpdateOrderDto {
   @IsString({ message: 'Courier company must be a string' })
   @MaxLength(50, { message: 'Courier company must not exceed 50 characters' })
   courierCompany?: string;
+  
+  @ApiPropertyOptional({
+    description: 'Invoice number',
+    example: '1234567890',
+    maxLength: 50,
+  })
+  @IsOptional()
+  @IsString({ message: 'Invoice number must be a string' })
+  @MaxLength(50, { message: 'Invoice number must not exceed 50 characters' })
+  invoiceNumber?: string;
 }
 
 // ============================================
@@ -601,8 +611,8 @@ export class OrderResponseDto {
   @ApiProperty({ description: 'Total payment amount in KRW', example: 145000 })
   totalPaymentAmount!: number;
 
-  @ApiProperty({ description: 'Product number', example: 1001 })
-  productNumber!: number;
+  @ApiProperty({ description: 'Product', example: { id: '123e4567-e89b-12d3-a456-426614174000', productName: 'Organic Apple 1kg', productCode: '1234567890', productPrice: 10000, salePrice: 12000, consumerPrice: 8000, supplyPrice: 6000, modelName: 'Apple 1kg' } })
+  productId!: string;
 
   @ApiProperty({ description: 'Product name', example: 'Organic Apple 1kg' })
   productName!: string;
@@ -697,36 +707,12 @@ export class OrderFilterDto {
   limit?: number;
 
   @ApiPropertyOptional({
-    description: 'Search by order number',
-    example: 'ORD-2025-001234',
+    description: 'Search by order number, product name, customer name, recipient name',
+    example: 'ORD-2025-001234 OR Apple OR 김철수 OR 박영희',
   })
   @IsOptional()
-  @IsString({ message: 'Order number search must be a string' })
-  orderNumber?: string;
-
-  @ApiPropertyOptional({
-    description: 'Search by product name (partial match)',
-    example: 'Apple',
-  })
-  @IsOptional()
-  @IsString({ message: 'Product name search must be a string' })
-  productName?: string;
-
-  @ApiPropertyOptional({
-    description: 'Search by customer/orderer name (partial match)',
-    example: '김철수',
-  })
-  @IsOptional()
-  @IsString({ message: 'Customer name search must be a string' })
-  customerName?: string;
-
-  @ApiPropertyOptional({
-    description: 'Search by recipient name (partial match)',
-    example: '박영희',
-  })
-  @IsOptional()
-  @IsString({ message: 'Recipient name search must be a string' })
-  recipientName?: string;
+  @IsString({ message: 'Search query must be a string' })
+  q?: string;
 
 
   @ApiPropertyOptional({
@@ -808,13 +794,14 @@ export class OrderFilterDto {
 
   @ApiPropertyOptional({
     description: 'Order status filter',
-    enum: EOrderSituation,
+    enum: [...Object.values(EOrderSituation), 'ALL'],
     example: EOrderSituation.ORDER_NEW,
   })
   @IsOptional()
   @IsString({ message: 'Order status must be a string' })
-  @IsEnum(EOrderSituation, { message: 'Order status must be a valid order status' })
-  //adding all
+  @IsIn([...Object.values(EOrderSituation), 'ALL'], {
+    message: 'Order status must be a valid order status or ALL',
+  })
   situation?: EOrderSituation | 'ALL';
 
   @ApiPropertyOptional({

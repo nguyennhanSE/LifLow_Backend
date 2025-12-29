@@ -58,7 +58,7 @@ export class CouponsController {
     return responseModel;
   }
 
-  @Get()
+  @Get('list')
   @Roles(ERoleName.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

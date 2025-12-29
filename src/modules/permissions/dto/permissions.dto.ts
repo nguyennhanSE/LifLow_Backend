@@ -1,46 +1,50 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, IsArray, ValidateNested } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, IsArray, ValidateNested, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { EPermissions } from '../enum/permissions.enum';
 
 export class UserPermissionsDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  dashboardAccess?: boolean;
+  [EPermissions.DASHBOARD_ACCESS]?: boolean;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  memberAccess?: boolean;
+  [EPermissions.MEMBER_MANAGEMENT]?: boolean;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  productAccess?: boolean;
+  [EPermissions.PRODUCT_MANAGEMENT]?: boolean;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  orderAccess?: boolean;
+  [EPermissions.ORDER_MANAGEMENT]?: boolean;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  recipeAccess?: boolean;
+  [EPermissions.RECIPE_MANAGEMENT]?: boolean;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  bannerAccess?: boolean;
+  [EPermissions.BANNER_MANAGEMENT]?: boolean;
 }
 
 export class UpdateUserPermissionsDto {
   @ApiProperty({
     description: 'Permissions object',
     example: {
-      dashboardAccess: true,
-      memberAccess: true,
-      productAccess: false
+      [EPermissions.DASHBOARD_ACCESS]: true,
+      [EPermissions.MEMBER_MANAGEMENT]: true,
+      [EPermissions.PRODUCT_MANAGEMENT]: false,
+      [EPermissions.ORDER_MANAGEMENT]: false,
+      [EPermissions.RECIPE_MANAGEMENT]: false,
+      [EPermissions.BANNER_MANAGEMENT]: false,
     }
   })
   @IsObject()
@@ -79,10 +83,11 @@ export class CheckPermissionDto {
 
   @ApiProperty({
     description: 'Permission to check from EPermissions enum',
-    example: 'MEMBER_MANAGEMENT_READ'
+    enum: EPermissions,
+    example: EPermissions.MEMBER_MANAGEMENT
   })
-  @IsString()
+  @IsEnum(EPermissions)
   @IsNotEmpty()
-  permission!: string;
+  permission!: EPermissions;
 }
 

@@ -1,5 +1,6 @@
 import { UserEntity } from '../../user/entities/user.entity';
 import { EOrderSituation } from '../enum/order.enum';
+import { ProductEntity } from '../../product/entities/product.entity';
 
 export class OrderEntity {
   id!: string;
@@ -7,7 +8,7 @@ export class OrderEntity {
   itemWiseOrderNumber!: string;
   totalOrderAmount!: number;
   totalPaymentAmount!: number;
-  productNumber!: number;
+  productId!: string;
   productName!: string;
   productNameWithOptions!: string;
   quantity!: number;
@@ -29,9 +30,12 @@ export class OrderEntity {
   orderStatus?: string | null;
   createdAt!: Date;
   updatedAt!: Date;
-  user?: UserEntity | null;
+
   // Extensions
+  user?: UserEntity | null;
+  product?: ProductEntity | null;
   situation?: EOrderSituation | null;
   courierCompany?: string | null;
+  invoiceNumber?: string | null;
 }
 

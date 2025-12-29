@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Query,
+  Put,
 } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import {
@@ -197,23 +198,20 @@ export class MembershipsController {
     return responseModel;
   }
 
-  @Patch('user/:userId/membership/:membershipId')
+  @Patch('user/:userId/')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER)
   @ApiOperation({ summary: 'Update user membership (status, dates)' })
   @ApiParam({ name: 'userId', description: 'User ID' })
-  @ApiParam({ name: 'membershipId', description: 'Membership ID' })
   @ApiResponse({ status: 200, description: 'User membership updated successfully' })
   @ApiResponse({ status: 404, description: 'User membership not found' })
   async updateUserMembership(
     @Param('userId') userId: string,
-    @Param('membershipId') membershipId: string,
     @Body() updateDto: UpdateUserMembershipDto,
   ) {
     const responseModel = new ResponseModel();
     try {
       const userMembership = await this.membershipsService.updateUserMembership(
         userId,
-        membershipId,
         updateDto,
       );
       responseModel.setData(userMembership);

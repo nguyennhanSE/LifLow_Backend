@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto, GetUsersQueryDto, UpdateUserDto } from './dto/user.dto';
+import { CreateUserDto, GetAdminListQueryDto, GetUsersQueryDto, UpdateUserDto } from './dto/user.dto';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { toResponse } from './mapper/user.mapper';
@@ -13,7 +13,8 @@ import { AssignRolesToSingleUserDto } from '../roles/dto/roles.dto';
 import { Request } from 'express';
 import { TokenPayload } from 'src/libs/constants/interface';
 import { MembershipsService } from '../memberships/memberships.service';
-import { QueryUserMembershipsDto } from '../memberships/dto/membership.dto';
+import { QueryUserMembershipsDto } from '../memberships/dto/membership.dto';  
+import { OrderRepository } from '../order/repositories/order.repository';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
@@ -23,7 +24,8 @@ export class UserController {
     private readonly userService: UserService,
     private readonly permissionsService: PermissionsService,
     private readonly rolesService: RolesService,
-    private readonly membershipsService: MembershipsService
+    private readonly membershipsService: MembershipsService,
+    private readonly orderRepository: OrderRepository
   ) {}
 
   @Post("create")
@@ -79,14 +81,50 @@ export class UserController {
         { counted: counted ?? true },
       );
 
-      const docs = data.docs.map(e => toResponse(e));
+      console.log('data', data);
+      const lastDocs = await Promise.all(data.docs.map(async e => {return { ...e, orderNumber: await this.orderRepository.getOrderNumber(e.id) }}));
+      const docs = lastDocs.map(e => toResponse(e));
 
-      const result = { ...data, docs };
+      const result = { ...data, docs: docs };
       responseModel.setData(result);
     } catch (error) {
       throw error;
     }
 
+    return responseModel;
+  }
+
+  @Get('admin-list')
+  @Roles(ERoleName.ADMIN)
+  @ApiOperation({ summary: 'Get list of admin users' })
+  @ApiResponse({ status: 200, description: 'Admin users retrieved successfully' })
+  async getAdminList(@Query() q: GetAdminListQueryDto) {
+    const responseModel = new ResponseModel();
+    try {
+      const { 
+        page, 
+        limit, 
+        sort, 
+        sortBy, 
+        q: search,
+        role
+      } = q;
+      const pageNum = page ? (typeof page === 'string' ? parseInt(page, 10) : page) : 1;
+      const limitNum = limit ? (typeof limit === 'string' ? parseInt(limit, 10) : limit) : 10;
+      const result = await this.userService.getAdminPaginate(
+        { 
+          page: pageNum, 
+          limit: limitNum, 
+          sort: sort || 'asc', 
+          sortBy: sortBy || 'createdAt' 
+        },
+        { q: search, role: role === 'ALL' ? undefined : role },
+        { counted: true },
+      );
+      responseModel.setData(result);
+    } catch (error) {
+      throw error;
+    }
     return responseModel;
   }
 

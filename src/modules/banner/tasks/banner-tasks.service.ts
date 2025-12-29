@@ -169,21 +169,29 @@ export class BannerTasksService {
     try {
       this.logger.log('Starting product banner data sync task...');
 
-      // Find all banners with associated products
+      // Find all banners with associated products through ProductCategoryBannerRelation
       const productBanners = await this.prisma.banner.findMany({
         where: {
-          productId: {
-            not: null,
+          productCategoryBannerRelations: {
+            some: {
+              productId: {
+                not: null,
+              },
+            },
           },
         },
         include: {
-          product: {
-            select: {
-              id: true,
-              productName: true,
-              productPrice: true,
-              brand: true,
-              productSummaryDescription: true,
+          productCategoryBannerRelations: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  productName: true,
+                  productPrice: true,
+                  brand: true,
+                  productSummaryDescription: true,
+                },
+              },
             },
           },
         },
@@ -204,9 +212,11 @@ export class BannerTasksService {
       await this.prisma.$transaction(async (tx) => {
         for (const banner of productBanners) {
           try {
-            if (!banner.product) {
+            // Get product from productCategoryBannerRelations (source of truth)
+            const product = banner.productCategoryBannerRelations?.[0]?.product || null;
+            if (!product) {
               this.logger.warn(
-                `Banner ${banner.id} has productId but product not found - skipping`,
+                `Banner ${banner.id} has no product relation in ProductCategoryBannerRelation - skipping`,
               );
               failedCount++;
               continue;
@@ -216,10 +226,6 @@ export class BannerTasksService {
             await tx.banner.update({
               where: { id: banner.id },
               data: {
-                productName: banner.product.productName,
-                productPrice: banner.product.productPrice,
-                productBrand: banner.product.brand,
-                productExplanation: banner.product.productSummaryDescription,
               },
             });
 

@@ -10,6 +10,8 @@ import {
   HttpCode,
   HttpStatus,
   Request,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,7 +21,9 @@ import {
   ApiQuery,
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { RecipeService } from './recipe.service';
 import {
   CreateRecipeDto,
@@ -34,6 +38,7 @@ import {
   paginationResponse,
 } from '../../utils/responseFormatter';
 import { ResponseModel } from '../../libs/models/response/response.model';
+import { RecipeUserInterceptor } from './interceptors/recipe.interceptor';
 
 /**
  * Interface for authenticated request with user info
@@ -49,7 +54,7 @@ interface AuthenticatedRequest extends Request {
 }
 @ApiBearerAuth()
 @ApiTags('Recipes')
-@Controller('recipes')
+@Controller('recipe')
 export class RecipeController {
   constructor(private readonly recipeService: RecipeService) {}
 
@@ -59,12 +64,55 @@ export class RecipeController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @UseInterceptors(
+    RecipeUserInterceptor,
+    FileFieldsInterceptor([
+      { name: 'thumbnail', maxCount: 1 },
+    ])
+  )
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Create a new recipe',
     description: 'Creates a new recipe. Requires authentication. Author information is automatically set from the authenticated user.',
   })
-  @ApiBody({ type: CreateRecipeDto })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Create recipe with optional thumbnail image',
+    schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Recipe title (required)',
+          example: 'Delicious Homemade Pasta Recipe',
+          maxLength: 255,
+        },
+        category: {
+          type: 'string',
+          description: 'Recipe category (required)',
+          example: 'Italian',
+          maxLength: 50,
+        },
+        content: {
+          type: 'string',
+          description: 'Recipe content (detailed instructions and ingredients)',
+          example: 'This is the full recipe content with ingredients and instructions...',
+        },
+        ingredients: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Recipe ingredients',
+          example: ['Pasta', 'Tomato', 'Garlic', 'Cheese'],
+        },
+        thumbnail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Recipe thumbnail image (max 5MB, jpg/jpeg/png/webp)',
+        },
+      },
+      required: ['title', 'category'],
+    },
+  })
   @ApiResponse({
     status: 201,
     description: 'Recipe created successfully',
@@ -78,17 +126,23 @@ export class RecipeController {
     status: 401,
     description: 'Unauthorized - authentication required',
   })
+  @Roles(ERoleName.ADMIN, ERoleName.USER)
   async create(
     @Body() createRecipeDto: CreateRecipeDto,
+    @UploadedFiles() files: {
+      thumbnail?: Express.Multer.File[];
+    },
     @Request() req: AuthenticatedRequest,
   ) {
     const responseModel = new ResponseModel();
 
     try {
+      const thumbnail = files?.thumbnail?.[0];
       const recipe = await this.recipeService.create(
         req.user.id,
         req.user.name,
         createRecipeDto,
+        thumbnail,
       );
       const result = successResponse(recipe, 'Recipe created successfully');
       responseModel.setData(result);
@@ -102,7 +156,7 @@ export class RecipeController {
   /**
    * Get all recipes with pagination and filters (public)
    */
-  @Get()
+  @Get('/list')
   @Roles(ERoleName.USER, ERoleName.ADMIN)
   @ApiOperation({
     summary: 'Get paginated list of recipes',
@@ -461,6 +515,11 @@ export class RecipeController {
    */
   @Patch(':id')
   @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'thumbnail', maxCount: 1 },
+    ])
+  )
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Update a recipe',
@@ -472,7 +531,43 @@ export class RecipeController {
     description: 'Recipe UUID',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
-  @ApiBody({ type: UpdateRecipeDto })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Update recipe with optional thumbnail image',
+    schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Recipe title',
+          example: 'Delicious Homemade Pasta Recipe',
+          maxLength: 255,
+        },
+        category: {
+          type: 'string',
+          description: 'Recipe category',
+          example: 'Italian',
+          maxLength: 50,
+        },
+        content: {
+          type: 'string',
+          description: 'Recipe content (detailed instructions and ingredients)',
+          example: 'This is the full recipe content with ingredients and instructions...',
+        },
+        ingredients: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Recipe ingredients',
+          example: ['Pasta', 'Tomato', 'Garlic', 'Cheese'],
+        },
+        thumbnail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Recipe thumbnail image (max 5MB, jpg/jpeg/png/webp)',
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'Recipe updated successfully',
@@ -496,15 +591,20 @@ export class RecipeController {
   async update(
     @Param('id') id: string,
     @Body() updateRecipeDto: UpdateRecipeDto,
+    @UploadedFiles() files: {
+      thumbnail?: Express.Multer.File[];
+    },
     @Request() req: AuthenticatedRequest,
   ) {
     const responseModel = new ResponseModel();
 
     try {
+      const thumbnail = files?.thumbnail?.[0];
       const recipe = await this.recipeService.update(
         id,
         req.user.id,
         updateRecipeDto,
+        thumbnail,
       );
       const result = successResponse(recipe, 'Recipe updated successfully');
       responseModel.setData(result);
@@ -563,6 +663,97 @@ export class RecipeController {
       throw error;
     }
 
+    return responseModel;
+  }
+
+  @Patch(':id/deactivate')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Deactivate a recipe',
+    description: 'Deactivates a recipe. Only the recipe owner can deactivate it.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Recipe UUID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Recipe deactivated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid UUID format',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - authentication required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - you do not own this recipe',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Recipe not found',
+  })
+  async deactivate(@Param('id') id: string) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const result = await this.recipeService.deactivate(id);
+      const data = successResponse(result, result.message);
+      responseModel.setData(data);
+    } catch (error) {
+      throw error;
+    }
+    return responseModel;
+  }
+
+  @Patch(':id/activate')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Activate a recipe',
+    description: 'Activates a recipe. Only the recipe owner can activate it.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Recipe UUID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Recipe activated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid UUID format',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - authentication required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - you do not own this recipe',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Recipe not found',
+  })
+  async activate(@Param('id') id: string) {
+    const responseModel = new ResponseModel();
+    try {
+      const result = await this.recipeService.activate(id);
+      const data = successResponse(result, result.message);
+      responseModel.setData(data);
+    } catch (error) {
+      throw error;
+    }
     return responseModel;
   }
 }
