@@ -12,7 +12,8 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EBannerType, EBannerStatus, ECategoryType } from '../enums/banner.enum';
+import { EBannerType, EBannerStatus } from '../enums/banner.enum';
+import { ECategoryType } from '../../categories/enums/category.enum';
 
 export class CreateBannerDto {
   @ApiProperty({

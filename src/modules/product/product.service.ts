@@ -127,10 +127,16 @@ export class ProductService {
           data: createProductData,
         });
 
-        // Note: Product categories are now managed through ProductCategoryBannerRelation
-        // If you need to create product-category relations without banners,
-        // you may need to create a separate join table or use ProductCategoryBannerRelation with a null bannerId
-        // For now, categories are handled through ProductCategoryBannerRelation
+        // Update product with category if provided (use first category from array)
+        // Note: Product now has direct relation to Category via productCategoryNumber
+        if (categories && categories.length > 0) {
+          await tx.product.update({
+            where: { id: product.id },
+            data: {
+              productCategoryNumber: categories[0], // Use first category
+            },
+          });
+        }
 
         // Create discount if discount data is provided
         if (hasDiscountData && discountRate !== undefined && discountRate !== null) {
@@ -142,15 +148,6 @@ export class ProductService {
               discountStartDate: discountStartDate ?? null,
               discountEndDate: discountEndDate ?? null,
             },
-          });
-        }
-
-        if (categories && categories.length > 0) {
-          await tx.productCategoryBannerRelation.createMany({
-            data: categories.map(categoryNumber => ({
-              productId: product.id,
-              productCategoryNumber: categoryNumber,
-            })),
           });
         }
         // Upload image registration thumbnail

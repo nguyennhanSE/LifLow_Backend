@@ -347,7 +347,8 @@ model Product {
   ctaButtonUrl String? @db.VarChar(500) @map("cta_button_url")
   // relation 
   order Order[]
-  productCategoryBannerRelations ProductCategoryBannerRelation[]
+  productCategory Category? @relation(fields: [productCategoryNumber], references: [productCategoryNumber], onDelete: SetNull)
+  banner Banner[]
   // productRecipes ProductRecipe[]
   productSpecialOffer ProductSpecialOffer?
   productDiscount ProductDiscount?
@@ -389,27 +390,27 @@ model ProductSpecialOffer {
   @@map("product_special_offers")
 }
 
-model ProductCategoryBannerRelation {
-  id String @id @default(uuid())
+// model ProductCategoryBannerRelation {
+//   id String @id @default(uuid())
 
-  productId String? @map("product_id")
-  bannerId String? @map("banner_id")
-  productCategoryNumber String? @map("product_category_number")
+//   productId String? @map("product_id")
+//   bannerId String? @map("banner_id")
+//   productCategoryNumber String? @map("product_category_number")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+//   createdAt DateTime @default(now()) @map("created_at")
+//   updatedAt DateTime @updatedAt @map("updated_at")
   
 
-  // relation
-  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  category Category? @relation(fields: [productCategoryNumber], references: [productCategoryNumber], onDelete: SetNull)
-  banner Banner? @relation(fields: [bannerId], references: [id], onDelete: SetNull)
-  @@index([productId])
-  @@index([productCategoryNumber])
-  @@index([bannerId])
-  @@index([productId, productCategoryNumber, bannerId])
-  @@map("product_category_banner_relations")
-}
+//   // relation
+//   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+//   category Category? @relation(fields: [productCategoryNumber], references: [productCategoryNumber], onDelete: SetNull)
+//   banner Banner? @relation(fields: [bannerId], references: [id], onDelete: SetNull)
+//   @@index([productId])
+//   @@index([productCategoryNumber])
+//   @@index([bannerId])
+//   @@index([productId, productCategoryNumber, bannerId])
+//   @@map("product_category_banner_relations")
+// }
 
 model Category {
   productCategoryNumber String @id @unique @db.VarChar(50) @map("product_category_number")
@@ -419,7 +420,7 @@ model Category {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // relation
-  productCategoryBannerRelations ProductCategoryBannerRelation[]
+  products Product[]
   @@map("categories")
 }
 // Recipe
@@ -575,7 +576,6 @@ enum BannerStatus {
 }
 
 enum CategoryType {        
-    ALL                // 모든 배너
     LIVESTOCK          // 라이브스톡
     CONVENIENCE_FOOD   // 편의점 음식
     FISHERIES          // 수산물
@@ -613,7 +613,7 @@ model Banner {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations - Many-to-Many with Product
-  productCategoryBannerRelations ProductCategoryBannerRelation[]
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   @@index([type])
   @@index([status])
   @@index([displayOrder])

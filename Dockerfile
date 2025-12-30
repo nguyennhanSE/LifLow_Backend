@@ -55,11 +55,11 @@ RUN apk update && \
       ca-certificates && \
     fc-cache -f -v || true
 # Copy production deps, build output, and prisma schema (with generated client)
-COPY . .
+COPY package*.json ./
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/prisma ./prisma
-
+COPY prisma.config.ts ./prisma.config.ts
 
 
 EXPOSE 3500

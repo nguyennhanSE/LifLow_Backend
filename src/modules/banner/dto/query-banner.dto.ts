@@ -9,7 +9,8 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { EBannerType, EBannerStatus, ECategoryType } from '../enums/banner.enum';
+import { EBannerType, EBannerStatus } from '../enums/banner.enum';
+import { ECategoryType } from '../../categories/enums/category.enum';
 
 export class QueryBannerDto {
   @ApiPropertyOptional({

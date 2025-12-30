@@ -1,4 +1,4 @@
-import { ProductCategoryBannerRelation } from '@prisma/client';
+import { ProductEntity } from '../../product/entities/product.entity';
 
 export class CategoryEntity {
   productCategoryNumber!: string;
@@ -7,5 +7,5 @@ export class CategoryEntity {
   createdAt!: Date | null;
   updatedAt!: Date | null;
   // Relations
-  productCategoryBannerRelations?: ProductCategoryBannerRelation[] | null;
+  products?: ProductEntity[] | null;
 }

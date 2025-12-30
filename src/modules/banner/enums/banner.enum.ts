@@ -10,10 +10,3 @@ export enum EBannerStatus {
     INACTIVE = 'INACTIVE', // 비활성화
     SCHEDULED = 'SCHEDULED', // 예약됨
 }
-export enum ECategoryType {
-    ALL = 'ALL', // 모든 배너
-    LIVESTOCK = 'LIVESTOCK', // 라이브스톡
-    CONVENIENCE_FOOD = 'CONVENIENCE_FOOD', // 편의점 음식
-    FISHERIES = 'FISHERIES', // 수산물
-    SIDE_DISH = 'SIDE_DISH', // 사이드 요리
-}

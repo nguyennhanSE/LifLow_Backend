@@ -12,7 +12,8 @@ import { PaginatedResponseDto } from './dto/paginated-response.dto';
 import { BannerBulkUpdateStatusDto } from './dto/bulk-update-status.dto';
 import { ReorderBannersDto } from './dto/reorder-banners.dto';
 import { BannerMapper } from './mappers/banner.mapper';
-import { EBannerType, ECategoryType } from './enums/banner.enum';
+import { EBannerType } from './enums/banner.enum';
+import { ECategoryType } from '../categories/enums/category.enum';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AppLogger } from '../../libs/logger/logger.service';
 import { BannerEntity } from './entities/banner.entity';
@@ -186,23 +187,20 @@ export class BannerService {
         throw new NotFoundException(`Banner with ID ${bannerId} not found`);
       }
 
-      // Check if banner has product relations through ProductCategoryBannerRelation
-      if (!banner.productCategoryBannerRelations || banner.productCategoryBannerRelations.length === 0) {
+      // Check if banner has product relation
+      if (!banner.product) {
         throw new BadRequestException(
-          'Banner does not have an associated product through ProductCategoryBannerRelation',
+          'Banner does not have an associated product',
         );
       }
 
-      // Verify all products in relations still exist
-      for (const relation of banner.productCategoryBannerRelations) {
-        const productId = relation.productId;
-        if (productId && typeof productId === 'string') {
-          await this.productService.getProductById(productId);
-        }
+      // Verify product still exists
+      if (banner.productId) {
+        await this.productService.getProductById(banner.productId);
       }
 
       this.logger.log(
-        `Verified product data for banner: ID=${bannerId}, Relations=${banner.productCategoryBannerRelations.length}`,
+        `Verified product data for banner: ID=${bannerId}, ProductId=${banner.productId}`,
       );
 
       // Return the banner as-is since we're just verifying the products exist
@@ -394,7 +392,7 @@ export class BannerService {
     }
   }
 
-  async getBannersByCategory(category: ECategoryType): Promise<BannerEntity[]> {
+  async getBannersByCategory(category: ECategoryType | 'ALL'): Promise<BannerEntity[]> {
     const banners = await this.bannerRepository.getBannersByCategory(category);
     return banners;
   }

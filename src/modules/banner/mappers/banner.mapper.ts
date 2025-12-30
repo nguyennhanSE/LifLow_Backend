@@ -1,17 +1,11 @@
-import { Banner, Prisma, Product, Category } from '@prisma/client';
+import { Banner, Prisma } from '@prisma/client';
 import { BannerEntity } from '../entities/banner.entity';
 import { EBannerType, EBannerStatus } from '../enums/banner.enum';
 import { toProductEntity } from '../../product/mapper/product.mapper';
-import { toCategoryEntity } from '../../categories/mapper/category.mapper';
 
 type BannerWithRelations = Prisma.BannerGetPayload<{
   include: {
-    productCategoryBannerRelations: {
-      include: {
-        product: true;
-        category: true;
-      };
-    };
+    product: true;
   };
 }>;
 
@@ -55,29 +49,11 @@ export class BannerMapper {
   static toEntityWithProduct(prismaBanner: BannerWithRelations): BannerEntity {
     const entity = this.toEntity(prismaBanner);
     
-    // Get product from productCategoryBannerRelations if available
-    // Note: Banner model no longer has direct product relation, only productId field
-    // Product can be accessed through productCategoryBannerRelations
-    // if (prismaBanner.productCategoryBannerRelations && prismaBanner.productCategoryBannerRelations.length > 0) {
-    //   const firstRelation = prismaBanner.productCategoryBannerRelations[0];
-    //   if (firstRelation.product) {
-    //     entity.product = plainToInstance(ProductEntity, firstRelation.product);
-    //   } else {
-    //     entity.product = null;
-    //   }
-    // } else {
-    //   entity.product = null;
-    // }
-
-    // Map productCategoryBannerRelations if included
-    if (prismaBanner.productCategoryBannerRelations) {
-      entity.productCategoryBannerRelations = prismaBanner.productCategoryBannerRelations.map(relation => ({
-        id: relation.id,
-        product: relation.product ? toProductEntity(relation.product as Product) : null,
-        category: relation.category ? toCategoryEntity(relation.category as Category) : null
-      })) as any; // Type assertion needed because we're transforming Prisma types to entities
+    // Map product if included
+    if (prismaBanner.product) {
+      entity.product = toProductEntity(prismaBanner.product);
     } else {
-      entity.productCategoryBannerRelations = null;
+      entity.product = null;
     }
     
     return entity;
@@ -89,7 +65,7 @@ export class BannerMapper {
    * @returns BannerEntity for API responses
    */
   static toResponse(prismaBanner: Banner | BannerWithRelations): BannerEntity {
-    if ('productCategoryBannerRelations' in prismaBanner && prismaBanner.productCategoryBannerRelations) {
+    if ('product' in prismaBanner && prismaBanner.product) {
       return this.toEntityWithProduct(prismaBanner);
     }
     return this.toEntity(prismaBanner);

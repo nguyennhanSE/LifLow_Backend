@@ -1,7 +1,7 @@
 import { Expose, Type } from 'class-transformer';
-import { EBannerType, EBannerStatus, ECategoryType } from '../enums/banner.enum';
+import { EBannerType, EBannerStatus } from '../enums/banner.enum';
+import { ECategoryType } from '../../categories/enums/category.enum';
 import { ProductEntity } from '../../product/entities/product.entity';
-import { ProductCategoryBannerRelation } from '@prisma/client';
 
 export class BannerEntity {
   @Expose()
@@ -62,7 +62,4 @@ export class BannerEntity {
   @Expose()
   @Type(() => ProductEntity)
   product?: ProductEntity | null;
-
-  @Expose()
-  productCategoryBannerRelations?: ProductCategoryBannerRelation[] | null;
 }

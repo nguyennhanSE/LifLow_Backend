@@ -42,7 +42,8 @@ import { DeactivateExpiredResponseDto } from './dto/deactivate-expired-response.
 import { SyncProductDataResponseDto } from './dto/sync-product-data-response.dto';
 import { TasksStatusResponseDto } from './dto/tasks-status-response.dto';
 import { DeleteBannerResponseDto } from './dto/delete-banner-response.dto';
-import { EBannerType, ECategoryType } from './enums/banner.enum';
+import { EBannerType } from './enums/banner.enum';
+import { ECategoryType } from '../categories/enums/category.enum';
 import { BannerTasksService } from './tasks/banner-tasks.service';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
@@ -229,7 +230,19 @@ export class BannerController {
     description: 'Invalid banner type',
   })
   async findActiveByType(
-    @Param('type', new ParseEnumPipe(EBannerType))
+    @Param(
+      'type',
+      new ParseEnumPipe(EBannerType, {
+        exceptionFactory: (errors) => {
+          const validValues = Object.values(EBannerType).join(', ');
+          return new BadRequestException({
+            message: `Invalid banner type. Valid values are: ${validValues}`,
+            error: 'Bad Request',
+            statusCode: 400,
+          });
+        },
+      }),
+    )
     type: EBannerType,
   ) {
     const responseModel = new ResponseModel();
@@ -610,10 +623,10 @@ export class BannerController {
   // TODO: Add authentication guard
   // @UseGuards(JwtAuthGuard, RolesGuard)
   // @Roles('admin')
-  async getTasksStatus() {
+  getTasksStatus() {
     const responseModel = new ResponseModel();
-    const result = await this.bannerTasksService.getTasksStatus();
-    responseModel.setData(result);
+    const result = this.bannerTasksService.getTasksStatus();
+    responseModel.setData(result as any);
     return responseModel;
   }
 
@@ -672,15 +685,20 @@ export class BannerController {
   @ApiParam({
     name: 'category',
     type: String,
-    description: 'Category',
-    example: ECategoryType.LIVESTOCK,
+    description: 'Category type or "ALL" to get banners with null productCategoryNumber',
+    example: 'LIVESTOCK',
   })
   @ApiResponse({
     status: 200,
     description: 'Banners retrieved successfully',
     type: [BannerEntity],
   })
-  async getBannersByCategory(@Param('category', new ParseEnumPipe(ECategoryType)) category: ECategoryType) {
+  async getBannersByCategory(
+    @Param(
+      'category'
+    )
+    category: ECategoryType | 'ALL',
+  ) {
     const responseModel = new ResponseModel();
     const result = await this.bannerService.getBannersByCategory(category);
     responseModel.setData(result);

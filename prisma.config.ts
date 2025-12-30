@@ -1,10 +1,12 @@
 import * as dotenv from 'dotenv';
-import { defineConfig } from 'prisma/config';
+import { defineConfig, env } from 'prisma/config';
 
 // Load the same env file as your Nest app (`.env.dev` in development, `.env.prod` in production)
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const envFile = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 dotenv.config({ path: envFile });
+
+console.log('DATABASE_URL', env('DATABASE_URL'));
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',
@@ -14,6 +16,6 @@ export default defineConfig({
   },
   datasource: {
     // Use DATABASE_URL from the selected env file
-    url: process.env.DATABASE_URL!,
+    url: env('DATABASE_URL'),
   },
 });

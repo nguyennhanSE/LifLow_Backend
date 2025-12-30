@@ -44,12 +44,9 @@ export class ProductRepository {
       take: pagination.limit,
       include: {
         productSpecialOffer: true,
-        productCategoryBannerRelations: {
-          include: {
-            banner: true,
-            category: true,
-          },
-        },
+        productDiscount: true,
+        productCategory: true,
+        banner: true,
       },
     });
 
@@ -63,12 +60,10 @@ export class ProductRepository {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
-        productCategoryBannerRelations: {
-          include: {
-            banner: true,
-            category: true,
-          },
-        },
+        productSpecialOffer: true,
+        productDiscount: true,
+        productCategory: true,
+        banner: true,
       },
     });
 
@@ -76,7 +71,7 @@ export class ProductRepository {
       return null;
     }
 
-    return toProductEntity(product);
+    return toProductEntityWithRelations(product);
   }
 
   /**
@@ -167,10 +162,7 @@ export class ProductRepository {
         data: createData,
       });
 
-      // Note: Product categories are now managed through ProductCategoryBannerRelation
-      // If you need to create product-category relations without banners,
-      // you may need to create a separate join table or use ProductCategoryBannerRelation with a null bannerId
-      // For now, categories are handled through ProductCategoryBannerRelation
+      // Note: Product category is now managed through direct relation via productCategoryNumber
 
       return toProductEntity(product);
     } catch (error: any) {
@@ -192,7 +184,7 @@ export class ProductRepository {
       const { hsCode, ...restData } = data;
       const updateData: Prisma.ProductUpdateInput = restData as Prisma.ProductUpdateInput;
       if (hsCode !== undefined) {
-        updateData.hsCode = hsCode !== null ? BigInt(hsCode) : null;
+        updateData.hsCode = hsCode !== null ? BigInt(String(hsCode)) : null;
       }
 
       const product = await this.prisma.product.update({
@@ -536,12 +528,9 @@ export class ProductRepository {
       take: pagination.limit,
       include: {
         productSpecialOffer: true,
-        productCategoryBannerRelations: {
-          include: {
-            banner: true,
-            category: true,
-          },
-        },
+        productDiscount: true,
+        productCategory: true,
+        banner: true,
       },
     });
 

@@ -1,16 +1,15 @@
-import { Category, Product, Prisma, ProductSpecialOffer } from "@prisma/client";
+import { Category, Product, Prisma, ProductSpecialOffer, Banner } from "@prisma/client";
 import { ProductEntity, ProductSpecialOfferEntity } from "../entities/product.entity";
 import { toCategoryEntity } from "src/modules/categories/mapper/category.mapper";
 import { CategoryEntity } from "src/modules/categories/entities/category.entity";
+import { BannerMapper } from "src/modules/banner/mappers/banner.mapper";
 
 type ProductWithCategory = Prisma.ProductGetPayload<{
   include: { 
-    productSpecialOffer: true, 
-    productCategoryBannerRelations: { 
-      include: { 
-        category: true 
-      } 
-    } 
+    productSpecialOffer: true,
+    productDiscount: true,
+    productCategory: true,
+    banner: true
   }
 }>
 
@@ -142,20 +141,20 @@ export function toProductEntity(product: Product): ProductEntity {
 }
 
 export function toProductEntityWithRelations(product: ProductWithCategory): ProductEntity {
-  // Extract unique categories from productCategoryBannerRelations
-  const categoryMap = new Map<string, Category>();
-  if (product.productCategoryBannerRelations) {
-    product.productCategoryBannerRelations.forEach(relation => {
-      if (relation.category) {
-        categoryMap.set(relation.category.productCategoryNumber, relation.category);
-      }
-    });
-  }
-  const categories = Array.from(categoryMap.values());
-
   return {
     ...toProductEntity(product),
-    categories: categories.map(category => toCategoryEntity(category)),
+    category: product.productCategory ? toCategoryEntity(product.productCategory) : null,
     productSpecialOffer: product.productSpecialOffer ? toProductSpecialOfferEntity(product.productSpecialOffer) : null,
+    productDiscount: product.productDiscount ? {
+      id: product.productDiscount.id,
+      status: product.productDiscount.status,
+      productId: product.productDiscount.productId,
+      discountRate: product.productDiscount.discountRate,
+      discountStartDate: product.productDiscount.discountStartDate,
+      discountEndDate: product.productDiscount.discountEndDate,
+      createdAt: product.productDiscount.createdAt,
+      updatedAt: product.productDiscount.updatedAt,
+    } : null,
+    banner: product.banner ? product.banner.map((banner: Banner) => BannerMapper.toEntity(banner)) : null,
   }
 }

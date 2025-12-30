@@ -169,29 +169,23 @@ export class BannerTasksService {
     try {
       this.logger.log('Starting product banner data sync task...');
 
-      // Find all banners with associated products through ProductCategoryBannerRelation
+      // Find all banners with associated products (direct relation via productId)
       const productBanners = await this.prisma.banner.findMany({
         where: {
-          productCategoryBannerRelations: {
-            some: {
-              productId: {
-                not: null,
-              },
-            },
+          productId: {
+            not: null,
           },
         },
         include: {
-          productCategoryBannerRelations: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  productName: true,
-                  productPrice: true,
-                  brand: true,
-                  productSummaryDescription: true,
-                },
-              },
+          product: {
+            select: {
+              id: true,
+              productName: true,
+              productPrice: true,
+              salePrice: true,
+              brand: true,
+              productSummaryDescription: true,
+              imageRegistrationThumbnail: true,
             },
           },
         },
@@ -212,20 +206,26 @@ export class BannerTasksService {
       await this.prisma.$transaction(async (tx) => {
         for (const banner of productBanners) {
           try {
-            // Get product from productCategoryBannerRelations (source of truth)
-            const product = banner.productCategoryBannerRelations?.[0]?.product || null;
+            // Get product from direct relation
+            const product = banner.product;
             if (!product) {
               this.logger.warn(
-                `Banner ${banner.id} has no product relation in ProductCategoryBannerRelation - skipping`,
+                `Banner ${banner.id} has productId but no product relation found - skipping`,
               );
               failedCount++;
               continue;
             }
 
-            // Update denormalized product fields
+            // Update banner with product data if needed
+            // Note: Banner doesn't have denormalized product fields in schema,
+            // so this sync task may not be needed unless you add such fields
+            // For now, we'll just verify the relation exists
             await tx.banner.update({
               where: { id: banner.id },
               data: {
+                // If you add denormalized fields later, update them here
+                // e.g., productName: product.productName,
+                //      productPrice: product.productPrice,
               },
             });
 
@@ -300,14 +300,14 @@ export class BannerTasksService {
    * Get status of all scheduled tasks
    * Useful for monitoring and debugging
    */
-  async getTasksStatus(): Promise<{
+  getTasksStatus(): {
     tasksEnabled: boolean;
     tasks: {
       name: string;
       description: string;
       schedule: string;
     }[];
-  }> {
+  } {
     return {
       tasksEnabled: this.tasksEnabled,
       tasks: [

@@ -1,5 +1,6 @@
-import { ProductCategoryBannerRelation } from "@prisma/client";
 import { CategoryEntity } from "src/modules/categories/entities/category.entity";
+import { ProductDiscountEntity } from "src/modules/product-discount/entities/product-discount.entity";
+import { BannerEntity } from "src/modules/banner/entities/banner.entity";
 
 export class ProductEntity {
   id!: string;
@@ -100,9 +101,10 @@ export class ProductEntity {
   // extension
   ctaButtonUrl?: string | null;
   // relation
-  categories?: CategoryEntity[] | null;
+  category?: CategoryEntity | null;
   productSpecialOffer?: ProductSpecialOfferEntity | null;
-  productCategoryBannerRelations?: ProductCategoryBannerRelation[] | null;
+  productDiscount?: ProductDiscountEntity | null;
+  banner?: BannerEntity[] | null;
 }
 
 

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { CategoryType, Prisma } from '@prisma/client';
 import { CategoryEntity } from '../entities/category.entity';
-import { toCategoryEntity } from '../mapper/category.mapper';
+import { toCategoryEntity, toCategoryEntityWithProducts } from '../mapper/category.mapper';
 import { DuplicateError } from '../../../utils/customErrors';
 
 @Injectable()
@@ -37,16 +37,11 @@ export class CategoryRepository {
       skip,
       take,
       include: {
-        productCategoryBannerRelations: {
-          include: {
-            product: true,
-            banner: true,
-          },
-        },
+        products: true,
       },
     });
 
-    return categories.map(category => toCategoryEntity(category));
+    return categories.map(category => toCategoryEntityWithProducts(category));
   }
 
   /**
@@ -56,12 +51,7 @@ export class CategoryRepository {
     const category = await this.prisma.category.findUnique({
       where: { productCategoryNumber },
       include: {
-        productCategoryBannerRelations: {
-          include: {
-            product: true,
-            banner: true,
-          },
-        },
+        products: true,
       },
     });
 
@@ -69,7 +59,7 @@ export class CategoryRepository {
       throw new NotFoundException(`Category with productCategoryNumber ${productCategoryNumber} not found`);
     }
 
-    return toCategoryEntity(category);
+    return toCategoryEntityWithProducts(category);
   }
 
   /**
@@ -139,16 +129,11 @@ export class CategoryRepository {
       const category = await this.prisma.category.create({
         data,
         include: {
-          productCategoryBannerRelations: {
-            include: {
-              product: true,
-              banner: true,
-            },
-          },
+          products: true,
         },
       });
 
-      return toCategoryEntity(category);
+      return toCategoryEntityWithProducts(category);
     } catch (error: any) {
       // Handle Prisma unique constraint violation
       if (error.code === 'P2002') {
@@ -177,16 +162,11 @@ export class CategoryRepository {
           description: data.description,
         },
         include: {
-          productCategoryBannerRelations: {
-            include: {
-              product: true,
-              banner: true,
-            },
-          },
+          products: true,
         },
       });
 
-      return toCategoryEntity(category);
+      return toCategoryEntityWithProducts(category);
     } catch (error: any) {
       // Handle record not found
       if (error.code === 'P2025') {

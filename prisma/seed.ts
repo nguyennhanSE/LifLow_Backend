@@ -412,7 +412,6 @@ async function resetAllData() {
     () => prisma.user.deleteMany(),
     () => prisma.role.deleteMany(),
     () => prisma.membership.deleteMany(),
-    () => prisma.productCategoryBannerRelation.deleteMany(), // Delete ProductCategoryBannerRelation before Category
     () => prisma.category.deleteMany(),
     () => prisma.product.deleteMany(),
   ];
@@ -666,26 +665,21 @@ async function seedCategories() {
   const categoriesData = [
     {
       productCategoryNumber: 'CAT001',
-      name: CategoryType.ALL,
-      description: 'All products - Complete catalog of all available products',
-    },
-    {
-      productCategoryNumber: 'CAT002',
       name: CategoryType.LIVESTOCK,
       description: 'Livestock products - Fresh premium meats and livestock products',
     },
     {
-      productCategoryNumber: 'CAT003',
+      productCategoryNumber: 'CAT002',
       name: CategoryType.CONVENIENCE_FOOD,
       description: 'Convenience food - Quick and ready-to-eat meals for busy lifestyles',
     },
     {
-      productCategoryNumber: 'CAT004',
+      productCategoryNumber: 'CAT003',
       name: CategoryType.FISHERIES,
       description: 'Fisheries - Fresh seafood and premium fish products',
     },
     {
-      productCategoryNumber: 'CAT005',
+      productCategoryNumber: 'CAT004',
       name: CategoryType.SIDE_DISH,
       description: 'Side dish - Premium oils, condiments, and side dish ingredients',
     },
@@ -713,14 +707,11 @@ async function seedCategories() {
   return createdCategories;
 }
 
-// Note: Product categories are now managed through ProductCategoryBannerRelation
-// This function is kept for reference but product-category relationships should be created
-// through ProductCategoryBannerRelation when banners are created
+// Note: Product categories are managed directly through the Product model's productCategoryNumber field
 function seedProductCategories(
   products: Array<{ id: string; productCode: string | null; productName: string | null; salePrice: number | null; productCategoryNumber: string | null }>,
 ) {
-  console.log('🔗 Product-category relationships are now managed through ProductCategoryBannerRelation');
-  console.log('   Relationships will be created when banners are linked to products and categories\n');
+  console.log('🔗 Product-category relationships are managed through Product.productCategoryNumber\n');
   return [];
 }
 
@@ -1156,28 +1147,26 @@ async function seedBanners(
   console.log('🎨 Creating banners...');
 
   const banners: Array<{ id: string; title: string; type: BannerType; status: BannerStatus; linkedProductId?: string }> = [];
-  let relationsCount = 0;
   
-  // Map products by category for easy access
-  const productsByCategory = new Map<string, typeof products>();
-  products.forEach(product => {
-    if (product.productCategoryNumber) {
-      if (!productsByCategory.has(product.productCategoryNumber)) {
-        productsByCategory.set(product.productCategoryNumber, []);
-      }
-      productsByCategory.get(product.productCategoryNumber)!.push(product);
-    }
-  });
+  // Create a map from productCategoryNumber to CategoryType
+  const categoryTypeMap = new Map<string, CategoryType>();
+  categoryTypeMap.set('CAT001', CategoryType.LIVESTOCK);
+  categoryTypeMap.set('CAT002', CategoryType.CONVENIENCE_FOOD);
+  categoryTypeMap.set('CAT003', CategoryType.FISHERIES);
+  categoryTypeMap.set('CAT004', CategoryType.SIDE_DISH);
   
-  // Get all products for ALL category type
-  const allProducts = products;
+  // Helper function to get categoryType from productCategoryNumber
+  const getCategoryType = (productCategoryNumber: string | null): CategoryType | null => {
+    if (!productCategoryNumber) return null;
+    return categoryTypeMap.get(productCategoryNumber) || null;
+  };
   
   // 1 MAIN_PRODUCTS, 6 CATEGORY (5 CategoryType + 1 extra), 3 FOOTER, 1 CONTENT_HERO, 1 SPECIAL_PRICE = 12 banners
   const bannersData = [
-    // 1. MAIN_PRODUCTS Banner
+    // 1. MAIN_PRODUCTS Banner - productCategoryNumber should be null
     {
       type: BannerType.MAIN_PRODUCTS,
-      productCategoryNumber: 'CAT001',
+      productCategoryNumber: products[0].productCategoryNumber,
       categoryType: null,
       status: BannerStatus.ACTIVE,
       title: 'Premium Quality for Your Kitchen',
@@ -1190,13 +1179,13 @@ async function seedBanners(
       displayOrder: 1,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[0].id, // CAT001
+      productId: products[0].id, // CAT001 - Premium Organic Olive Oil
     },
-    // 2. CATEGORY Banner - ALL
+    // 2. CATEGORY Banner - ALL (no specific category)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: 'CAT001', // Using CAT001 for ALL type
-      categoryType: CategoryType.ALL,
+      productCategoryNumber: products[0].productCategoryNumber,
+      categoryType: null,
       status: BannerStatus.ACTIVE,
       title: 'Shop Everything You Need',
       badgeText: 'All Products',
@@ -1210,10 +1199,10 @@ async function seedBanners(
       endDate: new Date('2025-12-31'),
       productId: products[0].id, // CAT001
     },
-    // 3. CATEGORY Banner - LIVESTOCK
+    // 3. CATEGORY Banner - LIVESTOCK (CAT001)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: 'CAT003',
+      productCategoryNumber: 'CAT001',
       categoryType: CategoryType.LIVESTOCK,
       status: BannerStatus.ACTIVE,
       title: 'Explore Fresh Meats',
@@ -1226,12 +1215,12 @@ async function seedBanners(
       displayOrder: 3,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[3].id, // CAT003 - Premium Wagyu Beef Set
+      productId: products[0].id, // CAT001 - Premium Organic Olive Oil (LIVESTOCK)
     },
-    // 4. CATEGORY Banner - CONVENIENCE_FOOD
+    // 4. CATEGORY Banner - CONVENIENCE_FOOD (CAT002)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: 'CAT002',
+      productCategoryNumber: products[1].productCategoryNumber,
       categoryType: CategoryType.CONVENIENCE_FOOD,
       status: BannerStatus.ACTIVE,
       title: 'Quick & Convenient Meals',
@@ -1244,12 +1233,12 @@ async function seedBanners(
       displayOrder: 4,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[1].id, // CAT002
+      productId: products[1].id, // CAT002 - Artisan Whole Grain Bread (CONVENIENCE_FOOD)
     },
-    // 5. CATEGORY Banner - FISHERIES
+    // 5. CATEGORY Banner - FISHERIES (CAT003)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: 'CAT003',
+      productCategoryNumber: products[2].productCategoryNumber,
       categoryType: CategoryType.FISHERIES,
       status: BannerStatus.ACTIVE,
       title: 'Fresh Seafood Collection',
@@ -1262,12 +1251,12 @@ async function seedBanners(
       displayOrder: 5,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[2].id, // CAT003 - Wild Caught Salmon Fillet
+      productId: products[2].id, // CAT003 - Wild Caught Salmon Fillet (FISHERIES)
     },
-    // 6. CATEGORY Banner - SIDE_DISH
+    // 6. CATEGORY Banner - SIDE_DISH (CAT004)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: 'CAT004',
+      productCategoryNumber: products[3].productCategoryNumber,
       categoryType: CategoryType.SIDE_DISH,
       status: BannerStatus.ACTIVE,
       title: 'Fresh From Farm to Table',
@@ -1280,13 +1269,13 @@ async function seedBanners(
       displayOrder: 6,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[4].id, // CAT004
+      productId: products[4].id, // CAT004 - Organic Vegetable Box (SIDE_DISH)
     },
-    // 7. CATEGORY Banner - SIDE_DISH (extra one to make 6 CATEGORY banners)
+    // 7. CATEGORY Banner - SIDE_DISH (extra one, using CAT001 product but should match categoryType)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: 'CAT001',
-      categoryType: CategoryType.SIDE_DISH,
+      productCategoryNumber: products[0].productCategoryNumber,
+      categoryType: CategoryType.LIVESTOCK,
       status: BannerStatus.ACTIVE,
       title: 'Premium Oils & Condiments',
       badgeText: 'Organic',
@@ -1298,13 +1287,13 @@ async function seedBanners(
       displayOrder: 7,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[0].id, // CAT001
+      productId: products[0].id, // CAT001 - Premium Organic Olive Oil (LIVESTOCK)
     },
     // 8. FOOTER Banner 1
     {
       type: BannerType.FOOTER,
-      productCategoryNumber: 'CAT002',
-      categoryType: null,
+      productCategoryNumber: products[1].productCategoryNumber, // CAT002
+      categoryType: getCategoryType(products[1].productCategoryNumber), // CONVENIENCE_FOOD
       status: BannerStatus.ACTIVE,
       title: 'Join Our Newsletter',
       badgeText: null,
@@ -1316,13 +1305,13 @@ async function seedBanners(
       displayOrder: 8,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[1].id, // CAT002
+      productId: products[1].id, // CAT002 - Artisan Whole Grain Bread
     },
     // 9. FOOTER Banner 2
     {
       type: BannerType.FOOTER,
-      productCategoryNumber: 'CAT003',
-      categoryType: null,
+      productCategoryNumber: products[2].productCategoryNumber, // CAT003
+      categoryType: getCategoryType(products[2].productCategoryNumber), // FISHERIES
       status: BannerStatus.ACTIVE,
       title: 'Follow Us on Social Media',
       badgeText: 'Connect',
@@ -1334,13 +1323,13 @@ async function seedBanners(
       displayOrder: 9,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[2].id, // CAT003
+      productId: products[2].id, // CAT003 - Wild Caught Salmon Fillet
     },
     // 10. FOOTER Banner 3
     {
       type: BannerType.FOOTER,
-      productCategoryNumber: 'CAT004',
-      categoryType: null,
+      productCategoryNumber: products[4].productCategoryNumber, // CAT004
+      categoryType: getCategoryType(products[4].productCategoryNumber), // SIDE_DISH
       status: BannerStatus.ACTIVE,
       title: 'Customer Support',
       badgeText: '24/7',
@@ -1352,13 +1341,13 @@ async function seedBanners(
       displayOrder: 10,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[4].id, // CAT004
+      productId: products[4].id, // CAT004 - Organic Vegetable Box
     },
     // 11. CONTENT_HERO Banner
     {
       type: BannerType.CONTENT_HERO,
-      productCategoryNumber: 'CAT002',
-      categoryType: null,
+      productCategoryNumber: products[1].productCategoryNumber, // CAT002
+      categoryType: getCategoryType(products[1].productCategoryNumber), // CONVENIENCE_FOOD
       status: BannerStatus.ACTIVE,
       title: 'Valentine\'s Day Special',
       badgeText: 'Coming Soon',
@@ -1370,13 +1359,13 @@ async function seedBanners(
       displayOrder: 11,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[1].id, // CAT002
+      productId: products[1].id, // CAT002 - Artisan Whole Grain Bread
     },
     // 12. SPECIAL_PRICE Banner
     {
       type: BannerType.SPECIAL_PRICE,
-      productCategoryNumber: 'CAT003',
-      categoryType: CategoryType.FISHERIES,
+      productCategoryNumber: products[2].productCategoryNumber, // CAT003
+      categoryType: getCategoryType(products[2].productCategoryNumber), // FISHERIES
       status: BannerStatus.ACTIVE,
       title: 'This Week\'s Special Offer',
       badgeText: '30% OFF',
@@ -1388,7 +1377,7 @@ async function seedBanners(
       displayOrder: 12,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[2].id, // CAT003
+      productId: products[2].id, // CAT003 - Wild Caught Salmon Fillet
     },
   ];
 
@@ -1412,26 +1401,6 @@ async function seedBanners(
       },
     });
     
-    // Create ProductCategoryBannerRelation for ALL banners (all have productId and productCategoryNumber)
-    if (data.productId && data.productCategoryNumber) {
-      try {
-        await prisma.productCategoryBannerRelation.create({
-          data: {
-            productId: data.productId,
-            bannerId: banner.id,
-            productCategoryNumber: data.productCategoryNumber,
-          },
-        });
-        relationsCount++;
-        console.log(`   ✓ Created relation: Product ${data.productId} - Banner ${banner.id} - Category ${data.productCategoryNumber}`);
-      } catch (error: any) {
-        // Skip if relation already exists or category doesn't exist
-        if (error?.code !== 'P2002' && error?.code !== 'P2003') {
-          console.warn(`   ⚠ Could not create relation for banner ${banner.id}: ${error.message}`);
-        }
-      }
-    }
-    
     banners.push({ 
       id: banner.id, 
       title: data.title, 
@@ -1442,8 +1411,7 @@ async function seedBanners(
     console.log(`   ✓ ${data.title} (${data.type}, ${data.status}, categoryType: ${data.categoryType || 'N/A'})`);
   }
 
-  console.log(`✅ Created ${banners.length} banners (all ACTIVE)`);
-  console.log(`✅ Created ${relationsCount} ProductCategoryBannerRelations\n`);
+  console.log(`✅ Created ${banners.length} banners (all ACTIVE)\n`);
   return banners;
 }
 
