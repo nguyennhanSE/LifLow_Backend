@@ -4,20 +4,55 @@ Complete NestJS module for managing recipes with full CRUD operations, authentic
 
 ## 🚀 Getting Started
 
+### Prerequisites
+
+Before running the application, ensure you have the following installed:
+- **Docker** (version 20.10 or higher)
+- **Docker Compose** (version 2.0 or higher)
+
 ### Running the Application
 
-To run the application, use Docker Compose:
+**To start the application, use the following command:**
 
 ```bash
 docker compose up --build
 ```
 
 This command will:
-- Build the Docker images
+- Build the Docker images from scratch
 - Start all required services (database, application, etc.)
 - Set up the application environment
+- Run database migrations automatically
 
 The application will be available once the containers are running.
+
+#### Additional Docker Compose Commands
+
+**Run in detached mode (background):**
+```bash
+docker compose up --build -d
+```
+
+**Stop the application:**
+```bash
+docker compose down
+```
+
+**Stop and remove volumes (clean reset):**
+```bash
+docker compose down -v
+```
+
+**View logs:**
+```bash
+docker compose logs -f
+```
+
+**Rebuild without cache:**
+```bash
+docker compose build --no-cache
+docker compose up
+```
 
 ## 📁 Module Structure
 
