@@ -24,12 +24,18 @@ async function bootstrap() {
       .addServer(`http://localhost:${config.APP_PORT}/api/v1`, 'Development server')
       .build();
   } else if (NODE_ENV === 'production') {
+    // Remove trailing slash and /api/v1 if present to avoid duplication
+    let baseUrl = config.APP_HOST.trim();
+    baseUrl = baseUrl.replace(/\/+$/, ''); // Remove trailing slashes
+    baseUrl = baseUrl.replace(/\/api\/v1\/?$/, ''); // Remove /api/v1 if present
+    baseUrl = `${baseUrl}/api/v1`; // Always add /api/v1
+    
     swaggerConfig = new DocumentBuilder()
       .addBearerAuth()
       .setTitle('Liflow Backend API')
       .setDescription('API of Liflow Backend with authentication and role-based authorization')
       .setVersion('1.0')
-      .addServer(`${config.APP_HOST}/api/v1`, 'Production server')
+      .addServer(baseUrl, 'Production server')
       .build();
   }
 
