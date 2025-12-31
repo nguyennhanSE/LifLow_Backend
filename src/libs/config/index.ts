@@ -8,7 +8,7 @@ dotenv.config({ path: envFile });
 export const config = {
   // App Configuration
   APP_PORT: parseInt(process.env.PORT || process.env.APP_PORT || '3001', 10),
-  APP_HOST: process.env.APP_HOST || 'http://localhost:3001',
+  APP_HOST: process.env.APP_HOST || 'http://localhost:3500',
 
   // Frontend Configuration
   FRONTEND_URL: process.env.FRONTEND_URL ?? 'http://localhost:3000',

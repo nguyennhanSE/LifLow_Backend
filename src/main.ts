@@ -24,11 +24,26 @@ async function bootstrap() {
       .addServer(`http://localhost:${config.APP_PORT}/api/v1`, 'Development server')
       .build();
   } else if (NODE_ENV === 'production') {
-    // Remove trailing slash and /api/v1 if present to avoid duplication
+    // Parse and clean APP_HOST to extract only origin (protocol + host + port)
+    // Remove any path segments including /api/v1 to avoid duplication
     let baseUrl = config.APP_HOST.trim();
-    baseUrl = baseUrl.replace(/\/+$/, ''); // Remove trailing slashes
-    baseUrl = baseUrl.replace(/\/api\/v1\/?$/, ''); // Remove /api/v1 if present
-    baseUrl = `${baseUrl}/api/v1`; // Always add /api/v1
+    
+    try {
+      // Parse URL to extract only origin (protocol + hostname + port)
+      const url = new URL(baseUrl);
+      baseUrl = `${url.protocol}//${url.host}`;
+    } catch (error) {
+      // If URL parsing fails, try manual cleanup
+      baseUrl = baseUrl.replace(/\/+$/, ''); // Remove trailing slashes
+      // Remove any path segments (everything after the first / after host:port)
+      const match = baseUrl.match(/^(https?:\/\/[^/]+)/);
+      if (match) {
+        baseUrl = match[1];
+      }
+    }
+    
+    // Always add /api/v1 to the clean origin
+    baseUrl = `${baseUrl}/api/v1`;
     
     swaggerConfig = new DocumentBuilder()
       .addBearerAuth()
