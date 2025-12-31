@@ -1,7 +1,6 @@
 
 services:
   app:
-    container_name: liflow-backend-container
     build:
       context: .
       dockerfile: Dockerfile
@@ -25,12 +24,15 @@ services:
     restart: unless-stopped
     networks:
       - liflow-network
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run start:dev
 
   postgres:
-    container_name: postgres
     image: postgres
     env_file:
-      - .env.prod
+      - .env.prod 
     environment:
       # IMPORTANT:
       # - `${...}` here is resolved by Docker Compose *before* containers start.
@@ -53,7 +55,6 @@ services:
       timeout: 5s
       retries: 5
   redis: 
-    container_name: redis
     image: redis:7-alpine
     ports:
       - "6379:6379"
@@ -70,10 +71,9 @@ services:
     # environment:
     #   - REDIS_REPLICATION_MODE=master
   backup:
-    container_name: postgres-backup
     image: prodrigestivill/postgres-backup-local
     env_file:
-      - .env.prod
+      - .env.dev
     restart: unless-stopped
     volumes:
       - ./backups:/backups
@@ -81,8 +81,8 @@ services:
       # Use Docker service name for postgres connection
       - POSTGRES_HOST=postgres
       - POSTGRES_DB=${DATABASE_NAME:-postgres}
-      - POSTGRES_USER=${DATABASE_USERNAME:-postgres}
-      - POSTGRES_PASSWORD=${DATABASE_PASSWORD:-123456}
+      - POSTGRES_USER=${POSTGRES_BACKUP_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_BACKUP_USER_PASSWORD:-postgres}
       - SCHEDULE=@daily
       - BACKUP_KEEP_DAYS=7
       - EXTRA_OPTS=--schema=public

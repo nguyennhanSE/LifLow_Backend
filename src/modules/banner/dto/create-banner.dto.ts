@@ -10,10 +10,32 @@ import {
   IsNotEmpty,
   MaxLength,
   ValidateIf,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  Validate,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EBannerType, EBannerStatus } from '../enums/banner.enum';
 import { ECategoryType } from '../../categories/enums/category.enum';
+
+@ValidatorConstraint({ name: 'isProductIdAllowedForBannerType', async: false })
+export class IsProductIdAllowedForBannerTypeConstraint
+  implements ValidatorConstraintInterface
+{
+  validate(productId: any, args: any) {
+    const bannerType = args.object.type;
+    // productId chỉ được phép khi type là MAIN_PRODUCTS
+    // productId is only allowed when type is MAIN_PRODUCTS
+    if (productId && bannerType !== EBannerType.MAIN_PRODUCTS) {
+      return false;
+    }
+    return true;
+  }
+
+  defaultMessage(args: any) {
+    return 'productId chỉ được sử dụng cho banner type MAIN_PRODUCTS. productId is only allowed for MAIN_PRODUCTS banner type.';
+  }
+}
 
 export class CreateBannerDto {
   @ApiProperty({
@@ -45,10 +67,12 @@ export class CreateBannerDto {
   productCategoryNumber?: string;
 
   @ApiPropertyOptional({
-    description: 'Product ID (UUID) for product banners',
+    description: 'Product ID (UUID) - Chỉ được sử dụng cho banner type MAIN_PRODUCTS. Only allowed for MAIN_PRODUCTS banner type.',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @IsOptional()
+  @Validate(IsProductIdAllowedForBannerTypeConstraint)
+  @ValidateIf((o) => o.type === EBannerType.MAIN_PRODUCTS)
   @IsUUID('4', { message: 'productId must be a valid UUID' })
   productId?: string;
 

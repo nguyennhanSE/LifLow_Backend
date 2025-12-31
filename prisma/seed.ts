@@ -1,9 +1,10 @@
 // Import PrismaClient from generated location
-import { PrismaClient, CouponType, CouponTargetGrade, OrderSituation, BannerType, BannerStatus, CategoryType } from '@prisma/client';
+import { PrismaClient, CouponType, CouponTargetGrade, OrderSituation, BannerType, BannerStatus, CategoryType, RecipeCategory } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
 import { config } from '../src/libs/config';
+import { ECategoryType } from 'src/modules/categories/enums/category.enum';
 
 // ========================================
 // Database Connection Setup
@@ -408,7 +409,6 @@ async function resetAllData() {
     () => prisma.order.deleteMany(),
     () => prisma.point.deleteMany(),
     () => prisma.recipe.deleteMany(),
-    () => prisma.recipeCategory.deleteMany(),
     () => prisma.user.deleteMany(),
     () => prisma.role.deleteMany(),
     () => prisma.membership.deleteMany(),
@@ -870,75 +870,11 @@ async function seedPoints(
   return points;
 }
 
-async function seedRecipeCategories() {
-  console.log('📂 Creating recipe categories...');
-
-  const categories = [
-    {
-      name: 'Korean',
-      description: 'Traditional and modern Korean cuisine',
-    },
-    {
-      name: 'Italian',
-      description: 'Classic Italian dishes and pasta recipes',
-    },
-    {
-      name: 'Healthy',
-      description: 'Nutritious and balanced meal options',
-    },
-    {
-      name: 'Thai',
-      description: 'Authentic Thai flavors and spices',
-    },
-    {
-      name: 'Japanese',
-      description: 'Traditional Japanese cooking techniques',
-    },
-    {
-      name: 'Mediterranean',
-      description: 'Fresh Mediterranean cuisine with olive oil and herbs',
-    },
-    {
-      name: 'Vegan',
-      description: 'Plant-based recipes without animal products',
-    },
-    {
-      name: 'French',
-      description: 'Classical French culinary techniques and pastries',
-    },
-  ];
-
-  const createdCategories: Array<{ id: string; name: string }> = [];
-  for (const category of categories) {
-    // NOTE:
-    // - Some DBs / generated Prisma clients may not have `name` as a unique field in `WhereUniqueInput`.
-    // - Using findFirst + update/create avoids TS2322 while still keeping category names stable.
-    const existingCategory = await prisma.recipeCategory.findFirst({
-      where: { name: category.name },
-      select: { id: true, name: true },
-    });
-
-    const createdCategory = existingCategory
-      ? await prisma.recipeCategory.update({
-          where: { id: existingCategory.id },
-          data: { description: category.description },
-          select: { id: true, name: true },
-        })
-      : await prisma.recipeCategory.create({
-          data: category,
-          select: { id: true, name: true },
-        });
-    createdCategories.push(createdCategory);
-    console.log(`   ✓ ${category.name}`);
-  }
-
-  console.log(`✅ Created ${createdCategories.length} recipe categories\n`);
-  return createdCategories;
-}
+// RecipeCategory is now an enum, not a model, so we don't need to seed it
+// The enum values are: RECIPE, REVIEWS, DAILY_LIFE
 
 async function seedRecipes(
   users: Array<{ id: string; name: string }>,
-  recipeCategories: Array<{ id: string; name: string }>,
 ) {
   console.log('📖 Creating recipes...');
 
@@ -946,63 +882,59 @@ async function seedRecipes(
   const recipeData = [
     {
       title: 'Classic Korean Kimchi Fried Rice',
-      category: 'Korean',
+      category: RecipeCategory.RECIPE,
       content: 'A delicious and easy kimchi fried rice recipe with bacon and vegetables.',
       ingredients: ['Rice', 'Kimchi', 'Bacon', 'Green onion', 'Sesame oil', 'Soy sauce', 'Egg'],
     },
     {
       title: 'Homemade Italian Pasta Carbonara',
-      category: 'Italian',
+      category: RecipeCategory.RECIPE,
       content: 'Authentic Italian carbonara with eggs, pecorino cheese, and guanciale.',
       ingredients: ['Spaghetti', 'Eggs', 'Pecorino cheese', 'Guanciale', 'Black pepper'],
     },
     {
       title: 'Healthy Buddha Bowl',
-      category: 'Healthy',
+      category: RecipeCategory.RECIPE,
       content: 'A nutritious bowl packed with quinoa, roasted vegetables, and tahini dressing.',
       ingredients: ['Quinoa', 'Sweet potato', 'Chickpeas', 'Kale', 'Avocado', 'Tahini', 'Lemon'],
     },
     {
       title: 'Spicy Thai Green Curry',
-      category: 'Thai',
+      category: RecipeCategory.RECIPE,
       content: 'Aromatic Thai green curry with chicken and vegetables in coconut milk.',
       ingredients: ['Chicken', 'Green curry paste', 'Coconut milk', 'Thai basil', 'Bamboo shoots', 'Fish sauce'],
     },
     {
       title: 'Japanese Ramen Bowl',
-      category: 'Japanese',
+      category: RecipeCategory.RECIPE,
       content: 'Rich and flavorful ramen with pork belly, soft-boiled egg, and noodles.',
       ingredients: ['Ramen noodles', 'Pork belly', 'Egg', 'Green onion', 'Nori', 'Miso paste', 'Chicken broth'],
     },
     {
       title: 'Mediterranean Grilled Chicken',
-      category: 'Mediterranean',
+      category: RecipeCategory.RECIPE,
       content: 'Grilled chicken marinated in herbs and lemon, served with Greek salad.',
       ingredients: ['Chicken breast', 'Olive oil', 'Lemon', 'Oregano', 'Garlic', 'Tomatoes', 'Cucumber', 'Feta cheese'],
     },
     {
       title: 'Vegan Lentil Soup',
-      category: 'Vegan',
+      category: RecipeCategory.DAILY_LIFE,
       content: 'Hearty and nutritious lentil soup with vegetables and aromatic spices.',
       ingredients: ['Red lentils', 'Carrots', 'Celery', 'Onion', 'Garlic', 'Cumin', 'Vegetable broth'],
     },
     {
       title: 'Classic French Croissant',
-      category: 'French',
+      category: RecipeCategory.REVIEWS,
       content: 'Buttery, flaky croissants made from scratch with laminated dough.',
       ingredients: ['Flour', 'Butter', 'Milk', 'Sugar', 'Salt', 'Yeast'],
     },
   ];
-
-  // Create a map for quick category lookup
-  const categoryMap = new Map(recipeCategories.map(cat => [cat.name, cat.id]));
 
   const regularUsers = users.filter(u => u.name.startsWith('USER'));
 
   for (let i = 0; i < recipeData.length; i++) {
     const data = recipeData[i];
     const author = regularUsers[Math.floor(Math.random() * regularUsers.length)];
-    const categoryId = categoryMap.get(data.category);
 
     const recipe = await prisma.recipe.create({
       data: {
@@ -1010,13 +942,13 @@ async function seedRecipes(
         authorId: author.id,
         authorName: author.name,
         category: data.category,
-        recipeCategoryId: categoryId,
         dateOfWriting: generateRandomDate(365),
         views: Math.floor(Math.random() * 5000),
         status: 'active',
         content: data.content,
         ingredients: data.ingredients,
         thumbnailUrl: `https://example.com/thumbnails/recipe-${i + 1}.jpg`,
+        isActive: true,
       },
     });
 
@@ -1184,7 +1116,7 @@ async function seedBanners(
     // 2. CATEGORY Banner - ALL (no specific category)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: products[0].productCategoryNumber,
+      productCategoryNumber: null,
       categoryType: null,
       status: BannerStatus.ACTIVE,
       title: 'Shop Everything You Need',
@@ -1197,7 +1129,7 @@ async function seedBanners(
       displayOrder: 2,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[0].id, // CAT001
+      // productId không được phép cho CATEGORY banner
     },
     // 3. CATEGORY Banner - LIVESTOCK (CAT001)
     {
@@ -1215,12 +1147,12 @@ async function seedBanners(
       displayOrder: 3,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[0].id, // CAT001 - Premium Organic Olive Oil (LIVESTOCK)
+      // productId không được phép cho CATEGORY banner
     },
     // 4. CATEGORY Banner - CONVENIENCE_FOOD (CAT002)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: products[1].productCategoryNumber,
+      productCategoryNumber: 'CAT002',
       categoryType: CategoryType.CONVENIENCE_FOOD,
       status: BannerStatus.ACTIVE,
       title: 'Quick & Convenient Meals',
@@ -1233,12 +1165,12 @@ async function seedBanners(
       displayOrder: 4,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[1].id, // CAT002 - Artisan Whole Grain Bread (CONVENIENCE_FOOD)
+      // productId không được phép cho CATEGORY banner
     },
     // 5. CATEGORY Banner - FISHERIES (CAT003)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: products[2].productCategoryNumber,
+      productCategoryNumber: 'CAT003',
       categoryType: CategoryType.FISHERIES,
       status: BannerStatus.ACTIVE,
       title: 'Fresh Seafood Collection',
@@ -1251,12 +1183,12 @@ async function seedBanners(
       displayOrder: 5,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[2].id, // CAT003 - Wild Caught Salmon Fillet (FISHERIES)
+      // productId không được phép cho CATEGORY banner
     },
     // 6. CATEGORY Banner - SIDE_DISH (CAT004)
     {
       type: BannerType.CATEGORY,
-      productCategoryNumber: products[3].productCategoryNumber,
+      productCategoryNumber: 'CAT004',
       categoryType: CategoryType.SIDE_DISH,
       status: BannerStatus.ACTIVE,
       title: 'Fresh From Farm to Table',
@@ -1269,25 +1201,7 @@ async function seedBanners(
       displayOrder: 6,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[4].id, // CAT004 - Organic Vegetable Box (SIDE_DISH)
-    },
-    // 7. CATEGORY Banner - SIDE_DISH (extra one, using CAT001 product but should match categoryType)
-    {
-      type: BannerType.CATEGORY,
-      productCategoryNumber: products[0].productCategoryNumber,
-      categoryType: CategoryType.LIVESTOCK,
-      status: BannerStatus.ACTIVE,
-      title: 'Premium Oils & Condiments',
-      badgeText: 'Organic',
-      mainText: 'Discover our premium selection of organic oils and condiments',
-      ctaButtonText: 'Shop Now',
-      ctaButtonUrl: '/categories/oils',
-      imageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=1200',
-      mobileImageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=800',
-      displayOrder: 7,
-      startDate: new Date('2025-01-01'),
-      endDate: new Date('2025-12-31'),
-      productId: products[0].id, // CAT001 - Premium Organic Olive Oil (LIVESTOCK)
+      // productId không được phép cho CATEGORY banner
     },
     // 8. FOOTER Banner 1
     {
@@ -1305,7 +1219,7 @@ async function seedBanners(
       displayOrder: 8,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[1].id, // CAT002 - Artisan Whole Grain Bread
+      // productId không được phép cho FOOTER banner
     },
     // 9. FOOTER Banner 2
     {
@@ -1323,7 +1237,7 @@ async function seedBanners(
       displayOrder: 9,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[2].id, // CAT003 - Wild Caught Salmon Fillet
+      // productId không được phép cho FOOTER banner
     },
     // 10. FOOTER Banner 3
     {
@@ -1341,7 +1255,7 @@ async function seedBanners(
       displayOrder: 10,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[4].id, // CAT004 - Organic Vegetable Box
+      // productId không được phép cho FOOTER banner
     },
     // 11. CONTENT_HERO Banner
     {
@@ -1359,7 +1273,7 @@ async function seedBanners(
       displayOrder: 11,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[1].id, // CAT002 - Artisan Whole Grain Bread
+      // productId không được phép cho CONTENT_HERO banner
     },
     // 12. SPECIAL_PRICE Banner
     {
@@ -1377,7 +1291,7 @@ async function seedBanners(
       displayOrder: 12,
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
-      productId: products[2].id, // CAT003 - Wild Caught Salmon Fillet
+      // productId không được phép cho SPECIAL_PRICE banner
     },
   ];
 
@@ -1505,8 +1419,7 @@ async function main() {
     const productCategories = seedProductCategories(products);
     const orders = await seedOrders(users, products);
     const points = await seedPoints(users, orders);
-    const recipeCategories = await seedRecipeCategories();
-    const recipes = await seedRecipes(users, recipeCategories);
+    const recipes = await seedRecipes(users);
     const coupons = await seedCoupons();
     const couponHistories = await seedCouponHistories(users, coupons, orders);
     const banners = await seedBanners(products, categories);
@@ -1524,7 +1437,6 @@ async function main() {
     console.log(`   • ${productCategories.length} product-category relationships`);
     console.log(`   • ${orders.length} orders`);
     console.log(`   • ${points.length} point transactions`);
-    console.log(`   • ${recipeCategories.length} recipe categories`);
     console.log(`   • ${recipes.length} recipes`);
     console.log(`   • ${coupons.length} coupons`);
     console.log(`   • ${couponHistories.length} coupon histories`);

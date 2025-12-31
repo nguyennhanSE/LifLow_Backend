@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsArray,
 } from 'class-validator';
+import { ERecipeCategory } from '../enums/recipe.enum';
 
 export class CreateRecipeDto {
   @ApiPropertyOptional({
@@ -25,7 +26,7 @@ export class CreateRecipeDto {
   @IsOptional()
   @IsString({ message: 'Category must be a string' })
   @MaxLength(50, { message: 'Category must not exceed 50 characters' })
-  category?: string;
+  category?: ERecipeCategory;
 
   @ApiPropertyOptional({
     description: 'Recipe content (detailed instructions and ingredients)',
@@ -43,7 +44,7 @@ export class CreateRecipeDto {
   @IsArray({ message: 'Ingredients must be an array' })
   @IsString({ each: true, message: 'Each ingredient must be a string' })
   ingredients?: string[];
-
+  
   // Additional optional fields can be added here as needed
   [key: string]: any;
 }

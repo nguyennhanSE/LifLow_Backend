@@ -1,6 +1,7 @@
 import { Recipe, User } from '@prisma/client';
 import { RecipeEntity, RecipeEntityWithAuthor } from '../entities/recipe.entity';
 import { toUserEntity } from 'src/modules/user/mapper/user.mapper';
+import { ERecipeCategory } from '../enums/recipe.enum';
 
 /**
  * Type for Recipe with author relation
@@ -18,7 +19,7 @@ export function toRecipeEntity(recipe: Recipe): RecipeEntity {
     title: recipe.title,
     authorId: recipe.authorId ?? null,
     authorName: recipe.authorName ?? null,
-    category: recipe.category,
+    category: recipe.category as ERecipeCategory,
     dateOfWriting: recipe.dateOfWriting,
     views: recipe.views,
     status: recipe.status,  

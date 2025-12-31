@@ -17,6 +17,7 @@ import { RecipeEntityWithAuthor } from './entities/recipe.entity';
 import { toRecipeEntityWithAuthor } from './mapper/recipe.mapper';
 import { AwsService } from 'src/libs/integration/aws/aws.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ERecipeCategory } from './enums/recipe.enum';
 
 @Injectable()
 export class RecipeService {
@@ -278,17 +279,17 @@ export class RecipeService {
    * - Supports pagination
    */
   async getByCategory(
-    category: string,
+    category: ERecipeCategory,
     query?: Partial<RecipeListQueryDto>,
   ): Promise<RecipePaginationResult> {
     try {
-      if (!category || category.trim() === '') {
+      if (!category) {
         throw new BadRequestException('Category is required');
       }
 
       const result = await this.recipeRepository.findAll({
         ...query,
-        category: category.trim(),
+        category,
         status: query?.status || 'active',
         page: query?.page || 1,
         limit: query?.limit || 20,

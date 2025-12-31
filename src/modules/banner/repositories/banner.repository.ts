@@ -438,7 +438,9 @@ export class BannerRepository {
         product: true,
       },
     });
-    return banners.map(banner => BannerMapper.toEntityWithProduct(banner));
+    return banners
+      .filter(banner => (banner.type as EBannerType) === EBannerType.CATEGORY)
+      .map(banner => BannerMapper.toEntityWithProduct(banner));
   }
 
   async updateWithImageUrl(id: string, imageUrl: string): Promise<BannerEntity> {

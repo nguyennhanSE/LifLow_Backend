@@ -9,6 +9,7 @@ import {
   IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ERecipeCategory } from '../enums/recipe.enum';
 
 export class RecipeListQueryDto {
   @ApiPropertyOptional({
@@ -41,7 +42,7 @@ export class RecipeListQueryDto {
   })
   @IsOptional()
   @IsString({ message: 'Category must be a string' })
-  category?: string;
+  category?: ERecipeCategory;
 
   @ApiPropertyOptional({
     description: 'Filter by recipe status',

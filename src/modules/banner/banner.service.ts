@@ -303,8 +303,14 @@ export class BannerService {
   private async validateCreateBanner(
     createBannerDto: CreateBannerDto,
   ): Promise<void> {
-    // Validate product exists if productId is provided
+    // Validate that productId is only allowed for MAIN_PRODUCTS banner type
     if (createBannerDto.productId) {
+      if (createBannerDto.type !== EBannerType.MAIN_PRODUCTS) {
+        throw new BadRequestException(
+          'productId chỉ được sử dụng cho banner type MAIN_PRODUCTS. productId is only allowed for MAIN_PRODUCTS banner type.',
+        );
+      }
+      
       await this.validateProductExists(createBannerDto.productId);
       
       // Validate that productCategoryNumber is also provided when productId is provided
@@ -336,11 +342,27 @@ export class BannerService {
     id: string,
     updateBannerDto: UpdateBannerDto,
   ): Promise<void> {
+    // Get existing banner to check current type if type is not being updated
+    const existingBanner = await this.bannerRepository.findOne(id);
+    if (!existingBanner) {
+      throw new NotFoundException(`Banner with id ${id} not found`);
+    }
+
+    // Determine the banner type (use updated type if provided, otherwise existing type)
+    const bannerType = updateBannerDto.type ?? existingBanner.type;
+
     // Validate product exists if productId is being updated
     if (
       updateBannerDto.productId !== undefined &&
       updateBannerDto.productId !== null
     ) {
+      // Validate that productId is only allowed for MAIN_PRODUCTS banner type
+      if (bannerType !== EBannerType.MAIN_PRODUCTS) {
+        throw new BadRequestException(
+          'productId chỉ được sử dụng cho banner type MAIN_PRODUCTS. productId is only allowed for MAIN_PRODUCTS banner type.',
+        );
+      }
+
       await this.validateProductExists(updateBannerDto.productId);
       
       // Validate that productCategoryNumber is also provided when productId is provided
@@ -349,6 +371,19 @@ export class BannerService {
           'productCategoryNumber is required when productId is provided',
         );
       }
+    }
+
+    // If type is being changed to non-MAIN_PRODUCTS and productId exists, clear productId
+    if (
+      updateBannerDto.type &&
+      updateBannerDto.type !== EBannerType.MAIN_PRODUCTS &&
+      existingBanner.productId
+    ) {
+      // Note: This should be handled in the update logic to clear productId
+      // For now, we'll throw an error to prevent invalid state
+      throw new BadRequestException(
+        'Không thể thay đổi banner type từ MAIN_PRODUCTS sang loại khác khi đã có productId. Cannot change banner type from MAIN_PRODUCTS to another type when productId exists. Please remove productId first.',
+      );
     }
 
     // Validate date range if dates are being updated

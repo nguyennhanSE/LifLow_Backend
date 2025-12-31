@@ -1,11 +1,12 @@
 import { UserEntity } from "src/modules/user/entities/user.entity";
+import { ERecipeCategory } from "../enums/recipe.enum";
 
 export class RecipeEntity {
   id!: string;
   title?: string;
   authorId?: string | null;
   authorName?: string | null; // denormalized for fast listing
-  category?: string;
+  category?: ERecipeCategory;
   dateOfWriting?: Date; // @map("date_of_writing")
   views?: number;
   status?: string; // e.g., Active | Hidden

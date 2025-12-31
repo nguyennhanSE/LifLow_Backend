@@ -423,14 +423,19 @@ model Category {
   products Product[]
   @@map("categories")
 }
+
+enum RecipeCategory {
+  RECIPE
+  REVIEWS
+  DAILY_LIFE
+}
 // Recipe
 model Recipe {
   id             String   @id @default(uuid())
   title          String   @db.VarChar(255)
   authorId       String?
   authorName     String   @db.VarChar(100) // denormalized for fast listing
-  category       String   @db.VarChar(50) // denormalized category name
-  recipeCategoryId String? @map("recipe_category_id")
+  category       RecipeCategory   @map("category") // denormalized category name
   dateOfWriting  DateTime @map("date_of_writing")
   views          Int      @default(0)
   status         String   @default("active") // e.g., active | inactive
@@ -445,7 +450,6 @@ model Recipe {
 
   // Relations
   author         User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  recipeCategory RecipeCategory? @relation(fields: [recipeCategoryId], references: [id], onDelete: SetNull) // Back-reference (RecipeCategory owns the relation)
   // productRecipes ProductRecipe[]
   @@index([status])
   @@index([authorId])
@@ -453,19 +457,19 @@ model Recipe {
   @@map("recipes")
 }
 
-model RecipeCategory {
-  id        String   @id @default(uuid())
-  name      String   @db.VarChar(50) @map("name")
-  description String? @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+// model RecipeCategory {
+//   id        String   @id @default(uuid())
+//   name      String   @db.VarChar(50) @map("name")
+//   description String? @db.Text
+//   createdAt DateTime @default(now()) @map("created_at")
+//   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // One RecipeCategory can have many Recipes
-  recipes Recipe[]
+//   // One RecipeCategory can have many Recipes
+//   recipes Recipe[]
 
-  @@index([name])
-  @@map("recipe_categories")
-}
+//   @@index([name])
+//   @@map("recipe_categories")
+// }
 
 // Coupon
 enum CouponType {
@@ -586,6 +590,10 @@ model Banner {
   id String @id @default(uuid())
 
   productCategoryNumber String? @map("product_category_number")
+  // NOTE: productId chỉ được sử dụng cho banner type MAIN_PRODUCTS
+  // Chỉ có MAIN_PRODUCTS banner mới có productId, các loại banner khác không có
+  // NOTE: productId should only be used for MAIN_PRODUCTS banner type
+  // Only MAIN_PRODUCTS banners have productId, other banner types should not have it
   productId String? @map("product_id")
   // categoryType CategoryType? @map("category_type") // 카테고리 타입
   type BannerType @map("type") // 배너 타입
@@ -612,7 +620,8 @@ model Banner {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relations - Many-to-Many with Product
+  // Relations - Only MAIN_PRODUCTS banners should have product relation
+  // Relations - Chỉ MAIN_PRODUCTS banners mới có quan hệ với Product
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   @@index([type])
   @@index([status])

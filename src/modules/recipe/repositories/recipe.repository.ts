@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from 'prisma/prisma.service';
 import { Prisma, Recipe, User } from '@prisma/client';
 import { RecipeListQueryDto } from '../dto/recipe-list-query.dto';
+import { ERecipeCategory } from '../enums/recipe.enum';
 
 export type RecipeWithAuthor = Recipe & { author?: User | null };
 
@@ -273,7 +274,7 @@ export class RecipeRepository {
   /**
    * Count recipes by category
    */
-  async countByCategory(category: string): Promise<number> {
+  async countByCategory(category: ERecipeCategory): Promise<number> {
     return await this.prisma.recipe.count({ where: { category } });
   }
 

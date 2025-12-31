@@ -39,6 +39,7 @@ import {
 } from '../../utils/responseFormatter';
 import { ResponseModel } from '../../libs/models/response/response.model';
 import { RecipeUserInterceptor } from './interceptors/recipe.interceptor';
+import { ERecipeCategory } from './enums/recipe.enum';
 
 /**
  * Interface for authenticated request with user info
@@ -88,10 +89,10 @@ export class RecipeController {
           maxLength: 255,
         },
         category: {
-          type: 'string',
+          type: 'enum',
+          enum: Object.values(ERecipeCategory),
           description: 'Recipe category (required)',
-          example: 'Italian',
-          maxLength: 50,
+          example: ERecipeCategory.RECIPE,
         },
         content: {
           type: 'string',
@@ -437,7 +438,7 @@ export class RecipeController {
     description: 'Bad request - category is required',
   })
   async getByCategory(
-    @Param('category') category: string,
+    @Param('category') category: ERecipeCategory,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('status') status?: string,

@@ -1,0 +1,45 @@
+FROM node:22-alpine
+WORKDIR /usr/src/app
+
+# Install system dependencies
+RUN apk update && apk add --no-cache \
+  bash \
+  postgresql-client \
+  chromium \
+  nss \
+  freetype \
+  harfbuzz \
+  ttf-freefont \
+  ttf-dejavu \
+  fontconfig \
+  font-noto \
+  font-noto-cjk \
+  ca-certificates && \
+  fc-cache -f -v || true
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies)
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+
+# Copy Prisma schema and generate client
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Copy Prisma config
+COPY prisma.config.ts ./prisma.config.ts
+
+# Copy source code (will be overridden by volume mount in development)
+COPY . .
+
+EXPOSE 3500
+
+ENV NODE_ENV=development
+ENV PORT=3500
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    PUPPETEER_SKIP_DOWNLOAD=true
+
+# Default command (can be overridden in docker-compose)
+CMD ["npm", "run", "start:dev"]
+
