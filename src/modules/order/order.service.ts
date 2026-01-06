@@ -606,7 +606,7 @@ export class OrdersService {
   /**
    * Generate a sequential order group number with date prefix (e.g., 20251117-01, 20251117-02, ...)
    */
-  private async generateOrderGroupNumber(): Promise<string> {
+  async generateOrderGroupNumber(): Promise<string> {
     // Get today's date in YYYYMMDD format
     const now = new Date();
     const year = now.getFullYear();
@@ -637,12 +637,12 @@ export class OrdersService {
   /**
    * Ensure generated order group number is unique
    */
-  private async generateUniqueOrderGroupNumber(
+  async generateUniqueOrderGroupNumber(
     maxAttempts = 5,
   ): Promise<string> {
     for (let i = 0; i < maxAttempts; i++) {
       const orderGroupNumber = await this.generateOrderGroupNumber();
-      const exists = await this.orderRepository.count({ orderGroupNumber });
+      const exists = await this.orderRepository.countByOrderGroupNumber(orderGroupNumber);
       if (exists === 0) {
         return orderGroupNumber;
       }
@@ -655,7 +655,7 @@ export class OrdersService {
   /**
    * Generate order number with date prefix (e.g., 20251231-01, 20251231-02, ...)
    */
-  private async generateOrderNumber(): Promise<string> {
+  async generateOrderNumber(): Promise<string> {
     // Get today's date in YYYYMMDD format
     const now = new Date();
     const year = now.getFullYear();
@@ -686,7 +686,7 @@ export class OrdersService {
   /**
    * Ensure generated order number is unique
    */
-  private async generateUniqueOrderNumber(
+  async generateUniqueOrderNumber(
     maxAttempts = 5,
   ): Promise<string> {
     for (let i = 0; i < maxAttempts; i++) {

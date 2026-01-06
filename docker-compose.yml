@@ -24,10 +24,10 @@ services:
     restart: unless-stopped
     networks:
       - liflow-network
-    volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
-    command: npm run start:dev
+    # volumes:
+    #   - .:/usr/src/app
+    #   - /usr/src/app/node_modules
+    # command: npm run start:dev
 
   postgres:
     image: postgres

@@ -85,6 +85,13 @@ export class OrderRepository {
     return this.prisma.order.count({ where });
   }
 
+  async countByOrderGroupNumber(orderGroupNumber: string): Promise<number> {
+    return this.prisma.order.count({ where: { orderGroupNumber } });
+  }
+  async findByOrderGroupNumber(orderGroupNumber: string): Promise<OrderWithUser[]> {
+    return this.prisma.order.findMany({ where: { orderGroupNumber } });
+  }
+
   async countByStatus(status: EOrderSituation): Promise<number> {
     return this.prisma.order.count({ where: { situation: status } as any });
   }

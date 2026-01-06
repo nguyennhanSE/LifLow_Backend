@@ -55,17 +55,8 @@ export class InitiatePaymentResponseDto {
   @ApiProperty({ description: '주문 ID' })
   orderId: string;
 
-  @ApiProperty({ description: '결제 금액' })
-  amount: number;
-
-  @ApiProperty({ description: '주문명' })
-  orderName: string;
-
-  @ApiProperty({ description: 'Toss 결제 페이지 URL' })
-  checkoutUrl?: string;
-
-  @ApiProperty({ description: '고객 키 (정기결제용)' })
-  customerKey?: string;
+  @ApiProperty({ description: '고객 이름' })
+  customerName: string;
 }
 
 export class PaymentListResponseDto {

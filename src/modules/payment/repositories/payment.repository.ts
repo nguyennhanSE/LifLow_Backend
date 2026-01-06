@@ -5,7 +5,7 @@ import { Payment, PaymentStatus, PaymentType, Prisma } from '@prisma/client';
 export interface CreatePaymentData {
   userId: string;
   subscriptionId?: string;
-  orderId: string;
+  orderGroupNumber: string;
   paymentKey: string;
   transactionKey?: string;
   mId?: string;
@@ -65,13 +65,13 @@ export class PaymentRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreatePaymentData): Promise<Payment> {
-    this.logger.log(`Creating payment: ${data.orderId}`);
+    this.logger.log(`Creating payment for order group: ${data.orderGroupNumber}`);
 
     return this.prisma.payment.create({
       data: {
         userId: data.userId,
         subscriptionId: data.subscriptionId,
-        orderId: data.orderId,
+        orderGroupNumber: data.orderGroupNumber,
         paymentKey: data.paymentKey,
         transactionKey: data.transactionKey,
         mId: data.mId,
@@ -119,10 +119,10 @@ export class PaymentRepository {
     });
   }
 
-  async findByOrderId(orderId: string): Promise<Payment | null> {
-    return this.prisma.payment.findUnique({
-      where: { orderId },
-      include: { user: true },
+  async findByOrderGroupNumber(orderGroupNumber: string): Promise<Payment | null> {
+    return this.prisma.payment.findFirst({
+      where: { orderGroupNumber },
+      include: { user: true, orderGroup: true },
     });
   }
 

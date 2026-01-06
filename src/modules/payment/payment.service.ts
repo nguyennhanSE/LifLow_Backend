@@ -22,6 +22,7 @@ import {
   PaymentListResponseDto,
 } from './dto/payment-response.dto';
 import { TossPaymentResponse } from './dto/toss-payment.dto';
+import { OrdersService } from '../order/order.service';
 
 @Injectable()
 export class PaymentService {
@@ -31,6 +32,7 @@ export class PaymentService {
     private readonly tossApiService: TossPaymentApiService,
     private readonly paymentRepository: PaymentRepository,
     private readonly configService: ConfigService,
+    private readonly ordersService: OrdersService,
   ) {}
 
   /**
@@ -38,26 +40,19 @@ export class PaymentService {
    * Client will use this to open Toss checkout page
    */
   async initiatePayment(
-    dto: CreatePaymentDto,
+    userId: string,
+    customerName: string,
   ): Promise<InitiatePaymentResponseDto> {
-    this.logger.log(`Initiating payment for user: ${dto.userId}`);
+    this.logger.log(`Initiating payment for user: ${userId}`);
 
     try {
       // Generate unique order ID
-      const orderId = this.generateOrderId(dto.userId);
+      const orderGroupNumber = await this.ordersService.generateUniqueOrderGroupNumber();
 
-      // Get client key and success/fail URLs from config
-      const clientKey = this.configService.get<string>('TOSS_CLIENT_KEY');
-      const successUrl = this.configService.get<string>('TOSS_SUCCESS_URL');
-      const failUrl = this.configService.get<string>('TOSS_FAIL_URL');
-
-      // For now, just return the order info
       // The client will use this to call Toss Payment Widget
       return Promise.resolve({
-        orderId,
-        amount: dto.amount,
-        orderName: dto.orderName,
-        customerKey: dto.userId, // Using userId as customerKey for simplicity
+        orderId: orderGroupNumber,
+        customerName: customerName, 
       });
     } catch (error) {
       this.logger.error('Failed to initiate payment', error);
@@ -98,7 +93,7 @@ export class PaymentService {
       try {
         await this.paymentRepository.create({
           userId: '', // Will need to get from order context
-          orderId: dto.orderId,
+          orderGroupNumber: dto.orderId,
           paymentKey: dto.paymentKey,
           totalAmount: dto.amount,
           balanceAmount: 0,
@@ -147,14 +142,14 @@ export class PaymentService {
   }
 
   /**
-   * Get payment by order ID
+   * Get payment by order group number
    */
-  async getPaymentByOrderId(orderId: string): Promise<PaymentResponseDto> {
-    const payment = await this.paymentRepository.findByOrderId(orderId);
+  async getPaymentByOrderId(orderGroupNumber: string): Promise<PaymentResponseDto> {
+    const payment = await this.paymentRepository.findByOrderGroupNumber(orderGroupNumber);
 
     if (!payment) {
       throw new NotFoundException(
-        `Payment with order ID ${orderId} not found`,
+        `Payment with order group number ${orderGroupNumber} not found`,
       );
     }
 
@@ -218,7 +213,7 @@ export class PaymentService {
 
       // Call Toss API to cancel
       const tossPayment = await this.tossApiService.cancelPayment(
-        payment.paymentKey as string,
+        payment.paymentKey,
         {
           cancelReason: dto.cancelReason,
           cancelAmount: dto.cancelAmount,
@@ -334,7 +329,7 @@ export class PaymentService {
     return this.paymentRepository.create({
       userId: tossPayment.metadata?.userId || '', // Should be passed in metadata
       subscriptionId: tossPayment.metadata?.subscriptionId,
-      orderId: tossPayment.orderId,
+      orderGroupNumber: tossPayment.orderId, // Toss's orderId is our orderGroupNumber
       paymentKey: tossPayment.paymentKey,
       transactionKey: tossPayment.transactionKey,
       mId: tossPayment.mId,
@@ -395,7 +390,7 @@ export class PaymentService {
     return {
       id: payment.id,
       userId: payment.userId,
-      orderId: payment.orderId,
+      orderId: payment.orderGroupNumber, // Map orderGroupNumber to orderId for API response
       paymentKey: payment.paymentKey,
       orderName: payment.orderName,
       totalAmount: payment.totalAmount,

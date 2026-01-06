@@ -11,6 +11,7 @@ import {
   Headers,
   BadRequestException,
   Logger,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -34,9 +35,25 @@ import {
   PaymentListResponseDto,
 } from './dto/payment-response.dto';
 import { TossPaymentApiService } from './services/toss-payment-api.service';
+import { ERoleName } from '../roles/enums/role.enum';
+import { Roles } from 'src/libs/decorator/roles.decorator';
+/**
+ * Interface for authenticated request with user info
+ */
+interface AuthenticatedRequest extends Request {
+  user: {
+    sub: string;
+    name: string;
+    email?: string;
+    roles?: string[];
+  };
+}
 
 @ApiTags('Payments')
 @Controller('payments')
+
+@ApiBearerAuth()
+@Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 
@@ -56,9 +73,9 @@ export class PaymentController {
   // @UseGuards(AuthGuard) // Add your auth guard here
   // @ApiBearerAuth()
   async initiatePayment(
-    @Body() createPaymentDto: CreatePaymentDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<InitiatePaymentResponseDto> {
-    return this.paymentService.initiatePayment(createPaymentDto);
+    return this.paymentService.initiatePayment(req.user.sub, req.user.name);
   }
 
   @Post('confirm')
@@ -209,10 +226,11 @@ export class PaymentController {
     status: 400,
     description: 'Invalid webhook signature or payload',
   })
-  async handleWebhook(
+  
+  handleWebhook(
     @Headers('toss-signature') signature: string,
     @Body() payload: PaymentWebhookDto,
-  ): Promise<{ success: boolean }> {
+  ): any{
     this.logger.log('Received webhook from Toss', {
       eventType: payload.eventType,
     });
@@ -229,7 +247,7 @@ export class PaymentController {
     }
 
     // Process webhook
-    await this.paymentService.handleWebhook(payload.eventType, payload.data);
+    this.paymentService.handleWebhook(payload.eventType, payload.data);
 
     return { success: true };
   }
