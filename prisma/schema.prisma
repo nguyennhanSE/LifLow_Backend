@@ -241,6 +241,7 @@ model OrderGroup {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   orders Order[]
+  payments Payment[]
   @@index([orderGroupNumber])
   @@map("order_groups")
 }
@@ -744,7 +745,7 @@ enum PaymentType {
   // User & Order
   userId String @map("user_id")
   subscriptionId String? @map("subscription_id") // 정기결제용
-  orderId String @unique @map("order_id") // 가맹점 주문번호
+  orderGroupNumber String @map("order_group_number") // 가맹점 주문번호
   
   // Toss Payment Keys
   paymentKey String @unique @map("payment_key") // Toss 결제 키 (중요!)
@@ -800,12 +801,11 @@ enum PaymentType {
   
   // Relations
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([userId])
+  orderGroup OrderGroup @relation(fields: [orderGroupNumber], references: [orderGroupNumber], onDelete: Cascade)
+  @@index([orderGroupNumber])
   @@index([paymentKey])
-  @@index([orderId])
   @@index([status])
   @@index([requestedAt])
+  @@index([userId])
   @@map("payments")
 }
-
