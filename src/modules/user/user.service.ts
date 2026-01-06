@@ -140,4 +140,37 @@ export class UserService {
 
     return { message: `User ${id} deleted successfully` };
   }
+  /**
+   * Get user points
+   */
+  async getUserPoints(userId: string): Promise<{totalUsedPoints: number, availablePoints: number}> {
+    try {
+      return await this.userRepository.getUserPoints(userId);
+    } catch (error) {
+      console.error('Error in getUserPoints:', error);
+      throw error;
+    }
+  }
+  /**
+   * Get user information
+   */
+  async getUserInfo(userId: string, options: {
+    includeOrders?: boolean;
+    includePermissions?: boolean;
+    includeMembership?: boolean;
+    includePoint?: boolean;
+    includeCarts?: boolean;
+    includePayments?: boolean;
+    includeProductReviews?: boolean;
+    includeProductInquiries?: boolean;
+    includeCouponHistories?: boolean;
+    includeRecipes?: boolean;
+  }): Promise<UserEntity> {
+    try {
+      return await this.userRepository.getUserInfo(userId, options);
+    } catch (error) {
+      console.error('Error in getUserInfo:', error);
+      throw error;
+    }
+  }
 }

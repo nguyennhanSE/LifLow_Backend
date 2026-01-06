@@ -25,14 +25,21 @@ import { BannerModule } from './modules/banner/banner.module';
 import { AwsModule } from './libs/integration/aws/aws.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductDiscountModule } from './modules/product-discount/product-discount.module';
+import { CartsModule } from './modules/carts/carts.module';
+import { PointModule } from './modules/point/point.module';
+import { ProductReviewsModule } from './modules/product-reviews/product-reviews.module';
+import { ProductInquiriesModule } from './modules/product-inquiries/product-inquiries.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(), // Enable scheduled tasks (cron jobs)
-    UserModule,
     AuthModule,
-    PaymentModule,
+    UserModule,
+    PointModule,
     ProductModule, // Product CRUD operations
+    ProductDiscountModule,
+    ProductReviewsModule,
+    ProductInquiriesModule,
     RecipeModule,
     GuardModule,
     LoggerModule,
@@ -46,7 +53,8 @@ import { ProductDiscountModule } from './modules/product-discount/product-discou
     BannerModule,
     AwsModule,
     CategoriesModule,
-    ProductDiscountModule,
+    CartsModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [

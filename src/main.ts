@@ -43,7 +43,7 @@ async function bootstrap() {
     }
     
     // Always add /api/v1 to the clean origin
-    baseUrl = `${baseUrl}/api/v1`;
+    // baseUrl = `${baseUrl}/api/v1`;
     
     swaggerConfig = new DocumentBuilder()
       .addBearerAuth()

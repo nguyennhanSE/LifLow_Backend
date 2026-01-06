@@ -69,7 +69,7 @@ export class AuthGuard implements CanActivate {
       this.logger.debug(
         `[${this.context}] User authenticated successfully`,
         {
-          userId: payload.sub,
+          sub: payload.sub,
           email: payload.email,
           roles: payload.roles,
         },

@@ -45,11 +45,11 @@ export class RolesGuard implements CanActivate {
     try {
       // Get user roles from request (attached by AuthGuard)
       const userRoles: string[] = user.roles ?? [];
-      this.logger.debug(`[${this.context}] User roles`, {
-        userId: user.sub,
-        userRoles,
-        requiredRoles,
-      });
+      // this.logger.debug(`[${this.context}] User roles`, {
+      //   userId: user.sub,
+      //   userRoles,
+      //   requiredRoles,
+      // });
 
       // Check if user has any of the required roles
       const hasRequiredRole = requiredRoles.some((role) =>
@@ -68,11 +68,11 @@ export class RolesGuard implements CanActivate {
         throw new ForbiddenException('Insufficient permissions');
       }
 
-      this.logger.debug(`[${this.context}] User has required role`, {
-        userId: user.sub,
-        userRoles,
-        requiredRoles,
-      });
+      // this.logger.debug(`[${this.context}] User has required role`, {
+      //   userId: user.sub,
+      //   userRoles,
+      //   requiredRoles,
+      // });
 
       return true;
     } catch (error) {

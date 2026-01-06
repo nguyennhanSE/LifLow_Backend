@@ -1,5 +1,5 @@
 // Import PrismaClient from generated location
-import { PrismaClient, CouponType, CouponTargetGrade, OrderSituation, BannerType, BannerStatus, CategoryType, RecipeCategory } from '@prisma/client';
+import { PrismaClient, CouponType,OrderSituation, BannerType, BannerStatus, CategoryType, RecipeCategory } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
@@ -974,7 +974,7 @@ async function seedCoupons() {
       maxDiscountAmount: 50000,
       isAutoIssue: true,
       autoIssueDayOfMonth: new Date('2025-01-01'),
-      targetGrades: [CouponTargetGrade.VIP],
+      targetGrades: ['VIP'],
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
     },
@@ -986,7 +986,7 @@ async function seedCoupons() {
       minPurchaseAmount: 500000,
       isAutoIssue: true,
       autoIssueDayOfMonth: new Date('2025-01-01'),
-      targetGrades: [CouponTargetGrade.VVIP],
+      targetGrades: ['VVIP'],
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
     },
@@ -999,7 +999,7 @@ async function seedCoupons() {
       maxDiscountAmount: 30000,
       isAutoIssue: true,
       autoIssueDayOfMonth: new Date('2025-01-15'),
-      targetGrades: [CouponTargetGrade.VIP, CouponTargetGrade.VVIP],
+      targetGrades: ['VIP', 'VVIP'],
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-12-31'),
     },
@@ -1011,7 +1011,7 @@ async function seedCoupons() {
       minPurchaseAmount: 300000,
       isAutoIssue: false,
       autoIssueDayOfMonth: new Date('2025-01-01'),
-      targetGrades: [],
+      targetGrades: ['GOLD', 'SILVER'],
       startDate: new Date('2025-01-01'),
       endDate: new Date('2025-01-31'),
     },
@@ -1417,11 +1417,11 @@ async function main() {
     const categories = await seedCategories();
     const products = await seedProducts();
     const productCategories = seedProductCategories(products);
-    const orders = await seedOrders(users, products);
-    const points = await seedPoints(users, orders);
+    // const orders = await seedOrders(users, products);
+    // const points = await seedPoints(users, orders);
     const recipes = await seedRecipes(users);
     const coupons = await seedCoupons();
-    const couponHistories = await seedCouponHistories(users, coupons, orders);
+    // const couponHistories = await seedCouponHistories(users, coupons, orders);
     const banners = await seedBanners(products, categories);
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
@@ -1435,11 +1435,11 @@ async function main() {
     console.log(`   • ${categories.length} categories`);
     console.log(`   • ${products.length} products`);
     console.log(`   • ${productCategories.length} product-category relationships`);
-    console.log(`   • ${orders.length} orders`);
-    console.log(`   • ${points.length} point transactions`);
+    // console.log(`   • ${orders.length} orders`);
+    // console.log(`   • ${points.length} point transactions`);
     console.log(`   • ${recipes.length} recipes`);
     console.log(`   • ${coupons.length} coupons`);
-    console.log(`   • ${couponHistories.length} coupon histories`);
+    // console.log(`   • ${couponHistories.length} coupon histories`);
     console.log(`   • ${banners.length} banners`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 

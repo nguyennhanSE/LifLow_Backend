@@ -59,4 +59,36 @@ export const config = {
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ?? '',
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY ?? '',
   AWS_S3_BUCKET: process.env.AWS_S3_BUCKET ?? '',
+
+  // Toss Configuration
+  TOSS_CLIENT_KEY: process.env.TOSS_CLIENT_KEY ?? '',
+  TOSS_SECRET_KEY: process.env.TOSS_SECRET_KEY ?? '',
+  TOSS_API_URL: process.env.TOSS_API_URL ?? '',
+  TOSS_WEBHOOK_SECRET: process.env.TOSS_WEBHOOK_SECRET ?? '',
+  TOSS_SUCCESS_URL: process.env.TOSS_SUCCESS_URL ?? '',
+  TOSS_FAIL_URL: process.env.TOSS_FAIL_URL ?? '',
+};
+
+// TOSS Payments Helper Functions
+export const getTossConfig = () => ({
+  secretKey: config.TOSS_SECRET_KEY,
+  clientKey: config.TOSS_CLIENT_KEY,
+  apiUrl: config.TOSS_API_URL,
+  webhookSecret: config.TOSS_WEBHOOK_SECRET,
+  successUrl: config.TOSS_SUCCESS_URL,
+  failUrl: config.TOSS_FAIL_URL,
+});
+
+export const getTossAuthHeader = (): string => {
+  const secretKey = config.TOSS_SECRET_KEY;
+  if (!secretKey) {
+      throw new Error('TOSS_SECRET_KEY is not configured');
+  }
+  // Toss uses Basic Auth: base64(SECRET_KEY + ':')
+  const encoded = Buffer.from(`${secretKey}:`).toString('base64');
+  return `Basic ${encoded}`;
+};
+
+export const getTossClientKey = (): string => {
+  return config.TOSS_CLIENT_KEY || '';
 };

@@ -259,7 +259,7 @@ export class AuthService {
                 roles,
             };
             const refreshTokenPayload: TokenPayload = {
-                sub: user.id,
+                sub: user.id,   
                 tokenType: tokenType.RefreshToken,
                 username: user.id,
                 email: email || user.email,

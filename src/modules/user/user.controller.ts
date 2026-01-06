@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto, GetAdminListQueryDto, GetUsersQueryDto, UpdateUserDto } from './dto/user.dto';
+import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto } from './dto/user.dto';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { toResponse } from './mapper/user.mapper';
@@ -145,7 +145,7 @@ export class UserController {
     return responseModel;
   }
 
-  @Get(':id')
+  @Get('member/:id')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER)
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiResponse({ status: 200, description: 'User retrieved successfully' })
@@ -396,6 +396,55 @@ export class UserController {
       }
 
       const result = await this.membershipsService.getUserActiveMembership(userId);
+      responseModel.setData(result);
+    } catch (error) {
+      throw error;
+    }
+    return responseModel;
+  }
+  @Get('/me/points')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Get user order number' })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User order number retrieved successfully' })
+  async getUserPoints(@Req() req: Request & { user?: TokenPayload }) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+      if (!requestingUserId) {
+        throw new ForbiddenException('Cannot view other users points');
+      }
+      const result = await this.userService.getUserPoints(requestingUserId);
+      responseModel.setData(result);
+    } catch (error) {
+      throw error;
+    }
+    return responseModel;
+  }
+  
+  @Get('/me')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Get user information' })
+  @ApiResponse({ status: 200, description: 'User information retrieved successfully' })
+  async getUserInfo(@Req() req: Request & { user?: TokenPayload }, @Query() q: GetUserInfoDto) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+      if (!requestingUserId) {
+        throw new ForbiddenException('Cannot view other users information');
+      }
+      const result = await this.userService.getUserInfo(requestingUserId, {
+        includeOrders: q.includeOrders ?? false,
+        includePermissions: q.includePermissions ?? false,
+        includeMembership: q.includeMembership ?? true,
+        includePoint: q.includePoint ?? false,
+        includeCarts: q.includeCarts ?? false,
+        includePayments: q.includePayments ?? false,
+        includeProductReviews: q.includeProductReviews ?? false,
+        includeProductInquiries: q.includeProductInquiries ?? false,
+        includeCouponHistories: q.includeCouponHistories ?? false,
+        includeRecipes: q.includeRecipes ?? false,
+      });
       responseModel.setData(result);
     } catch (error) {
       throw error;

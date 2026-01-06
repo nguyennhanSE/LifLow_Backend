@@ -38,26 +38,6 @@ export enum PaymentMethod {
 // 1. CREATE ORDER DTO
 // ============================================
 export class CreateOrderDto {
-  @ApiPropertyOptional({
-    description: 'Order number',
-    example: 'ORD-2025-001234',
-    maxLength: 255,
-  })
-  @IsOptional()
-  @IsString({ message: 'Order number must be a string' })
-  @MaxLength(255, { message: 'Order number must not exceed 255 characters' })
-  orderNumber?: string;
-
-  @ApiPropertyOptional({
-    description: 'Item-wise order number',
-    example: 'ITEM-2025-001234-01',
-    maxLength: 255,
-  })
-  @IsOptional()
-  @IsString({ message: 'Item-wise order number must be a string' })
-  @MaxLength(255, { message: 'Item-wise order number must not exceed 255 characters' })
-  itemWiseOrderNumber?: string;
-
   @ApiProperty({
     description: 'Total order amount in KRW',
     example: 150000,
@@ -85,11 +65,11 @@ export class CreateOrderDto {
     example: 1001,
     minimum: 1,
   })
-  @IsNotEmpty({ message: 'Product number is required' })
+  @IsNotEmpty({ message: 'Product id is required' })
   @Type(() => Number)
-  @IsInt({ message: 'Product number must be an integer' })
-  @Min(1, { message: 'Product number must be at least 1' })
-  productNumber!: number;
+  @IsInt({ message: 'Product id must be an integer' })
+  @Min(1, { message: 'Product id must be at least 1' })
+  productId!: string;
 
   @ApiPropertyOptional({
     description: 'Product name',
@@ -235,38 +215,6 @@ export class CreateOrderDto {
   orderDate?: string;
 
   @ApiPropertyOptional({
-    description: 'Orderer name',
-    example: '박영희',
-    minLength: 2,
-    maxLength: 100,
-  })
-  @IsOptional()
-  @IsString({ message: 'Orderer name must be a string' })
-  @MinLength(2, { message: 'Orderer name must be at least 2 characters' })
-  @MaxLength(100, { message: 'Orderer name must not exceed 100 characters' })
-  ordererName?: string;
-
-  @ApiPropertyOptional({
-    description: 'Orderer mobile phone (format: 010-XXXX-XXXX or 01XXXXXXXXX)',
-    example: '010-9876-5432',
-    pattern: '^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$',
-  })
-  @IsOptional()
-  @IsString({ message: 'Orderer mobile phone must be a string' })
-  @Matches(/^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/, {
-    message: 'Orderer mobile phone must be in format 010-XXXX-XXXX or 01XXXXXXXXX',
-  })
-  ordererMobilePhone?: string;
-
-  @ApiPropertyOptional({
-    description: 'Orderer user ID (UUID)',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  @IsOptional()
-  @IsUUID('4', { message: 'Orderer ID must be a valid UUID' })
-  ordererId?: string;
-
-  @ApiPropertyOptional({
     description: 'Desired delivery date (format: YYYY-MM-DD)',
     example: '2025-12-15',
     pattern: '^\\d{4}-\\d{2}-\\d{2}$',
@@ -277,16 +225,6 @@ export class CreateOrderDto {
     message: 'Desired delivery date must be in format YYYY-MM-DD',
   })
   desiredDeliveryDate?: string;
-
-  @ApiPropertyOptional({
-    description: 'Membership level at order time',
-    example: 'GOLD',
-    maxLength: 50,
-  })
-  @IsOptional()
-  @IsString({ message: 'Membership level must be a string' })
-  @MaxLength(50, { message: 'Membership level must not exceed 50 characters' })
-  membershipLevelAtOrderTime?: string;
 
   @ApiPropertyOptional({
     description: 'Situation',

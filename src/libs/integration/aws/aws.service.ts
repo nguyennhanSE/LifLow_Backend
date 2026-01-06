@@ -1,16 +1,17 @@
-import { Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { IAwsService } from './aws.interface';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { config } from '../../config';
 import { AppLogger } from 'src/libs/logger/logger.service';
-import { RequestInvalidError } from 'src/libs/errors/error-base';
 
 @Injectable()
 export class AwsService implements IAwsService {
     constructor(
         private readonly s3: S3Client,
-        private readonly logger: AppLogger,
-        ) { }
+        private readonly logger: AppLogger ,
+        ) { 
+            this.logger = new Logger(AwsService.name) as unknown as AppLogger;
+        }
 
     private get bucket(): string {
         return config.AWS_S3_BUCKET || process.env.AWS_S3_BUCKET || '';

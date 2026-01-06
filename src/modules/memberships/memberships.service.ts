@@ -12,6 +12,7 @@ import {
 import { MembershipEntity, UserMembershipEntity } from './entities/membership.entity';
 import { IPaginate } from '../../libs/models/paginate/pagimate.model';
 import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class MembershipsService {
@@ -20,6 +21,7 @@ export class MembershipsService {
   constructor(
     private readonly membershipRepository: MembershipRepository,
     private readonly membershipRecalculationService: MembershipRecalculationService,
+    private readonly prisma: PrismaService,
   ) {}
 
   // ============= MEMBERSHIP CRUD =============
@@ -217,9 +219,10 @@ export class MembershipsService {
     }
 
     const updateData: Prisma.UserMembershipUpdateInput= {};
+    let membership: MembershipEntity | null = null;
 
     if (updateDto.membershipLevel) {
-      const membership = await this.membershipRepository.getMembershipByName(updateDto.membershipLevel);
+      membership = await this.membershipRepository.getMembershipByName(updateDto.membershipLevel);
       if (!membership) {
         throw new NotFoundException(`Membership with name "${updateDto.membershipLevel}" not found`);
       }
@@ -228,6 +231,7 @@ export class MembershipsService {
           id: membership.id,
         },
       };
+      updateData.membershipName = membership.name;
     }
     if (updateDto.startDate) {
       updateData.startDate = new Date(updateDto.startDate);
@@ -238,8 +242,19 @@ export class MembershipsService {
     updateData.updatedAt = new Date();
     updateData.status = updateDto.status ?? 'normal';
     updateData.updatedByAdmin = true;
-
-    return await this.membershipRepository.updateUserMembership(userId, updateData);
+    
+    // Update membership and user membershipLevel in parallel
+    const [updatedMembership] = await Promise.all([
+      this.membershipRepository.updateUserMembership(userId, updateData),
+      membership
+        ? this.prisma.user.update({
+            where: { id: userId },
+            data: { membershipLevel: membership.name },
+          })
+        : Promise.resolve(),
+    ]);
+    
+    return updatedMembership;
   }
 
   async removeUserMembership(

@@ -38,7 +38,6 @@ import { PaginatedBannerResponseDto } from './dto/paginated-banner-response.dto'
 import { BulkUpdateStatusResponseDto } from './dto/bulk-update-status-response.dto';
 import { ReorderBannersResponseDto } from './dto/reorder-banners-response.dto';
 import { ActivateScheduledResponseDto } from './dto/activate-scheduled-response.dto';
-import { DeactivateExpiredResponseDto } from './dto/deactivate-expired-response.dto';
 import { SyncProductDataResponseDto } from './dto/sync-product-data-response.dto';
 import { TasksStatusResponseDto } from './dto/tasks-status-response.dto';
 import { DeleteBannerResponseDto } from './dto/delete-banner-response.dto';
@@ -538,37 +537,6 @@ export class BannerController {
     const responseData = {
       ...result,
       message: `Activated ${result.activated} scheduled banner${result.activated !== 1 ? 's' : ''}`,
-    };
-    responseModel.setData(responseData);
-    return responseModel;
-  }
-
-  /**
-   * Manual trigger: Deactivate expired banners
-   * POST /banners/tasks/deactivate-expired
-   */
-  @Post('tasks/deactivate-expired')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
-  @ApiOperation({
-    summary: 'Manually trigger deactivation of expired banners',
-    description:
-      'Immediately deactivates all active banners that have passed their endDate. Normally this runs automatically every hour.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Task executed successfully',
-    type: DeactivateExpiredResponseDto,
-  })
-  // TODO: Add authentication guard
-  // @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles('admin')
-  async triggerDeactivateExpired() {
-    const responseModel = new ResponseModel();
-    const result =
-      await this.bannerTasksService.manualDeactivateExpiredBanners();
-    const responseData = {
-      ...result,
-      message: `Deactivated ${result.deactivated} expired banner${result.deactivated !== 1 ? 's' : ''}`,
     };
     responseModel.setData(responseData);
     return responseModel;

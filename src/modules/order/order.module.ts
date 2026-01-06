@@ -7,9 +7,12 @@ import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { OrderExceptionFilter } from './filters/order-exception.filter';
 import { ResponseTransformInterceptor } from './interceptors/response-transform.interceptor';
 import { LoggerModule } from 'src/libs/logger/logger.module';
+import { PointModule } from '../point/point.module';
+import { PointService } from '../point/point.service';
+import { MembershipsModule } from '../memberships/memberships.module';
 
 @Module({
-  imports: [LoggerModule],
+  imports: [LoggerModule, MembershipsModule, PointModule],
   controllers: [OrdersController],
   providers: [
     OrdersService,

@@ -79,76 +79,7 @@ export class BannerTasksService {
     }
   }
 
-  /**
-   * Auto-deactivate expired banners
-   * Runs every hour by default
-   */
-  @Cron(CronExpression.EVERY_HOUR, {
-    name: 'deactivate-expired-banners',
-    timeZone: 'Asia/Seoul', // Adjust to your timezone
-  })
-  async handleDeactivateExpiredBanners(): Promise<{
-    deactivated: number;
-    bannerIds: string[];
-  }> {
-    if (!this.tasksEnabled) {
-      return { deactivated: 0, bannerIds: [] };
-    }
-
-    try {
-      this.logger.log('Starting expired banner deactivation task...');
-
-      const now = new Date();
-
-      // Find active banners that have expired
-      const expiredBanners = await this.prisma.banner.findMany({
-        where: {
-          status: EBannerStatus.ACTIVE,
-          endDate: {
-            not: null,
-            lt: now,
-          },
-        },
-        select: {
-          id: true,
-          title: true,
-          endDate: true,
-        },
-      });
-
-      if (expiredBanners.length === 0) {
-        this.logger.log('No expired banners to deactivate');
-        return { deactivated: 0, bannerIds: [] };
-      }
-
-      // Extract banner IDs
-      const bannerIds = expiredBanners.map((banner) => banner.id);
-
-      // Bulk update status to INACTIVE
-      const deactivatedCount = await this.bannerRepository.bulkUpdateStatus(
-        bannerIds,
-        EBannerStatus.INACTIVE,
-      );
-
-      this.logger.log(
-        `Successfully deactivated ${deactivatedCount} expired banner(s): [${bannerIds.join(', ')}]`,
-      );
-
-      return {
-        deactivated: deactivatedCount,
-        bannerIds,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Failed to deactivate expired banners: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-      // Don't throw - let the cron continue on next run
-      return { deactivated: 0, bannerIds: [] };
-    }
-  }
-
-  /**
+b   /**
    * Sync product data for all product banners
    * Runs daily at 2 AM by default
    * Keeps denormalized product data fresh
@@ -272,18 +203,6 @@ export class BannerTasksService {
   }
 
   /**
-   * Manual trigger for deactivating expired banners
-   * Can be called from controller endpoint or tests
-   */
-  async manualDeactivateExpiredBanners(): Promise<{
-    deactivated: number;
-    bannerIds: string[];
-  }> {
-    this.logger.log('Manual trigger: Deactivating expired banners');
-    return await this.handleDeactivateExpiredBanners();
-  }
-
-  /**
    * Manual trigger for syncing product data
    * Can be called from controller endpoint or tests
    */
@@ -314,11 +233,6 @@ export class BannerTasksService {
         {
           name: 'activate-scheduled-banners',
           description: 'Auto-activate scheduled banners',
-          schedule: 'Every hour',
-        },
-        {
-          name: 'deactivate-expired-banners',
-          description: 'Auto-deactivate expired banners',
           schedule: 'Every hour',
         },
         {

@@ -4,7 +4,7 @@ import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express
 import type { Response } from 'express';
 import { ProductService } from './product.service';
 import { ProductListQueryDto, CreateProductDto, UpdateProductDto, BulkDeleteProductDto, UpdateProductStatusDto, ProductBulkUpdateStatusDto,CreateProductSpecialOfferDto } from './dto/product.dto';
-import { successResponse, paginationResponse } from '../../utils/responseFormatter';
+import { paginationResponse } from '../../utils/responseFormatter';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { uploadProductImages } from '../../middlewares/uploadMiddleware';
@@ -78,8 +78,7 @@ export class ProductController {
 
     try {
       const product = await this.productService.getProductById(id);
-      const result = successResponse(product, 'Product retrieved successfully');
-      responseModel.setData(result);
+      responseModel.setData(product);
     } catch (error) {
       throw error;
     }
@@ -241,8 +240,7 @@ export class ProductController {
       const imageRegistrationThumbnail = files?.imageRegistrationThumbnail?.[0];
       const imageRegistrationDetail = files?.imageRegistrationDetail?.[0];
       const product = await this.productService.createProduct(createProductDto, imageRegistrationThumbnail, imageRegistrationDetail);
-      const result = successResponse(product, 'Product created successfully');
-      responseModel.setData(result);
+      responseModel.setData(product);
     } catch (error) {
       throw error;
     }
@@ -263,8 +261,7 @@ export class ProductController {
 
     try {
       const product = await this.productService.updateProduct(id, updateProductDto);
-      const result = successResponse(product, 'Product updated successfully');
-      responseModel.setData(result);
+      responseModel.setData(product);
     } catch (error) {
       throw error;
     }
@@ -282,8 +279,7 @@ export class ProductController {
 
     try {
       const result = await this.productService.deleteProduct(id);
-      const data = successResponse(result, result.message);
-      responseModel.setData(data);
+      responseModel.setData(result);
     } catch (error) {
       throw error;
     }
@@ -302,8 +298,7 @@ export class ProductController {
 
     try {
       const result = await this.productService.bulkDeleteProducts(bulkDeleteDto.productIds);
-      const data = successResponse(result, result.message);
-      responseModel.setData(data);
+      responseModel.setData(result);
     } catch (error) {
       throw error;
     }
@@ -323,8 +318,7 @@ export class ProductController {
 
     try {
       const product = await this.productService.updateProductStatus(id, statusDto);
-      const result = successResponse(product, 'Product status updated successfully');
-      responseModel.setData(result);
+      responseModel.setData(product);
     } catch (error) {
       throw error;
     }
@@ -349,8 +343,7 @@ export class ProductController {
           saleStatus: bulkStatusDto.saleStatus,
         }
       );
-      const data = successResponse(result, result.message);
-      responseModel.setData(data);
+      responseModel.setData(result);
     } catch (error) {
       throw error;
     }
@@ -367,8 +360,7 @@ export class ProductController {
 
     try {
       const stats = await this.productService.getProductStats();
-      const result = successResponse(stats, 'Product statistics retrieved successfully');
-      responseModel.setData(result);
+      responseModel.setData(stats);
     } catch (error) {
       throw error;
     }
@@ -432,8 +424,7 @@ export class ProductController {
 
     try {
       const product = await this.productService.uploadProductImages(id, files);
-      const result = successResponse(product, 'Product images uploaded successfully');
-      responseModel.setData(result);
+      responseModel.setData(product);
     } catch (error) {
       throw error;
     }
@@ -478,8 +469,7 @@ export class ProductController {
 
     try {
       const product = await this.productService.updateProductSpecialOffer(id, createProductSpecialOfferDto);
-      const result = successResponse(product, 'Product special offer updated successfully');
-      responseModel.setData(result);
+      responseModel.setData(product);
       return responseModel;
     } catch (error) {
       throw error;

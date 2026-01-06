@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
   UseFilters,
   UseInterceptors,
@@ -46,11 +47,11 @@ export class OrdersController {
   @ApiResponse({ status: 201, description: 'Order created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   @ApiResponse({ status: 404, description: 'User not found (ordererId)' })
-  async create(@Body() createOrderDto: CreateOrderDto) {
+  async create(@Req() req: Request & { user: { id: string } }, @Body() createOrderDto: CreateOrderDto[], @Body() points: number) {
     const responseModel = new ResponseModel();
 
     try {
-      const order = await this.ordersService.create(createOrderDto);
+      const order = await this.ordersService.create(createOrderDto, points, req.user.id);
       responseModel.setData(order);
     } catch (error) {
       throw error;

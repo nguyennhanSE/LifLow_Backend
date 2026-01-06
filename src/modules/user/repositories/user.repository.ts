@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "prisma/prisma.service";
 import { UserEntity } from "../entities/user.entity";
 import { CreateUserDto, UserFilterDto } from "../dto/user.dto";
@@ -535,4 +535,114 @@ export class UserRepository {
     }
   }
 
+  /**
+   * Get user points
+   */
+  async getUserPoints(userId: string): Promise<{totalUsedPoints: number, availablePoints: number}> {
+    try {
+      const result = await this.prisma.point.aggregate({
+        where: { userId },
+        _sum: { availablePointsIncrease: true, availablePointsDeduction: true },
+      });
+      return {
+        totalUsedPoints: result._sum.availablePointsIncrease || 0,
+        availablePoints: result._sum.availablePointsDeduction || 0,
+      };
+    } catch (error) {
+      console.error('Prisma error in getUserPoints:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user information
+   */
+  async getUserInfo(userId: string, options: {
+    includeOrders?: boolean;
+    includePermissions?: boolean;
+    includeMembership?: boolean;
+    includePoint?: boolean;
+    includeCarts?: boolean;
+    includePayments?: boolean;
+    includeProductReviews?: boolean;
+    includeProductInquiries?: boolean;
+    includeCouponHistories?: boolean;
+    includeRecipes?: boolean;
+  }): Promise<UserEntity> {
+    try {
+      const include: Prisma.UserInclude = {};
+
+      if (options.includePermissions) {
+        include.userRole = {
+          include: {
+            role: true,
+          },
+        };
+      }
+
+      if (options.includeMembership) {
+        include.userMembership = {
+          include: {
+            membership: true,
+          },
+        };
+        
+      }
+
+      if (options.includePoint) {
+        include.point = true;
+      }
+
+      if (options.includeOrders) {
+        include.orders = true;
+      }
+
+      if (options.includeCarts) {
+        include.carts = true;
+      }
+
+      if (options.includePayments) {
+        include.payments = true;
+      }
+
+      if (options.includeProductReviews) {
+        include.productReviews = true;
+      }
+
+      if (options.includeProductInquiries) {
+        include.productInquiries = true;
+      }
+
+      if (options.includeCouponHistories) {
+        include.couponHistories = true;
+      }
+
+      if (options.includeRecipes) {
+        include.recipes = true;
+      }
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: Object.keys(include).length > 0 ? include : undefined,
+      });
+
+      if (!user) {
+        throw new NotFoundException(`User with id ${userId} not found`);
+      }
+
+      // Map membership from userMembership if included
+      if (options.includeMembership) {
+        const userWithMembership = user as any;
+        if (userWithMembership.userMembership?.membership) {
+          userWithMembership.membership = userWithMembership.userMembership.membership;
+          delete userWithMembership.userMembership;
+        }
+      }
+
+      return user;
+    } catch (error) {
+      console.error('Prisma error in getUserInfo:', error);
+      throw error;
+    }
+  }
 }

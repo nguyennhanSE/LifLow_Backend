@@ -162,5 +162,39 @@ export class OrderRepository {
     const order = await this.prisma.order.findMany({ where: { user: { id: userId } } });
     return order.length ?? 0;
   }
+  
+  async getLastItemWiseOrderNumber(prefix?: string): Promise<string | null> {
+    const where: Prisma.OrderWhereInput = prefix
+      ? {
+          itemWiseOrderNumber: {
+            startsWith: prefix,
+          },
+        }
+      : {};
+    
+    const lastOrder = await this.prisma.order.findFirst({
+      orderBy: { itemWiseOrderNumber: 'desc' },
+      select: { itemWiseOrderNumber: true },
+      where,
+    });
+    return lastOrder?.itemWiseOrderNumber || null;
+  }
+
+  async getLastOrderNumber(itemWiseOrderNumber: string): Promise<string | null> {
+    const where: Prisma.OrderWhereInput = {
+      itemWiseOrderNumber: {
+        equals: itemWiseOrderNumber,
+      },
+      orderNumber: {
+        startsWith: `${itemWiseOrderNumber}-`,
+      },
+    };
+    const lastOrder = await this.prisma.order.findFirst({
+      orderBy: { orderNumber: 'desc' },
+      select: { orderNumber: true },
+      where,
+    });
+    return lastOrder?.orderNumber || null;
+  }
 }
 

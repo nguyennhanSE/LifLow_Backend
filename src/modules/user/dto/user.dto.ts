@@ -310,3 +310,155 @@ export class GetAdminListQueryDto {
     @trim()
     q?: string;
 }
+
+export class GetUserInfoDto {
+    @ApiPropertyOptional({
+        description: 'Include user orders in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includeOrders must be a boolean' })
+    includeOrders?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Include user roles and permissions in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includePermissions must be a boolean' })
+    includePermissions?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Include user membership information in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includeMembership must be a boolean' })
+    includeMembership?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Include user point information in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includePoint must be a boolean' })
+    includePoint?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Include user carts in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includeCarts must be a boolean' })
+    includeCarts?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Include user payments in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includePayments must be a boolean' })
+    includePayments?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Include user product reviews in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includeProductReviews must be a boolean' })
+    includeProductReviews?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Include user product inquiries in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includeProductInquiries must be a boolean' })
+    includeProductInquiries?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Include user coupon histories in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includeCouponHistories must be a boolean' })
+    includeCouponHistories?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Include user recipes in response',
+        example: true,
+        type: Boolean,
+        default: false
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    })
+    @IsBoolean({ message: 'includeRecipes must be a boolean' })
+    includeRecipes?: boolean;
+}

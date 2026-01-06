@@ -41,3 +41,4 @@ export class MembershipInfo {
   name!: string;
   description?: string | null;
 }
+

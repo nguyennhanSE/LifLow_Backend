@@ -13,12 +13,21 @@ import { OrderNotFoundException } from './exceptions/order-not-found.exception';
 import { OrderValidationException } from './exceptions/order-validation.exception';
 import { EOrderSituation } from './enum/order.enum';
 import { OrderEntity } from './entities/order.entity';
+import { PointService } from '../point/point.service';
+import { PrismaService } from 'prisma/prisma.service';
+import { MembershipsService } from '../memberships/memberships.service';
+
 
 type SalesByDayPoint = { date: string; totalPaymentAmount: number };
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly orderRepository: OrderRepository) {}
+  constructor(
+    private readonly orderRepository: OrderRepository,
+    private readonly pointService: PointService,
+    private readonly prisma: PrismaService,
+    private readonly membershipService: MembershipsService,
+  ) {}
 
   private formatLocalYyyyMmDd(d: Date): string {
     const yyyy = d.getFullYear();
@@ -28,32 +37,131 @@ export class OrdersService {
   }
 
   /**
-   * Create a new order
+   * Create new orders with points in a transaction
    * - Generates a unique orderNumber when not provided
    * - Validates the user exists if ordererId is present
+   * - Creates points for each order with orderNumber = itemWiseOrderNumber
    */
-  async create(createOrderDto: CreateOrderDto): Promise<OrderResponseDto> {
+  async create(createOrderDtos: CreateOrderDto[], points: number, userId: string): Promise<OrderResponseDto[]> {
     try {
-      // Validate user existence when ordererId is provided
-      if (createOrderDto.ordererId) {
-        const userExists = await this.orderRepository.userExists(
-          createOrderDto.ordererId,
-        );
-        if (!userExists) {
-          throw new OrderValidationException('User not found');
-        }
+      const user = await this.prisma.user.findUnique({
+        where: {
+          id: userId,
+        },
+      });
+      if (!user) {
+        throw new OrderValidationException(`User not found: ${userId}`);
+      }
+      const ordererName = user.name;
+      const ordererMobilePhone = user.phoneNumber;
+      const membershipLevelAtOrderTime = await this.membershipService.getUserActiveMembership(userId);
+
+      
+      // Generate itemWiseOrderNumber first (common for all orders in this batch)
+      // Check if first order has itemWiseOrderNumber, otherwise generate one
+      let itemWiseOrderNumber: string = (createOrderDtos[0] as any)?.itemWiseOrderNumber || '';
+      if (!itemWiseOrderNumber) {
+        // Generate a new itemWiseOrderNumber for this batch of orders
+        itemWiseOrderNumber = await this.generateUniqueItemWiseOrderNumber();
       }
 
-      const orderNumber =
-        createOrderDto.orderNumber || (await this.generateUniqueOrderNumber());
+      // Execute transaction
+      const result = await this.prisma.$transaction(async (tx) => {
+        const createdOrders: Array<Order & { user?: any; product?: any }> = [];
 
-      const created = await this.orderRepository.create({
-        ...createOrderDto,
-        orderNumber,
+        // Create all orders
+        for (const createOrderDto of createOrderDtos) {
+          // Generate orderNumber for each order based on the common itemWiseOrderNumber
+          // Format: {itemWiseOrderNumber}-{sequential_number} (e.g., 20251231-01-01, 20251231-01-02)
+          let orderNumber = (createOrderDto as any).orderNumber;
+          if (!orderNumber) {
+            // Generate orderNumber from itemWiseOrderNumber (e.g., 20251231-01 -> 20251231-01-01)
+            orderNumber = await this.generateUniqueOrderNumber(itemWiseOrderNumber);
+          }
+          
+          // Map CreateOrderDto to Prisma OrderCreateInput
+          const orderData: Prisma.OrderCreateInput = {
+            orderNumber,
+            itemWiseOrderNumber: itemWiseOrderNumber || '',
+            totalOrderAmount: createOrderDto.totalOrderAmount,
+            totalPaymentAmount: createOrderDto.totalPaymentAmount,
+            productName: createOrderDto.productName || '',
+            productNameWithOptions: createOrderDto.productNameWithOptions || '',
+            quantity: createOrderDto.quantity,
+            recipient: createOrderDto.recipient || '',
+            recipientAddressFull: createOrderDto.recipientAddressFull || '',
+            recipientPostalCode: createOrderDto.recipientPostalCode,
+            recipientMobilePhone: createOrderDto.recipientMobilePhone || '',
+            recipientPhoneNumber: createOrderDto.recipientPhoneNumber || '',
+            deliveryMessage: createOrderDto.deliveryMessage || '',
+            salePrice: createOrderDto.salePrice,
+            paymentType: createOrderDto.paymentType || '',
+            paymentMethod: createOrderDto.paymentMethod || '',
+            orderDate: createOrderDto.orderDate || this.formatLocalYyyyMmDd(new Date()),
+            ordererName: ordererName || '',
+            ordererMobilePhone: ordererMobilePhone || '',
+            desiredDeliveryDate: createOrderDto.desiredDeliveryDate || '',
+            membershipLevelAtOrderTime: membershipLevelAtOrderTime?.membershipName || '',
+            situation: (createOrderDto as any).situation,
+            courierCompany: (createOrderDto as any).courierCompany,
+            invoiceNumber: (createOrderDto as any).invoiceNumber,
+          };
+
+          // Add user relation if ordererId is provided
+          if (userId) {
+            orderData.user = {
+              connect: { id: userId },
+            };
+          }
+
+          // Add product relation if productNumber is provided
+          if (createOrderDto.productId) {
+            orderData.product = {
+              connect: { id: createOrderDto.productId },
+            };
+          }
+
+          const created = await tx.order.create({
+            data: orderData,
+            include: { user: true, product: true },
+          });
+
+          createdOrders.push(created as Order & { user?: any; product?: any });
+
+        }
+        // Create point for each order with orderNumber = itemWiseOrderNumber
+        if (itemWiseOrderNumber && points > 0) {
+          const today = this.formatLocalYyyyMmDd(new Date());
+          
+          await tx.point.create({
+            data: {
+              date: today,
+              userId: userId,
+              orderNumber: itemWiseOrderNumber,
+              pointsType: 'USED',
+              availablePointsBalance: points,
+              content: `Order points for ${itemWiseOrderNumber}`,
+            },
+          });
+        }
+        // Update user's available points
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            availablePoints: { decrement: points },
+            totalUsedPoints: { increment: points },
+            totalPurchaseAmount: { increment: createOrderDtos.reduce((acc, curr) => acc + curr.totalPaymentAmount, 0) },
+          },
+        });
+
+        return createdOrders;
       });
 
-      const orderEntity = toOrderEntity(created);
-      return toOrderResponseDto(orderEntity);
+      // Map to response DTOs
+      return result.map(order => {
+        const orderEntity = toOrderEntity(order);
+        return toOrderResponseDto(orderEntity);
+      });
     } catch (error) {
       this.handlePrismaError(error, 'Failed to create order');
     }
@@ -477,37 +585,99 @@ export class OrdersService {
   }
 
   /**
-   * Generate a unique order number (e.g., ORD-20251210-ABC123)
+   * Generate a sequential order number with date prefix (e.g., 20251117-01, 20251117-02, ...)
    */
-  private generateOrderNumber(): string {
+  private async generateItemWiseOrderNumber(): Promise<string> {
+    // Get today's date in YYYYMMDD format
     const now = new Date();
-    const datePart = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, '0'),
-      String(now.getDate()).padStart(2, '0'),
-    ].join('');
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const datePrefix = `${year}${month}${day}`;
+    
+    // Get the last order number for today
+    const lastItemWiseOrderNumber = await this.orderRepository.getLastItemWiseOrderNumber(datePrefix);
+    
+    let nextNumber = 1;
+    
+    if (lastItemWiseOrderNumber) {
+      // Extract number from format "YYYYMMDD-NN"
+      const match = lastItemWiseOrderNumber.match(/^(\d{8})-(\d+)$/);
+      if (match && match[1] === datePrefix) {
+        nextNumber = parseInt(match[2], 10) + 1;
+      } else {
+        // If format doesn't match, start from 01 for today
+        nextNumber = 1;
+      }
+    }
+    
+    // Format with zero-padding (e.g., 20251117-01, 20251117-02, ..., 20251117-100)
+    return `${datePrefix}-${nextNumber.toString().padStart(2, '0')}`;
+  }
 
-    const randomPart = Math.random().toString(36).substring(2, 5).toUpperCase();
-    return `ORD-${datePart}-${randomPart}`;
+  /**
+   * Ensure generated order number is unique
+   */
+  private async generateUniqueItemWiseOrderNumber(
+    maxAttempts = 5,
+  ): Promise<string> {
+    for (let i = 0; i < maxAttempts; i++) {
+      const itemWiseOrderNumber = await this.generateItemWiseOrderNumber();
+      const exists = await this.orderRepository.count({ itemWiseOrderNumber });
+      if (exists === 0) {
+        return itemWiseOrderNumber;
+      }
+      // If exists, wait a bit and try again (in case of race condition)
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    throw new InternalServerErrorException('Failed to generate unique item-wise order number');
+  }
+
+  /**
+   * Generate order number based on itemWiseOrderNumber (e.g., 20251231-01-01, 20251231-01-02, ...)
+   */
+  private async generateOrderNumber(itemWiseOrderNumber: string): Promise<string> {
+    // Get the last order number for this itemWiseOrderNumber
+    const lastOrderNumber = await this.orderRepository.getLastOrderNumber(itemWiseOrderNumber);
+    
+    let nextNumber = 1;
+    
+    if (lastOrderNumber) {
+      // Extract number from format "YYYYMMDD-NN-XX" (e.g., 20251231-01-02)
+      // We need to match the itemWiseOrderNumber prefix and extract the last number
+      const prefix = `${itemWiseOrderNumber}-`;
+      if (lastOrderNumber.startsWith(prefix)) {
+        const suffix = lastOrderNumber.substring(prefix.length);
+        const match = suffix.match(/^(\d+)$/);
+        if (match) {
+          nextNumber = parseInt(match[1], 10) + 1;
+        }
+      }
+    }
+    
+    // Format with zero-padding (e.g., 20251231-01-01, 20251231-01-02, ..., 20251231-01-100)
+    return `${itemWiseOrderNumber}-${nextNumber.toString().padStart(2, '0')}`;
   }
 
   /**
    * Ensure generated order number is unique
    */
   private async generateUniqueOrderNumber(
+    itemWiseOrderNumber: string,
     maxAttempts = 5,
   ): Promise<string> {
     for (let i = 0; i < maxAttempts; i++) {
-      const orderNumber = this.generateOrderNumber();
+      const orderNumber = await this.generateOrderNumber(itemWiseOrderNumber);
       const exists = await this.orderRepository.count({ orderNumber });
       if (exists === 0) {
         return orderNumber;
       }
+      // If exists, wait a bit and try again (in case of race condition)
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
-    // Fallback last generated value
-    return this.generateOrderNumber();
+    throw new InternalServerErrorException('Failed to generate unique order number');
   }
-
+  
   /**
    * Normalize Prisma errors into meaningful HTTP exceptions
    */
