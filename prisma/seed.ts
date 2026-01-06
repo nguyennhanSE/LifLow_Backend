@@ -789,39 +789,39 @@ async function seedOrders(
     const totalOrderAmount = salePrice * quantity;
 
     // Create order with direct product relation
-    const order = await prisma.order.create({
-      data: {
-        orderNumber: `ORD${(i + 1).toString().padStart(6, '0')}`,
-        itemWiseOrderNumber: `ITEM${(i + 1).toString().padStart(6, '0')}-01`,
-        totalOrderAmount,
-        totalPaymentAmount: totalOrderAmount, // Assuming no discount for now
-        productId: product.id, // Required field: 상품번호 (Product ID) - direct relation to Product
-        productName: product.productName || '',
-        productNameWithOptions: product.productName || '',
-        quantity,
-        salePrice,
-        // Common order fields
-        recipient: user.name,
-        recipientAddressFull: `Seoul, Gangnam-gu, Teheran-ro ${100 + i}`,
-        recipientPostalCode: 10000 + Math.floor(Math.random() * 90000),
-        recipientMobilePhone: user.phoneNumber,
-        recipientPhoneNumber: user.phoneNumber,
-        deliveryMessage: i % 3 === 0 ? 'Please leave at the door' : '',
-        paymentType: 'ONLINE',
-        paymentMethod: ['CARD', 'BANK_TRANSFER', 'KAKAO_PAY'][Math.floor(Math.random() * 3)],
-        orderDate: generateRandomDateString(180),
-        ordererName: user.name,
-        ordererMobilePhone: user.phoneNumber,
-        ordererId: user.id,
-        desiredDeliveryDate: new Date(Date.now() + Math.random() * 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        membershipLevelAtOrderTime: userMembership?.membershipName || 'GENERAL',
-        situation,
-        courierCompany,
-      },
-    });
+    // const order = await prisma.order.create({
+    //   data: {
+    //     orderNumber: `ORD${(i + 1).toString().padStart(6, '0')}`,
+    //     itemWiseOrderNumber: `ITEM${(i + 1).toString().padStart(6, '0')}-01`,
+    //     totalOrderAmount,
+    //     totalPaymentAmount: totalOrderAmount, // Assuming no discount for now
+    //     productId: product.id, // Required field: 상품번호 (Product ID) - direct relation to Product
+    //     productName: product.productName || '',
+    //     productNameWithOptions: product.productName || '',
+    //     quantity,
+    //     salePrice,
+    //     // Common order fields
+    //     recipient: user.name,
+    //     recipientAddressFull: `Seoul, Gangnam-gu, Teheran-ro ${100 + i}`,
+    //     recipientPostalCode: 10000 + Math.floor(Math.random() * 90000),
+    //     recipientMobilePhone: user.phoneNumber,
+    //     recipientPhoneNumber: user.phoneNumber,
+    //     deliveryMessage: i % 3 === 0 ? 'Please leave at the door' : '',
+    //     paymentType: 'ONLINE',
+    //     paymentMethod: ['CARD', 'BANK_TRANSFER', 'KAKAO_PAY'][Math.floor(Math.random() * 3)],
+    //     orderDate: generateRandomDateString(180),
+    //     ordererName: user.name,
+    //     ordererMobilePhone: user.phoneNumber,
+    //     ordererId: user.id,
+    //     desiredDeliveryDate: new Date(Date.now() + Math.random() * 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    //     membershipLevelAtOrderTime: userMembership?.membershipName || 'GENERAL',
+    //     situation,
+    //     courierCompany,
+    //   },
+    // });
 
-    orders.push(order);
-    console.log(`   ✓ ${order.orderNumber} - Product: ${product.productName} - Total: ₩${totalOrderAmount.toLocaleString()}`);
+    // orders.push(order);
+    // console.log(`   ✓ ${order.orderNumber} - Product: ${product.productName} - Total: ₩${totalOrderAmount.toLocaleString()}`);
   }
 
   console.log(`✅ Created ${orders.length} orders\n`);

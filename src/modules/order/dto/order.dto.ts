@@ -39,6 +39,14 @@ export enum PaymentMethod {
 // ============================================
 export class CreateOrderDto {
   @ApiProperty({
+    description: 'Cart ID (UUID)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsNotEmpty({ message: 'Cart ID is required' })
+  @IsUUID('4', { message: 'Cart ID must be a valid UUID' })
+  cartId!: string;
+
+  @ApiProperty({
     description: 'Total order amount in KRW',
     example: 150000,
     minimum: 0,
@@ -251,6 +259,14 @@ export class CreateOrderDto {
 // ============================================
 export class UpdateOrderDto {
   @ApiPropertyOptional({
+    description: 'Cart ID (UUID)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'Cart ID must be a valid UUID' })
+  cartId?: string;
+
+  @ApiPropertyOptional({
     description: 'Order number',
     example: 'ORD-2025-001234',
     maxLength: 255,
@@ -261,14 +277,14 @@ export class UpdateOrderDto {
   orderNumber?: string;
 
   @ApiPropertyOptional({
-    description: 'Item-wise order number',
-    example: 'ITEM-2025-001234-01',
+    description: 'Order group number',
+    example: 'GRP-2025-001234',
     maxLength: 255,
   })
   @IsOptional()
-  @IsString({ message: 'Item-wise order number must be a string' })
-  @MaxLength(255, { message: 'Item-wise order number must not exceed 255 characters' })
-  itemWiseOrderNumber?: string;
+  @IsString({ message: 'Order group number must be a string' })
+  @MaxLength(255, { message: 'Order group number must not exceed 255 characters' })
+  orderGroupNumber?: string;
 
   @ApiPropertyOptional({
     description: 'Total order amount in KRW',
@@ -537,11 +553,14 @@ export class OrderResponseDto {
   @ApiProperty({ description: 'Order ID (UUID)', example: '123e4567-e89b-12d3-a456-426614174000' })
   id!: string;
 
+  @ApiProperty({ description: 'Cart ID (UUID)', example: '123e4567-e89b-12d3-a456-426614174000' })
+  cartId!: string;
+
   @ApiProperty({ description: 'Order number', example: 'ORD-2025-001234' })
   orderNumber!: string;
 
-  @ApiProperty({ description: 'Item-wise order number', example: 'ITEM-2025-001234-01' })
-  itemWiseOrderNumber!: string;
+  @ApiPropertyOptional({ description: 'Order group number', example: 'GRP-2025-001234' })
+  orderGroupNumber?: string | null;
 
   @ApiProperty({ description: 'Total order amount in KRW', example: 150000 })
   totalOrderAmount!: number;

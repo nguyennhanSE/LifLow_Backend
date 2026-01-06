@@ -38,9 +38,9 @@ export class OrdersService {
 
   /**
    * Create new orders with points in a transaction
-   * - Generates a unique orderNumber when not provided
+   * - Generates a unique orderNumber and orderGroupNumber when not provided
    * - Validates the user exists if ordererId is present
-   * - Creates points for each order with orderNumber = itemWiseOrderNumber
+   * - Creates points for each order with orderNumber = orderGroupNumber
    */
   async create(createOrderDtos: CreateOrderDto[], points: number, userId: string): Promise<OrderResponseDto[]> {
     try {
@@ -57,32 +57,41 @@ export class OrdersService {
       const membershipLevelAtOrderTime = await this.membershipService.getUserActiveMembership(userId);
 
       
-      // Generate itemWiseOrderNumber first (common for all orders in this batch)
-      // Check if first order has itemWiseOrderNumber, otherwise generate one
-      let itemWiseOrderNumber: string = (createOrderDtos[0] as any)?.itemWiseOrderNumber || '';
-      if (!itemWiseOrderNumber) {
-        // Generate a new itemWiseOrderNumber for this batch of orders
-        itemWiseOrderNumber = await this.generateUniqueItemWiseOrderNumber();
+      // Generate orderGroupNumber first (common for all orders in this batch)
+      let orderGroupNumber: string = (createOrderDtos[0] as any)?.orderGroupNumber || '';
+      if (!orderGroupNumber) {
+        // Generate a new orderGroupNumber for this batch of orders
+        orderGroupNumber = await this.generateUniqueOrderGroupNumber();
       }
 
       // Execute transaction
       const result = await this.prisma.$transaction(async (tx) => {
         const createdOrders: Array<Order & { user?: any; product?: any }> = [];
 
+        // Create or get OrderGroup
+        let orderGroup = await tx.orderGroup.findUnique({
+          where: { orderGroupNumber },
+        });
+        
+        if (!orderGroup) {
+          orderGroup = await tx.orderGroup.create({
+            data: {
+              orderGroupNumber,
+            },
+          });
+        }
+
         // Create all orders
         for (const createOrderDto of createOrderDtos) {
-          // Generate orderNumber for each order based on the common itemWiseOrderNumber
-          // Format: {itemWiseOrderNumber}-{sequential_number} (e.g., 20251231-01-01, 20251231-01-02)
+          // Generate orderNumber for each order
           let orderNumber = (createOrderDto as any).orderNumber;
           if (!orderNumber) {
-            // Generate orderNumber from itemWiseOrderNumber (e.g., 20251231-01 -> 20251231-01-01)
-            orderNumber = await this.generateUniqueOrderNumber(itemWiseOrderNumber);
+            orderNumber = await this.generateUniqueOrderNumber();
           }
           
           // Map CreateOrderDto to Prisma OrderCreateInput
           const orderData: Prisma.OrderCreateInput = {
             orderNumber,
-            itemWiseOrderNumber: itemWiseOrderNumber || '',
             totalOrderAmount: createOrderDto.totalOrderAmount,
             totalPaymentAmount: createOrderDto.totalPaymentAmount,
             productName: createOrderDto.productName || '',
@@ -105,6 +114,12 @@ export class OrdersService {
             situation: (createOrderDto as any).situation,
             courierCompany: (createOrderDto as any).courierCompany,
             invoiceNumber: (createOrderDto as any).invoiceNumber,
+            cart: {
+              connect: { id: createOrderDto.cartId },
+            },
+            orderGroup: {
+              connect: { orderGroupNumber },
+            },
           };
 
           // Add user relation if ordererId is provided
@@ -114,7 +129,7 @@ export class OrdersService {
             };
           }
 
-          // Add product relation if productNumber is provided
+          // Add product relation if productId is provided
           if (createOrderDto.productId) {
             orderData.product = {
               connect: { id: createOrderDto.productId },
@@ -127,23 +142,24 @@ export class OrdersService {
           });
 
           createdOrders.push(created as Order & { user?: any; product?: any });
-
         }
-        // Create point for each order with orderNumber = itemWiseOrderNumber
-        if (itemWiseOrderNumber && points > 0) {
+        
+        // Create point for each order with orderNumber = orderGroupNumber
+        if (orderGroupNumber && points > 0) {
           const today = this.formatLocalYyyyMmDd(new Date());
           
           await tx.point.create({
             data: {
               date: today,
               userId: userId,
-              orderNumber: itemWiseOrderNumber,
+              orderNumber: orderGroupNumber,
               pointsType: 'USED',
               availablePointsBalance: points,
-              content: `Order points for ${itemWiseOrderNumber}`,
+              content: `Order points for ${orderGroupNumber}`,
             },
           });
         }
+        
         // Update user's available points
         await tx.user.update({
           where: { id: userId },
@@ -341,7 +357,8 @@ export class OrdersService {
         orders.forEach((order) => {
           stream.write({
             주문번호: order.orderNumber || '',
-            품목별주문번호: order.itemWiseOrderNumber || '',
+            주문그룹번호: order.orderGroupNumber || '',
+            장바구니ID: order.cartId || '',
             총주문금액: order.totalOrderAmount ?? 0,
             총결제금액: order.totalPaymentAmount ?? 0,
             상품번호: order.productId ?? '',
@@ -363,7 +380,9 @@ export class OrdersService {
             주문자ID: order.ordererId || '',
             희망배송일: order.desiredDeliveryDate || '',
             주문시회원등급: order.membershipLevelAtOrderTime || '',
-            주문상태: (order as any).orderStatus || '',
+            상황: (order as any).situation || '',
+            택배사: order.courierCompany || '',
+            송장번호: order.invoiceNumber || '',
             생성일: order.createdAt?.toISOString?.() || '',
             수정일: order.updatedAt?.toISOString?.() || '',
           });
@@ -585,9 +604,9 @@ export class OrdersService {
   }
 
   /**
-   * Generate a sequential order number with date prefix (e.g., 20251117-01, 20251117-02, ...)
+   * Generate a sequential order group number with date prefix (e.g., 20251117-01, 20251117-02, ...)
    */
-  private async generateItemWiseOrderNumber(): Promise<string> {
+  private async generateOrderGroupNumber(): Promise<string> {
     // Get today's date in YYYYMMDD format
     const now = new Date();
     const year = now.getFullYear();
@@ -595,14 +614,14 @@ export class OrdersService {
     const day = String(now.getDate()).padStart(2, '0');
     const datePrefix = `${year}${month}${day}`;
     
-    // Get the last order number for today
-    const lastItemWiseOrderNumber = await this.orderRepository.getLastItemWiseOrderNumber(datePrefix);
+    // Get the last order group number for today
+    const lastOrderGroupNumber = await this.orderRepository.getLastOrderGroupNumber(datePrefix);
     
     let nextNumber = 1;
     
-    if (lastItemWiseOrderNumber) {
+    if (lastOrderGroupNumber) {
       // Extract number from format "YYYYMMDD-NN"
-      const match = lastItemWiseOrderNumber.match(/^(\d{8})-(\d+)$/);
+      const match = lastOrderGroupNumber.match(/^(\d{8})-(\d+)$/);
       if (match && match[1] === datePrefix) {
         nextNumber = parseInt(match[2], 10) + 1;
       } else {
@@ -616,58 +635,62 @@ export class OrdersService {
   }
 
   /**
-   * Ensure generated order number is unique
+   * Ensure generated order group number is unique
    */
-  private async generateUniqueItemWiseOrderNumber(
+  private async generateUniqueOrderGroupNumber(
     maxAttempts = 5,
   ): Promise<string> {
     for (let i = 0; i < maxAttempts; i++) {
-      const itemWiseOrderNumber = await this.generateItemWiseOrderNumber();
-      const exists = await this.orderRepository.count({ itemWiseOrderNumber });
+      const orderGroupNumber = await this.generateOrderGroupNumber();
+      const exists = await this.orderRepository.count({ orderGroupNumber });
       if (exists === 0) {
-        return itemWiseOrderNumber;
+        return orderGroupNumber;
       }
       // If exists, wait a bit and try again (in case of race condition)
       await new Promise(resolve => setTimeout(resolve, 10));
     }
-    throw new InternalServerErrorException('Failed to generate unique item-wise order number');
+    throw new InternalServerErrorException('Failed to generate unique order group number');
   }
 
   /**
-   * Generate order number based on itemWiseOrderNumber (e.g., 20251231-01-01, 20251231-01-02, ...)
+   * Generate order number with date prefix (e.g., 20251231-01, 20251231-02, ...)
    */
-  private async generateOrderNumber(itemWiseOrderNumber: string): Promise<string> {
-    // Get the last order number for this itemWiseOrderNumber
-    const lastOrderNumber = await this.orderRepository.getLastOrderNumber(itemWiseOrderNumber);
+  private async generateOrderNumber(): Promise<string> {
+    // Get today's date in YYYYMMDD format
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const datePrefix = `${year}${month}${day}`;
+    
+    // Get the last order number for today
+    const lastOrderNumber = await this.orderRepository.getLastOrderNumber(datePrefix);
     
     let nextNumber = 1;
     
     if (lastOrderNumber) {
-      // Extract number from format "YYYYMMDD-NN-XX" (e.g., 20251231-01-02)
-      // We need to match the itemWiseOrderNumber prefix and extract the last number
-      const prefix = `${itemWiseOrderNumber}-`;
-      if (lastOrderNumber.startsWith(prefix)) {
-        const suffix = lastOrderNumber.substring(prefix.length);
-        const match = suffix.match(/^(\d+)$/);
-        if (match) {
-          nextNumber = parseInt(match[1], 10) + 1;
-        }
+      // Extract number from format "YYYYMMDD-NN"
+      const match = lastOrderNumber.match(/^(\d{8})-(\d+)$/);
+      if (match && match[1] === datePrefix) {
+        nextNumber = parseInt(match[2], 10) + 1;
+      } else {
+        // If format doesn't match, start from 01 for today
+        nextNumber = 1;
       }
     }
     
-    // Format with zero-padding (e.g., 20251231-01-01, 20251231-01-02, ..., 20251231-01-100)
-    return `${itemWiseOrderNumber}-${nextNumber.toString().padStart(2, '0')}`;
+    // Format with zero-padding (e.g., 20251231-01, 20251231-02, ..., 20251231-100)
+    return `${datePrefix}-${nextNumber.toString().padStart(2, '0')}`;
   }
 
   /**
    * Ensure generated order number is unique
    */
   private async generateUniqueOrderNumber(
-    itemWiseOrderNumber: string,
     maxAttempts = 5,
   ): Promise<string> {
     for (let i = 0; i < maxAttempts; i++) {
-      const orderNumber = await this.generateOrderNumber(itemWiseOrderNumber);
+      const orderNumber = await this.generateOrderNumber();
       const exists = await this.orderRepository.count({ orderNumber });
       if (exists === 0) {
         return orderNumber;

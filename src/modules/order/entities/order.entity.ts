@@ -4,8 +4,9 @@ import { ProductEntity } from '../../product/entities/product.entity';
 
 export class OrderEntity {
   id!: string;
+  cartId!: string;
   orderNumber!: string;
-  itemWiseOrderNumber!: string;
+  orderGroupNumber?: string | null;
   totalOrderAmount!: number;
   totalPaymentAmount!: number;
   productId!: string;
@@ -27,7 +28,6 @@ export class OrderEntity {
   ordererId?: string | null;
   desiredDeliveryDate!: string;
   membershipLevelAtOrderTime!: string;
-  orderStatus?: string | null;
   createdAt!: Date;
   updatedAt!: Date;
 
@@ -37,5 +37,11 @@ export class OrderEntity {
   situation?: EOrderSituation | null;
   courierCompany?: string | null;
   invoiceNumber?: string | null;
+  orderGroup?: OrderGroupEntity | null;
 }
 
+export class OrderGroupEntity {
+  orderGroupNumber!: string;
+  createdAt!: Date;
+  updatedAt!: Date;
+}

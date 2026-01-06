@@ -163,38 +163,38 @@ export class OrderRepository {
     return order.length ?? 0;
   }
   
-  async getLastItemWiseOrderNumber(prefix?: string): Promise<string | null> {
+  async getLastOrderNumber(prefix?: string): Promise<string | null> {
     const where: Prisma.OrderWhereInput = prefix
       ? {
-          itemWiseOrderNumber: {
+          orderNumber: {
             startsWith: prefix,
           },
         }
       : {};
     
     const lastOrder = await this.prisma.order.findFirst({
-      orderBy: { itemWiseOrderNumber: 'desc' },
-      select: { itemWiseOrderNumber: true },
-      where,
-    });
-    return lastOrder?.itemWiseOrderNumber || null;
-  }
-
-  async getLastOrderNumber(itemWiseOrderNumber: string): Promise<string | null> {
-    const where: Prisma.OrderWhereInput = {
-      itemWiseOrderNumber: {
-        equals: itemWiseOrderNumber,
-      },
-      orderNumber: {
-        startsWith: `${itemWiseOrderNumber}-`,
-      },
-    };
-    const lastOrder = await this.prisma.order.findFirst({
       orderBy: { orderNumber: 'desc' },
       select: { orderNumber: true },
       where,
     });
     return lastOrder?.orderNumber || null;
+  }
+
+  async getLastOrderGroupNumber(prefix?: string): Promise<string | null> {
+    const where: Prisma.OrderGroupWhereInput = prefix
+      ? {
+          orderGroupNumber: {
+            startsWith: prefix,
+          },
+        }
+      : {};
+    
+    const lastOrderGroup = await this.prisma.orderGroup.findFirst({
+      orderBy: { orderGroupNumber: 'desc' },
+      select: { orderGroupNumber: true },
+      where,
+    });
+    return lastOrderGroup?.orderGroupNumber || null;
   }
 }
 

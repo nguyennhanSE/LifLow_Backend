@@ -13,8 +13,9 @@ type OrderWithRelations = Order & { user?: User | null; product?: Product | null
 export function toOrderEntity(order: Order): OrderEntity {
   return {
     id: order.id,
+    cartId: order.cartId,
     orderNumber: order.orderNumber,
-    itemWiseOrderNumber: order.itemWiseOrderNumber,
+    orderGroupNumber: order.orderGroupNumber,
     totalOrderAmount: order.totalOrderAmount,
     totalPaymentAmount: order.totalPaymentAmount,
     productId: order.productId,
@@ -36,7 +37,6 @@ export function toOrderEntity(order: Order): OrderEntity {
     ordererId: order.ordererId,
     desiredDeliveryDate: order.desiredDeliveryDate,
     membershipLevelAtOrderTime: order.membershipLevelAtOrderTime,
-    orderStatus: (order as any).orderStatus ?? null,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
     // user: order.user ? toUserEntity(order.user) : null,

@@ -192,9 +192,9 @@ enum OrderSituation {
 // Order
 model Order {
   id String @id @default(uuid())
-  cartItemId String? @unique @map("cart_item_id")
+  cartId String @map("cart_id")
   orderNumber String @default("") @unique @map("order_number") // 1. 주문번호 (Order Number) - text, default
-  itemWiseOrderNumber String @default("") @map("item_wise_order_number") // 2. 품목별 주문번호 (Item-wise Order Number) - text, default
+  orderGroupNumber String? @map("order_group_number") // 2. 주문그룹번호 (Order Group Number) - text, default
   totalOrderAmount Int @map("total_order_amount") // 3. 총 주문금액 (Total Order Amount) - int4
   totalPaymentAmount Int @map("total_payment_amount") // 4. 총 결제금액 (Total Payment Amount) - int4
   productId String @map("product_id") // 5. 상품번호 (Product Number) - int4
@@ -228,11 +228,21 @@ model Order {
   couponHistories CouponHistory[]
   // Relation to OrderItems (one order can have many items)
   product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
-  cartItem CartItem? @relation(fields: [cartItemId], references: [id], onDelete: SetNull)
+  cart Cart? @relation(fields: [cartId], references: [id], onDelete: SetNull)
   point Point?
+  orderGroup OrderGroup? @relation(fields: [orderGroupNumber], references: [orderGroupNumber], onDelete: SetNull)
   @@map("orders")
   @@index([orderNumber])
-  @@index([cartItemId])
+  @@index([cartId])
+}
+
+model OrderGroup {
+  orderGroupNumber String @default("") @unique @map("order_group_number")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  orders Order[]
+  @@index([orderGroupNumber])
+  @@map("order_groups")
 }
 
 model Cart {
@@ -250,7 +260,7 @@ model Cart {
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   cartItems CartItem[]
-  // orders Order[]
+  orders Order[]
   
   @@index([userId])
   @@index([status])
@@ -276,7 +286,7 @@ model CartItem {
   // Relations
   cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  order Order? 
+  // order Order? 
   
   @@unique([cartId, productId])
   @@index([cartId])
@@ -728,7 +738,7 @@ enum PaymentType {
 }
 
 
-model Payment {
+ model Payment {
   id String @id @default(uuid())
   
   // User & Order
