@@ -1,80 +1,236 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-// import { PaymentService } from './payment.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { UpdatePaymentDto } from './dto/update-payment.dto';
-import { ResponseModel } from 'src/libs/models/response/response.model';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Headers,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
+import { PaymentService } from './payment.service';
+import {
+  CreatePaymentDto,
+  ConfirmPaymentRequestDto,
+  CancelPaymentRequestDto,
+  GetPaymentDto,
+  PaymentWebhookDto,
+} from './dto/payment-request.dto';
+import {
+  PaymentResponseDto,
+  InitiatePaymentResponseDto,
+  PaymentListResponseDto,
+} from './dto/payment-response.dto';
+import { TossPaymentApiService } from './services/toss-payment-api.service';
 
-@Controller('payment')
+@ApiTags('Payments')
+@Controller('payments')
 export class PaymentController {
-  // constructor(private readonly paymentService: PaymentService) {}
+  private readonly logger = new Logger(PaymentController.name);
 
-  // @Post()
-  // async create(@Body() createPaymentDto: CreatePaymentDto) {
-  //   const responseModel = new ResponseModel();
+  constructor(
+    private readonly paymentService: PaymentService,
+    private readonly tossApiService: TossPaymentApiService,
+  ) {}
 
-  //   try {
-  //     const result = await this.paymentService.create(createPaymentDto);
-  //     responseModel.setData(result);
-  //   } catch (error) {
-  //     throw error;
-  //   }
+  @Post('initiate')
+  @ApiOperation({ summary: 'Initiate a new payment' })
+  @ApiResponse({
+    status: 201,
+    description: 'Payment initiated successfully',
+    type: InitiatePaymentResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  // @UseGuards(AuthGuard) // Add your auth guard here
+  // @ApiBearerAuth()
+  async initiatePayment(
+    @Body() createPaymentDto: CreatePaymentDto,
+  ): Promise<InitiatePaymentResponseDto> {
+    return this.paymentService.initiatePayment(createPaymentDto);
+  }
 
-  //   return responseModel;
-  // }
+  @Post('confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm payment after checkout' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment confirmed successfully',
+    type: PaymentResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Payment confirmation failed' })
+  async confirmPayment(
+    @Body() confirmDto: ConfirmPaymentRequestDto,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentService.confirmPayment(confirmDto);
+  }
 
-  // @Get()
-  // async findAll() {
-  //   const responseModel = new ResponseModel();
+  @Post('cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel payment (full or partial)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment canceled successfully',
+    type: PaymentResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Payment cancellation failed' })
+  // @UseGuards(AuthGuard) // Add your auth guard here
+  // @ApiBearerAuth()
+  async cancelPayment(
+    @Body() cancelDto: CancelPaymentRequestDto,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentService.cancelPayment(cancelDto);
+  }
 
-  //   try {
-  //     const result = await this.paymentService.findAll();
-  //     responseModel.setData(result);
-  //   } catch (error) {
-  //     throw error;
-  //   }
+  @Get()
+  @ApiOperation({ summary: 'Get payments with filters and pagination' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns list of payments',
+    type: PaymentListResponseDto,
+  })
+  @ApiQuery({ name: 'userId', required: false, description: 'Filter by user ID' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (default: 10)' })
+  // @UseGuards(AuthGuard) // Add your auth guard here
+  // @ApiBearerAuth()
+  async getPayments(
+    @Query() query: GetPaymentDto,
+  ): Promise<PaymentListResponseDto> {
+    return this.paymentService.getPayments(query);
+  }
 
-  //   return responseModel;
-  // }
+  @Get(':id')
+  @ApiOperation({ summary: 'Get payment by ID' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns payment details',
+    type: PaymentResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  // @UseGuards(AuthGuard) // Add your auth guard here
+  // @ApiBearerAuth()
+  async getPaymentById(@Param('id') id: string): Promise<PaymentResponseDto> {
+    return this.paymentService.getPaymentById(id);
+  }
 
-  // @Get(':id')
-  // async findOne(@Param('id') id: string) {
-  //   const responseModel = new ResponseModel();
+  @Get('order/:orderId')
+  @ApiOperation({ summary: 'Get payment by order ID' })
+  @ApiParam({ name: 'orderId', description: 'Order ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns payment details',
+    type: PaymentResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  async getPaymentByOrderId(
+    @Param('orderId') orderId: string,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentService.getPaymentByOrderId(orderId);
+  }
 
-  //   try {
-  //     const result = await this.paymentService.findOne(+id);
-  //     responseModel.setData(result);
-  //   } catch (error) {
-  //     throw error;
-  //   }
+  @Get('key/:paymentKey')
+  @ApiOperation({ summary: 'Get payment by payment key' })
+  @ApiParam({ name: 'paymentKey', description: 'Toss payment key' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns payment details',
+    type: PaymentResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  async getPaymentByKey(
+    @Param('paymentKey') paymentKey: string,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentService.getPaymentByKey(paymentKey);
+  }
 
-  //   return responseModel;
-  // }
+  @Post('sync/:paymentKey')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sync payment with Toss (get latest status)' })
+  @ApiParam({ name: 'paymentKey', description: 'Toss payment key' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment synced successfully',
+    type: PaymentResponseDto,
+  })
+  async syncPayment(
+    @Param('paymentKey') paymentKey: string,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentService.syncPayment(paymentKey);
+  }
 
-  // @Patch(':id')
-  // async update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
-  //   const responseModel = new ResponseModel();
+  @Get('stats/summary')
+  @ApiOperation({ summary: 'Get payment statistics' })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns payment statistics',
+  })
+  // @UseGuards(AuthGuard) // Add your auth guard here
+  // @ApiBearerAuth()
+  async getPaymentStats(
+    @Query('userId') userId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ): Promise<any> {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
 
-  //   try {
-  //     const result = await this.paymentService.update(+id, updatePaymentDto);
-  //     responseModel.setData(result);
-  //   } catch (error) {
-  //     throw error;
-  //   }
+    return this.paymentService.getPaymentStats(userId, start, end);
+  }
 
-  //   return responseModel;
-  // }
+  @Post('webhook')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Webhook endpoint for Toss payment notifications',
+    description:
+      'This endpoint receives payment status updates from Toss (e.g., virtual account deposits)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook processed successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid webhook signature or payload',
+  })
+  async handleWebhook(
+    @Headers('toss-signature') signature: string,
+    @Body() payload: PaymentWebhookDto,
+  ): Promise<{ success: boolean }> {
+    this.logger.log('Received webhook from Toss', {
+      eventType: payload.eventType,
+    });
 
-  // @Delete(':id')
-  // async remove(@Param('id') id: string) {
-  //   const responseModel = new ResponseModel();
+    // Verify webhook signature
+    const isValid = this.tossApiService.verifyWebhook(
+      signature,
+      JSON.stringify(payload),
+    );
 
-  //   try {
-  //     const result = await this.paymentService.remove(+id);
-  //     responseModel.setData(result);
-  //   } catch (error) {
-  //     throw error;
-  //   }
+    if (!isValid) {
+      this.logger.warn('Invalid webhook signature');
+      throw new BadRequestException('Invalid webhook signature');
+    }
 
-  //   return responseModel;
-  // }
+    // Process webhook
+    await this.paymentService.handleWebhook(payload.eventType, payload.data);
+
+    return { success: true };
+  }
 }

@@ -721,16 +721,81 @@ enum PaymentStatus {
   CANCELLED // 취소됨
 }
 
-model Payment  {
+enum PaymentType {
+  NORMAL    // 일반결제
+  BILLING   // 자동결제 (정기결제)
+  BRANDPAY  // 브랜드페이
+}
+
+
+model Payment {
   id String @id @default(uuid())
+  
+  // User & Order
   userId String @map("user_id")
-  amount Int @map("amount")
+  subscriptionId String? @map("subscription_id") // 정기결제용
+  orderId String @unique @map("order_id") // 가맹점 주문번호
+  
+  // Toss Payment Keys
+  paymentKey String @unique @map("payment_key") // Toss 결제 키 (중요!)
+  transactionKey String? @map("transaction_key") // 거래 키
+  mId String? @map("m_id") // 가맹점 ID
+  
+  // Amount Details
+  totalAmount Int @map("total_amount") // 총 결제 금액
+  balanceAmount Int @map("balance_amount") // 취소 가능 잔액
+  suppliedAmount Int? @map("supplied_amount") // 공급가액
+  vat Int? @map("vat") // 부가세
+  taxFreeAmount Int @default(0) @map("tax_free_amount") // 면세 금액
+  taxExemptionAmount Int @default(0) @map("tax_exemption_amount") // 과세 제외 금액
+  
+  // Payment Info
   status PaymentStatus @default(PENDING) @map("status")
+  type PaymentType @default(NORMAL) @map("type")
+  method String? @map("method") // 카드, 가상계좌, 계좌이체, 휴대폰 등
+  currency String @default("KRW") @map("currency")
+  orderName String @map("order_name") // 주문명
+  
+  // Dates
+  requestedAt DateTime @map("requested_at") // 결제 요청 시각
+  approvedAt DateTime? @map("approved_at") // 결제 승인 시각
+  
+  // Failure Info
+  failureCode String? @map("failure_code")
+  failureMessage String? @map("failure_message")
+  
+  // Receipt & Details
+  receiptUrl String? @map("receipt_url") // 영수증 URL
+  
+  // Payment Method Details (stored as JSON)
+  cardInfo Json? @map("card_info") // 카드 정보
+  virtualAccountInfo Json? @map("virtual_account_info") // 가상계좌 정보
+  easyPayInfo Json? @map("easy_pay_info") // 간편결제 정보
+  transferInfo Json? @map("transfer_info") // 계좌이체 정보
+  mobilePhoneInfo Json? @map("mobile_phone_info") // 휴대폰 결제 정보
+  giftCertificateInfo Json? @map("gift_certificate_info") // 상품권 정보
+  
+  // Cancel Info
+  cancels Json? @map("cancels") // 취소 내역 (배열)
+  canceledAmount Int @default(0) @map("canceled_amount") // 취소된 금액
+  
+  // Secret & Security
+  secret String? @map("secret") // 가상계좌 웹훅 검증용
+  
+  // Additional
+  metadata Json? @map("metadata") // 추가 메타데이터
+  
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-
+  
   // Relations
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([paymentKey])
+  @@index([orderId])
+  @@index([status])
+  @@index([requestedAt])
   @@map("payments")
 }
 
