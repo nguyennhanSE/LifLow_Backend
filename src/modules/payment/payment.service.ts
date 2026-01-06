@@ -37,9 +37,9 @@ export class PaymentService {
    * Initiate payment - Create order ID and return payment info
    * Client will use this to open Toss checkout page
    */
-  initiatePayment(
+  async initiatePayment(
     dto: CreatePaymentDto,
-  ): InitiatePaymentResponseDto {
+  ): Promise<InitiatePaymentResponseDto> {
     this.logger.log(`Initiating payment for user: ${dto.userId}`);
 
     try {
@@ -53,12 +53,12 @@ export class PaymentService {
 
       // For now, just return the order info
       // The client will use this to call Toss Payment Widget
-      return {
+      return Promise.resolve({
         orderId,
         amount: dto.amount,
         orderName: dto.orderName,
         customerKey: dto.userId, // Using userId as customerKey for simplicity
-      };
+      });
     } catch (error) {
       this.logger.error('Failed to initiate payment', error);
       throw new HttpException(
