@@ -20,7 +20,7 @@ export class PointService {
   /**
    * Create a new point
    * - Validates the user exists if userId is present
-   * - Validates the order exists if orderNumber is present
+   * - Validates the order group exists if orderGroupNumber is present
    */
   async create(createPointDto: CreatePointDto): Promise<PointResponseDto> {
     try {
@@ -32,11 +32,11 @@ export class PointService {
         }
       }
 
-      // Validate order existence when orderNumber is provided
-      if (createPointDto.orderNumber) {
-        const orderExists = await this.pointRepository.orderExists(createPointDto.orderNumber);
-        if (!orderExists) {
-          throw new PointValidationException('Order not found');
+      // Validate order group existence when orderGroupNumber is provided
+      if (createPointDto.orderGroupNumber) {
+        const orderGroupExists = await this.pointRepository.orderGroupExists(createPointDto.orderGroupNumber);
+        if (!orderGroupExists) {
+          throw new PointValidationException('Order group not found');
         }
       }
 
@@ -134,11 +134,11 @@ export class PointService {
   }
 
   /**
-   * Get point by order number
+   * Get point by order group number
    */
-  async findByOrderNumber(orderNumber: string): Promise<PointResponseDto | null> {
+  async findByOrderGroupNumber(orderGroupNumber: string): Promise<PointResponseDto | null> {
     try {
-      const point = await this.pointRepository.findByOrderNumber(orderNumber, true);
+      const point = await this.pointRepository.findByOrderGroupNumber(orderGroupNumber, true);
 
       if (!point) {
         return null;
@@ -147,7 +147,7 @@ export class PointService {
       const pointEntity = toPointEntityWithRelations(point);
       return toPointResponseDto(pointEntity);
     } catch (error) {
-      this.handlePrismaError(error, `Failed to fetch point for order ${orderNumber}`);
+      this.handlePrismaError(error, `Failed to fetch point for order group ${orderGroupNumber}`);
     }
   }
 
@@ -170,11 +170,11 @@ export class PointService {
         }
       }
 
-      // Validate order if changing orderNumber
-      if (updatePointDto.orderNumber) {
-        const orderExists = await this.pointRepository.orderExists(updatePointDto.orderNumber);
-        if (!orderExists) {
-          throw new PointValidationException('Order not found');
+      // Validate order group if changing orderGroupNumber
+      if (updatePointDto.orderGroupNumber) {
+        const orderGroupExists = await this.pointRepository.orderGroupExists(updatePointDto.orderGroupNumber);
+        if (!orderGroupExists) {
+          throw new PointValidationException('Order group not found');
         }
       }
 
@@ -223,7 +223,7 @@ export class PointService {
       searchTerms.push({
         OR: [
           { userId: { contains: filterDto.q, mode: 'insensitive' } },
-          { orderNumber: { contains: filterDto.q, mode: 'insensitive' } },
+          { orderGroupNumber: { contains: filterDto.q, mode: 'insensitive' } },
           { content: { contains: filterDto.q, mode: 'insensitive' } },
         ],
       });
@@ -238,9 +238,9 @@ export class PointService {
       where.userId = filterDto.userId;
     }
 
-    // Order number filter
-    if (filterDto.orderNumber) {
-      where.orderNumber = filterDto.orderNumber;
+    // Order group number filter
+    if (filterDto.orderGroupNumber) {
+      where.orderGroupNumber = filterDto.orderGroupNumber;
     }
 
     // Points type filter

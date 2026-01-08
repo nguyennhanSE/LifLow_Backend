@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { ECartStatus } from '../enums/cart.enum';
+import { ECartItemStatus } from '../enums/cart.enum';
 
 // Using any due to Prisma type generation issues
 export type CartWithRelations = any;
@@ -94,7 +94,7 @@ export class CartRepository {
   }
 
   /**
-   * Find active cart by user ID
+   * Find active cart by user ID (returns the most recent cart)
    */
   async findActiveCartByUserId(
     userId: string,
@@ -104,7 +104,9 @@ export class CartRepository {
     return await this.prisma.cart.findFirst({
       where: {
         userId,
-        status: ECartStatus.ACTIVE,
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
       include: {
         user: includeUser,
@@ -213,7 +215,7 @@ export class CartRepository {
   }
 
   /**
-   * Checkout cart (update status and set checkedOutAt)
+   * Checkout cart (set checkedOutAt timestamp only)
    */
   async checkout(
     id: string,
@@ -223,7 +225,6 @@ export class CartRepository {
     return await this.prisma.cart.update({
       where: { id },
       data: {
-        status: ECartStatus.CHECKED_OUT,
         checkedOutAt: new Date(),
       },
       include: {
@@ -240,12 +241,16 @@ export class CartRepository {
   }
 
   /**
-   * Clear all items from cart (used in transaction)
+   * Clear all ACTIVE items from cart (used in transaction)
+   * Preserves CHECKED_OUT items
    */
   async clearItems(cartId: string, tx?: Prisma.TransactionClient): Promise<void> {
     const client = tx || this.prisma;
     await client.cartItem.deleteMany({
-      where: { cartId },
+      where: { 
+        cartId,
+        status: ECartItemStatus.ACTIVE,
+      },
     });
   }
 

@@ -830,7 +830,7 @@ async function seedOrders(
 
 async function seedPoints(
   users: Array<{ id: string; availablePoints: number }>,
-  orders: Array<{ id: string; orderNumber: string }>,
+  orders: Array<{ id: string; orderGroupNumber: string }>,
 ) {
   console.log('💰 Creating point records (1-to-1 with users)...');
 
@@ -855,7 +855,7 @@ async function seedPoints(
         userId: user.id,
         membershipLevel: userMembership?.membershipName || 'GENERAL',
         content: isEarned ? `Order reward points` : `Points redemption`,
-        orderNumber: order.orderNumber,
+        orderGroupNumber: order.orderGroupNumber,
         pointsType: isEarned ? 'EARNED' : 'USED',
         availablePointsIncrease: increase,
         availablePointsDeduction: deduction,

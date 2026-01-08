@@ -61,14 +61,14 @@ export class CreatePointDto {
   content?: string;
 
   @ApiPropertyOptional({
-    description: 'Order number',
+    description: 'Order group number',
     example: 'ORD-2025-001234',
     maxLength: 50,
   })
   @IsOptional()
-  @IsString({ message: 'Order number must be a string' })
-  @MaxLength(50, { message: 'Order number must not exceed 50 characters' })
-  orderNumber?: string;
+  @IsString({ message: 'Order group number must be a string' })
+  @MaxLength(50, { message: 'Order group number must not exceed 50 characters' })
+  orderGroupNumber?: string;
 
   @ApiPropertyOptional({
     description: 'Points type',
@@ -160,14 +160,14 @@ export class UpdatePointDto {
   content?: string;
 
   @ApiPropertyOptional({
-    description: 'Order number',
+    description: 'Order group number',
     example: 'ORD-2025-001234',
     maxLength: 50,
   })
   @IsOptional()
-  @IsString({ message: 'Order number must be a string' })
-  @MaxLength(50, { message: 'Order number must not exceed 50 characters' })
-  orderNumber?: string;
+  @IsString({ message: 'Order group number must be a string' })
+  @MaxLength(50, { message: 'Order group number must not exceed 50 characters' })
+  orderGroupNumber?: string;
 
   @ApiPropertyOptional({
     description: 'Points type',
@@ -229,8 +229,8 @@ export class PointResponseDto {
   @ApiPropertyOptional({ description: 'Content/Details', example: 'Order points' })
   content?: string | null;
 
-  @ApiPropertyOptional({ description: 'Order number', example: 'ORD-2025-001234' })
-  orderNumber?: string | null;
+  @ApiPropertyOptional({ description: 'Order group number', example: 'ORD-2025-001234' })
+  orderGroupNumber?: string | null;
 
   @ApiPropertyOptional({ description: 'Points type', example: 'EARNED' })
   pointsType?: string | null;
@@ -253,8 +253,8 @@ export class PointResponseDto {
   @ApiPropertyOptional({ description: 'Associated user information' })
   user?: any;
 
-  @ApiPropertyOptional({ description: 'Associated order information' })
-  order?: any;
+  @ApiPropertyOptional({ description: 'Associated order group information' })
+  orderGroup?: any;
 }
 
 // ============================================
@@ -284,7 +284,7 @@ export class PointFilterDto {
   limit?: number;
 
   @ApiPropertyOptional({
-    description: 'Search by user ID, order number, content',
+    description: 'Search by user ID, order group number, content',
     example: 'user123 OR ORD-2025-001234',
   })
   @IsOptional()
@@ -300,12 +300,12 @@ export class PointFilterDto {
   userId?: string;
 
   @ApiPropertyOptional({
-    description: 'Filter by order number',
+    description: 'Filter by order group number',
     example: 'ORD-2025-001234',
   })
   @IsOptional()
-  @IsString({ message: 'Order number must be a string' })
-  orderNumber?: string;
+  @IsString({ message: 'Order group number must be a string' })
+  orderGroupNumber?: string;
 
   @ApiPropertyOptional({
     description: 'Filter by points type',

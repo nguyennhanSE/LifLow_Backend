@@ -70,7 +70,6 @@ export class PaymentRepository {
     return this.prisma.payment.create({
       data: {
         userId: data.userId,
-        subscriptionId: data.subscriptionId,
         orderGroupNumber: data.orderGroupNumber,
         paymentKey: data.paymentKey,
         transactionKey: data.transactionKey,

@@ -1,4 +1,3 @@
-import { ECartStatus } from '../enums/cart.enum';
 import { UserEntity } from '../../user/entities/user.entity';
 import { CartItemEntity } from './cart-item.entity';
 
@@ -12,9 +11,6 @@ export class CartEntity {
 
   /** User ID that owns this cart (maps to user_id in database) */
   userId!: string;
-
-  /** Current status of the cart (maps to status in database) */
-  status!: ECartStatus;
 
   /** Total amount of all items in the cart (maps to total_amount in database) */
   totalAmount!: number;

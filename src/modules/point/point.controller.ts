@@ -40,7 +40,7 @@ export class PointController {
   @ApiBody({ type: CreatePointDto })
   @ApiResponse({ status: 201, description: 'Point created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  @ApiResponse({ status: 404, description: 'User or Order not found' })
+  @ApiResponse({ status: 404, description: 'User or OrderGroup not found' })
   async create(@Body() createPointDto: CreatePointDto) {
     const responseModel = new ResponseModel();
 
@@ -99,18 +99,18 @@ export class PointController {
     return responseModel;
   }
 
-  @Get('order/:orderNumber')
+  @Get('order-group/:orderGroupNumber')
   @Roles(ERoleName.ADMIN)
-  @ApiOperation({ summary: 'Get point by order number' })
+  @ApiOperation({ summary: 'Get point by order group number' })
   @ApiResponse({ status: 200, description: 'Point retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Point not found' })
-  async findByOrderNumber(@Param('orderNumber') orderNumber: string) {
+  async findByOrderGroupNumber(@Param('orderGroupNumber') orderGroupNumber: string) {
     const responseModel = new ResponseModel();
 
     try {
-      const point = await this.pointService.findByOrderNumber(orderNumber);
+      const point = await this.pointService.findByOrderGroupNumber(orderGroupNumber);
       if (!point) {
-        throw new PointNotFoundException(`Point for order ${orderNumber} not found`);
+        throw new PointNotFoundException(`Point for order group ${orderGroupNumber} not found`);
       }
       responseModel.setData(point);
     } catch (error) {

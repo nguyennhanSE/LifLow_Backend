@@ -16,28 +16,23 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { EOrderSituation } from '../enum/order.enum';
+import { PaymentType } from 'src/modules/payment/enums/payment.enum';
 
-// Enums for Order fields
-export enum PaymentType {
-  PREPAID = '선결제',
-  POSTPAID = '후결제',
-  COD = '착불',
-}
-
-export enum PaymentMethod {
-  CREDIT_CARD = '신용카드',
-  BANK_TRANSFER = '계좌이체',
-  VIRTUAL_ACCOUNT = '가상계좌',
-  MOBILE = '휴대폰결제',
-  KAKAO_PAY = '카카오페이',
-  NAVER_PAY = '네이버페이',
-  TOSS = '토스',
-}
 
 // ============================================
 // 1. CREATE ORDER DTO
 // ============================================
 export class CreateOrderDto {
+  @ApiPropertyOptional({
+    description: 'Order group number',
+    example: 'GRP-2025-001234',
+    maxLength: 255,
+  })
+  @IsNotEmpty({ message: 'Order group number is required' })
+  @IsString({ message: 'Order group number must be a string' })
+  @MaxLength(255, { message: 'Order group number must not exceed 255 characters' })
+  orderGroupNumber!: string;
+
   @ApiProperty({
     description: 'Cart ID (UUID)',
     example: '123e4567-e89b-12d3-a456-426614174000',
@@ -195,7 +190,7 @@ export class CreateOrderDto {
   @ApiPropertyOptional({
     description: 'Payment type',
     enum: PaymentType,
-    example: PaymentType.PREPAID,
+    example: PaymentType.NORMAL,
   })
   @IsOptional()
   @IsString({ message: 'Payment type must be a string' })
@@ -203,8 +198,6 @@ export class CreateOrderDto {
 
   @ApiPropertyOptional({
     description: 'Payment method',
-    enum: PaymentMethod,
-    example: PaymentMethod.CREDIT_CARD,
   })
   @IsOptional()
   @IsString({ message: 'Payment method must be a string' })
@@ -435,7 +428,7 @@ export class UpdateOrderDto {
   @ApiPropertyOptional({
     description: 'Payment type',
     enum: PaymentType,
-    example: PaymentType.PREPAID,
+    example: PaymentType.NORMAL,
   })
   @IsOptional()
   @IsString({ message: 'Payment type must be a string' })
@@ -443,8 +436,7 @@ export class UpdateOrderDto {
 
   @ApiPropertyOptional({
     description: 'Payment method',
-    enum: PaymentMethod,
-    example: PaymentMethod.CREDIT_CARD,
+    example: 'CARD',
   })
   @IsOptional()
   @IsString({ message: 'Payment method must be a string' })

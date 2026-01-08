@@ -1,5 +1,4 @@
 import { UserEntity } from '../../user/entities/user.entity';
-import { OrderEntity } from '../../order/entities/order.entity';
 
 export class PointEntity {
   id!: string;
@@ -7,7 +6,7 @@ export class PointEntity {
   userId?: string | null;
   membershipLevel?: string | null;
   content?: string | null;
-  orderNumber?: string | null;
+  orderGroupNumber?: string | null;
   pointsType?: string | null;
   availablePointsIncrease?: number | null;
   availablePointsDeduction?: number | null;
@@ -17,5 +16,5 @@ export class PointEntity {
 
   // Relations
   user?: UserEntity | null;
-  order?: OrderEntity | null;
+  orderGroup?: any | null;
 }

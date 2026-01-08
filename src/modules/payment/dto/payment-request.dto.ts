@@ -1,6 +1,99 @@
-import { IsString, IsNumber, IsOptional, IsUUID, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsUUID, IsEnum, IsArray, IsInt, Min, Max, ValidateNested, IsNotEmpty, MaxLength, MinLength, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentStatus, PaymentType } from '@prisma/client';
+import { Type } from 'class-transformer';
+
+/**
+ * Cart with order data for payment confirmation
+ * Combines cart ID with order creation data
+ */
+export class CartOrderItemDto {
+  @ApiProperty({ description: '장바구니 ID (UUID)', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @IsNotEmpty({ message: 'Cart ID is required' })
+  @IsUUID('4', { message: 'Cart ID must be a valid UUID' })
+  cartItemId!: string;
+
+  @ApiProperty({ description: '상품 ID', example: '123e4567-e89b-12d3-a456-426614174001' })
+  @IsNotEmpty({ message: 'Product ID is required' })
+  @IsString({ message: 'Product ID must be a string' })
+  productId!: string;
+
+  @ApiProperty({ description: '주문 금액 (KRW)', example: 150000 })
+  @IsNotEmpty({ message: 'Total order amount is required' })
+  @Type(() => Number)
+  @IsInt({ message: 'Total order amount must be an integer' })
+  @Min(0, { message: 'Total order amount must be at least 0' })
+  totalOrderAmount!: number;
+
+  @ApiProperty({ description: '결제 금액 (KRW)', example: 145000 })
+  @IsNotEmpty({ message: 'Total payment amount is required' })
+  @Type(() => Number)
+  @IsInt({ message: 'Total payment amount must be an integer' })
+  @Min(0, { message: 'Total payment amount must be at least 0' })
+  totalPaymentAmount!: number;
+
+  @ApiPropertyOptional({ description: '상품명', example: 'Organic Apple 1kg', maxLength: 500 })
+  @IsOptional()
+  @IsString({ message: 'Product name must be a string' })
+  @MaxLength(500, { message: 'Product name must not exceed 500 characters' })
+  productName?: string;
+
+  @ApiPropertyOptional({ description: '옵션 포함 상품명', example: 'Organic Apple 1kg (Red, Gift Box)', maxLength: 500 })
+  @IsOptional()
+  @IsString({ message: 'Product name with options must be a string' })
+  @MaxLength(500, { message: 'Product name with options must not exceed 500 characters' })
+  productNameWithOptions?: string;
+
+  @ApiProperty({ description: '주문 수량', example: 5, minimum: 1, maximum: 10000 })
+  @IsNotEmpty({ message: 'Quantity is required' })
+  @Type(() => Number)
+  @IsInt({ message: 'Quantity must be an integer' })
+  @Min(1, { message: 'Quantity must be at least 1' })
+  @Max(10000, { message: 'Quantity must not exceed 10000' })
+  quantity!: number;
+
+  @ApiProperty({ description: '판매 단가 (KRW)', example: 29000, minimum: 0 })
+  @IsNotEmpty({ message: 'Sale price is required' })
+  @Type(() => Number)
+  @IsInt({ message: 'Sale price must be an integer' })
+  @Min(0, { message: 'Sale price must be at least 0' })
+  salePrice!: number;
+
+  @ApiPropertyOptional({ description: '수령인 이름', example: '김철수', minLength: 2, maxLength: 100 })
+  @IsOptional()
+  @IsString({ message: 'Recipient name must be a string' })
+  @MinLength(2, { message: 'Recipient name must be at least 2 characters' })
+  @MaxLength(100, { message: 'Recipient name must not exceed 100 characters' })
+  recipient?: string;
+
+  @ApiPropertyOptional({ description: '수령인 주소', example: '서울특별시 강남구 테헤란로 123, 456호', maxLength: 500 })
+  @IsOptional()
+  @IsString({ message: 'Recipient address must be a string' })
+  @MaxLength(500, { message: 'Recipient address must not exceed 500 characters' })
+  recipientAddressFull?: string;
+
+  @ApiProperty({ description: '수령인 우편번호 (5자리)', example: 12345, minimum: 10000, maximum: 99999 })
+  @IsNotEmpty({ message: 'Recipient postal code is required' })
+  @Type(() => Number)
+  @IsInt({ message: 'Recipient postal code must be an integer' })
+  @Min(10000, { message: 'Recipient postal code must be a 5-digit number' })
+  @Max(99999, { message: 'Recipient postal code must be a 5-digit number' })
+  recipientPostalCode!: number;
+
+  @ApiPropertyOptional({ description: '수령인 휴대폰 번호 (format: 010-XXXX-XXXX)', example: '010-1234-5678', pattern: '^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$' })
+  @IsOptional()
+  @IsString({ message: 'Recipient mobile phone must be a string' })
+  @Matches(/^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$/, {
+    message: 'Recipient mobile phone must be in format 010-XXXX-XXXX or 01XXXXXXXXX',
+  })
+  recipientMobilePhone?: string;
+
+  @ApiPropertyOptional({ description: '배송 메시지', example: '문 앞에 놔주세요', maxLength: 500 })
+  @IsOptional()
+  @IsString({ message: 'Delivery message must be a string' })
+  @MaxLength(500, { message: 'Delivery message must not exceed 500 characters' })
+  deliveryMessage?: string;
+}
 
 export class CreatePaymentDto {
   @ApiProperty({ description: '사용자 ID' })
@@ -35,13 +128,17 @@ export class ConfirmPaymentRequestDto {
   @IsString()
   paymentKey: string;
 
-  @ApiProperty({ description: '주문 ID' })
+  @ApiProperty({ description: '주문 그룹 번호' })
   @IsString()
-  orderId: string;
+  orderGroupNumber: string;
 
   @ApiProperty({ description: '결제 금액' })
   @IsNumber()
   amount: number;
+
+  @ApiProperty({ description: '사용자 ID' })
+  @IsString()
+  userId: string;
 }
 
 export class CancelPaymentRequestDto {
@@ -94,3 +191,29 @@ export class GetPaymentDto {
   limit?: number;
 }
 
+export class PreparePaymentRequestDto {
+  @ApiProperty({ description: '주문 항목 배열 (장바구니 ID + 주문 데이터)', type: [CartOrderItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CartOrderItemDto)
+  orderItems!: CartOrderItemDto[];
+}
+
+export class InitiatePaymentRequestDto {
+  @ApiProperty({ description: '장바구니 ID 배열', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  cartItemIds!: string[];
+
+  @ApiPropertyOptional({ description: '사용할 쿠폰 ID 배열', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  couponIds?: string[];
+
+  @ApiPropertyOptional({ description: '사용할 포인트' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0, { message: 'Points must be at least 0' })
+  points?: number;
+}

@@ -52,11 +52,29 @@ export class PaymentResponseDto {
 }
 
 export class InitiatePaymentResponseDto {
-  @ApiProperty({ description: '주문 ID' })
+  @ApiProperty({ description: '주문 그룹 번호 (orderId)' })
   orderId: string;
 
-  @ApiProperty({ description: '고객 이름' })
-  customerName: string;
+  @ApiProperty({ description: '원본 금액 (할인 전)' })
+  originalAmount: number;
+
+  @ApiProperty({ description: '할인 금액' })
+  discountAmount: number;
+
+  @ApiProperty({ description: '최종 결제 금액' })
+  finalAmount: number;
+
+  @ApiProperty({ description: '주문 그룹 이름' })
+  orderGroupName: string;
+
+  @ApiProperty({ description: '고객 키 (Toss 요구사항)' })
+  customerKey: string;
+
+  @ApiProperty({ description: '성공 URL' })
+  successUrl: string;
+
+  @ApiProperty({ description: '실패 URL' })
+  failUrl: string;
 }
 
 export class PaymentListResponseDto {

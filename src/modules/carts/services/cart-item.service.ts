@@ -12,7 +12,7 @@ import { UpdateCartItemDto } from '../dto/update-cart-item.dto';
 import { CartItemResponseDto } from '../dto/cart-response.dto';
 import { CartItemMapper } from '../mapper/cart-item.mapper';
 import { CartItemEntity } from '../entities/cart-item.entity';
-import { ECartStatus } from '../enums/cart.enum';
+import { ECartStatus, ECartItemStatus } from '../enums/cart.enum';
 import { CartItemRepository } from '../repositories/cart-item.repository';
 import { CartRepository } from '../repositories/cart.repository';
 
@@ -73,6 +73,11 @@ export class CartItemService {
         });
 
         if (existingItem) {
+          // Check if existing item is already checked out
+          if (existingItem.status === ECartItemStatus.CHECKED_OUT) {
+            throw new BadRequestException('Cannot update checked out cart item');
+          }
+
           // Update quantity if item already exists
           const updatedItem = await tx.cartItem.update({
             where: { id: existingItem.id },
@@ -90,13 +95,14 @@ export class CartItemService {
 
           return updatedItem;
         } else {
-          // Create new cart item
+          // Create new cart item with ACTIVE status
           const newItem = await tx.cartItem.create({
             data: {
               cartId,
               productId: createDto.productId,
               quantity: createDto.quantity,
               salePrice: createDto.salePrice,
+              status: ECartItemStatus.ACTIVE,
             },
             include: {
               product: true,
@@ -142,6 +148,11 @@ export class CartItemService {
       // Validate cart is not checked out
       if (cartItem.cart?.status === ECartStatus.CHECKED_OUT) {
         throw new BadRequestException('Cannot update items in checked out cart');
+      }
+
+      // Validate cart item is not checked out
+      if (cartItem.status === ECartItemStatus.CHECKED_OUT) {
+        throw new BadRequestException('Cannot update checked out cart item');
       }
 
       // Validate quantity if provided
@@ -190,6 +201,11 @@ export class CartItemService {
       // Validate cart is not checked out
       if (cartItem.cart?.status === ECartStatus.CHECKED_OUT) {
         throw new BadRequestException('Cannot remove items from checked out cart');
+      }
+
+      // Validate cart item is not checked out
+      if (cartItem.status === ECartItemStatus.CHECKED_OUT) {
+        throw new BadRequestException('Cannot remove checked out cart item');
       }
 
       // Use transaction to remove item and update cart total
@@ -286,6 +302,11 @@ export class CartItemService {
         throw new BadRequestException('Cannot update items in checked out cart');
       }
 
+      // Validate cart item is not checked out
+      if (cartItem.status === ECartItemStatus.CHECKED_OUT) {
+        throw new BadRequestException('Cannot update checked out cart item');
+      }
+
       // Use transaction to update quantity and cart total
       const updatedItem = await this.prisma.$transaction(async (tx) => {
         const item = await tx.cartItem.update({
@@ -330,6 +351,18 @@ export class CartItemService {
         throw new BadRequestException('Cannot clear checked out cart');
       }
 
+      // Check if any cart items are checked out
+      const checkedOutItems = await this.prisma.cartItem.count({
+        where: {
+          cartId,
+          status: ECartItemStatus.CHECKED_OUT,
+        },
+      });
+
+      if (checkedOutItems > 0) {
+        throw new BadRequestException('Cannot clear cart with checked out items');
+      }
+
       // Use transaction to remove all items and update cart total
       await this.prisma.$transaction(async (tx) => {
         await tx.cartItem.deleteMany({
@@ -352,7 +385,7 @@ export class CartItemService {
   }
 
   /**
-   * Recalculate cart total amount
+   * Recalculate cart total amount (only counts ACTIVE items)
    * @param tx - Prisma transaction client
    * @param cartId - Cart ID
    */
@@ -361,7 +394,10 @@ export class CartItemService {
     cartId: string,
   ): Promise<void> {
     const cartItems = await tx.cartItem.findMany({
-      where: { cartId },
+      where: { 
+        cartId,
+        status: ECartItemStatus.ACTIVE, // Only count active items
+      },
     });
 
     const total = cartItems.reduce((sum, item) => {

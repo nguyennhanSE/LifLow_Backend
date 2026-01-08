@@ -28,6 +28,7 @@ import {
   CancelPaymentRequestDto,
   GetPaymentDto,
   PaymentWebhookDto,
+  InitiatePaymentRequestDto,
 } from './dto/payment-request.dto';
 import {
   PaymentResponseDto,
@@ -37,6 +38,7 @@ import {
 import { TossPaymentApiService } from './services/toss-payment-api.service';
 import { ERoleName } from '../roles/enums/role.enum';
 import { Roles } from 'src/libs/decorator/roles.decorator';
+import { ResponseModel } from 'src/libs/models/response';
 /**
  * Interface for authenticated request with user info
  */
@@ -49,8 +51,8 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-@ApiTags('Payments')
-@Controller('payments')
+@ApiTags('Payment')
+@Controller('payment')
 
 @ApiBearerAuth()
 @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
@@ -74,8 +76,22 @@ export class PaymentController {
   // @ApiBearerAuth()
   async initiatePayment(
     @Req() req: AuthenticatedRequest,
-  ): Promise<InitiatePaymentResponseDto> {
-    return this.paymentService.initiatePayment(req.user.sub, req.user.name);
+    @Body() initiatePaymentDto: InitiatePaymentRequestDto
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const userId = req.user.sub;
+      const payment = await this.paymentService.initiatePayment(
+        userId, 
+        initiatePaymentDto.cartItemIds, 
+        initiatePaymentDto.couponIds, 
+        initiatePaymentDto.points
+      );
+      responseModel.setData(payment);
+      return responseModel;
+    } catch (error) {
+      throw error;
+    }
   }
 
   @Post('confirm')
@@ -88,8 +104,10 @@ export class PaymentController {
   })
   @ApiResponse({ status: 400, description: 'Payment confirmation failed' })
   async confirmPayment(
-    @Body() confirmDto: ConfirmPaymentRequestDto,
+    @Body() confirmDto: any,
+    @Req() req: AuthenticatedRequest,
   ): Promise<PaymentResponseDto> {
+    confirmDto.userId = req.user.sub;
     return this.paymentService.confirmPayment(confirmDto);
   }
 
@@ -139,10 +157,10 @@ export class PaymentController {
   })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   // @UseGuards(AuthGuard) // Add your auth guard here
-  // @ApiBearerAuth()
-  async getPaymentById(@Param('id') id: string): Promise<PaymentResponseDto> {
-    return this.paymentService.getPaymentById(id);
-  }
+    // @ApiBearerAuth()
+    // async getPaymentById(@Param('id') id: string): Promise<PaymentResponseDto> {
+    //   return this.paymentService.getPaymentById(id);
+    // }
 
   @Get('order/:orderId')
   @ApiOperation({ summary: 'Get payment by order ID' })

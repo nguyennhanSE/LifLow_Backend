@@ -3,7 +3,7 @@ import { CartEntity } from '../entities/cart.entity';
 import { CartResponseDto, CartUserInfoDto } from '../dto/cart-response.dto';
 import { CreateCartDto } from '../dto/create-cart.dto';
 import { UpdateCartDto } from '../dto/update-cart.dto';
-import { ECartStatus } from '../enums/cart.enum';
+import { ECartStatus, ECartItemStatus } from '../enums/cart.enum';
 import { CartItemMapper } from './cart-item.mapper';
 import { CartItemEntity } from '../entities/cart-item.entity';
 import { UserEntity } from '../../user/entities/user.entity';
@@ -14,7 +14,6 @@ import { UserEntity } from '../../user/entities/user.entity';
 type CartBase = {
   id: string;
   userId: string;
-  status: string;
   totalAmount: number;
   checkedOutAt: Date | null;
   createdAt: Date;
@@ -39,7 +38,6 @@ type CartWithUser = CartBase & {
 type CartWithItems = {
   id: string;
   userId: string;
-  status: string;
   totalAmount: number;
   checkedOutAt: Date | null;
   createdAt: Date;
@@ -86,7 +84,6 @@ export class CartMapper {
     const entity = new CartEntity();
     entity.id = cart.id;
     entity.userId = cart.userId;
-    entity.status = cart.status as ECartStatus;
     entity.totalAmount = cart.totalAmount;
     entity.checkedOutAt = cart.checkedOutAt;
     entity.createdAt = cart.createdAt;
@@ -138,6 +135,7 @@ export class CartMapper {
           productId: item.productId,
           quantity: item.quantity,
           salePrice: item.salePrice,
+          status: item.status || ECartItemStatus.ACTIVE,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
         });
@@ -158,7 +156,6 @@ export class CartMapper {
     const entity = this.fromPrisma({
       id: cart.id,
       userId: cart.userId,
-      status: cart.status,
       totalAmount: cart.totalAmount,
       checkedOutAt: cart.checkedOutAt,
       createdAt: cart.createdAt,
@@ -198,7 +195,6 @@ export class CartMapper {
     const dto = new CartResponseDto();
     dto.id = entity.id;
     dto.userId = entity.userId;
-    dto.status = entity.status;
     dto.totalAmount = entity.totalAmount;
     dto.checkedOutAt = entity.checkedOutAt ?? null;
     dto.createdAt = entity.createdAt;
@@ -245,10 +241,6 @@ export class CartMapper {
     
     if (dto.userId !== undefined) {
       partial.userId = dto.userId;
-    }
-    
-    if (dto.status !== undefined) {
-      partial.status = dto.status;
     }
     
     return partial;

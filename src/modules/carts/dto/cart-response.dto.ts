@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ECartStatus } from '../enums/cart.enum';
 
 /**
  * Basic user information included in cart response
@@ -79,13 +78,6 @@ export class CartResponseDto {
 
   @ApiProperty({ description: 'User ID that owns this cart', example: '123e4567-e89b-12d3-a456-426614174000' })
   userId!: string;
-
-  @ApiProperty({
-    description: 'Cart status',
-    enum: ECartStatus,
-    example: ECartStatus.ACTIVE,
-  })
-  status!: ECartStatus;
 
   @ApiProperty({ description: 'Total amount of all items in the cart (in KRW)', example: 58000 })
   totalAmount!: number;

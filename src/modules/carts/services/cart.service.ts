@@ -14,7 +14,7 @@ import { QueryCartDto } from '../dto/query-cart.dto';
 import { CartResponseDto } from '../dto/cart-response.dto';
 import { CartMapper } from '../mapper/cart.mapper';
 import { CartEntity } from '../entities/cart.entity';
-import { ECartStatus } from '../enums/cart.enum';
+import { ECartStatus, ECartItemStatus } from '../enums/cart.enum';
 import { CartRepository } from '../repositories/cart.repository';
 import { CartItemRepository } from '../repositories/cart-item.repository';
 import { CreateCartItemDto } from '../dto/create-cart-item.dto';
@@ -61,7 +61,6 @@ export class CartService {
         user: {
           connect: { id: userId },
         },
-        status: ECartStatus.ACTIVE,
         totalAmount: 0,
       });
 
@@ -86,7 +85,6 @@ export class CartService {
           user: {
             connect: { id: userId },
           },
-          status: ECartStatus.ACTIVE,
           totalAmount: 0,
         });
       }
@@ -178,18 +176,8 @@ export class CartService {
         throw new NotFoundException(`Cart with ID ${id} not found`);
       }
 
-      // Validate business rules
-      if (updateDto.status === ECartStatus.CHECKED_OUT && existingCart.status === ECartStatus.CHECKED_OUT) {
-        throw new BadRequestException('Cart is already checked out');
-      }
-
       // Prepare update data
       const updateData: Prisma.CartUpdateInput = CartMapper.toEntityPartial(updateDto) as any;
-
-      // If checking out, set checkedOutAt timestamp
-      if (updateDto.status === ECartStatus.CHECKED_OUT) {
-        updateData.checkedOutAt = new Date();
-      }
 
       const updatedCart = await this.cartRepository.update(id, updateData);
 
@@ -227,7 +215,7 @@ export class CartService {
   }
 
   /**
-   * Checkout cart (change status to CHECKED_OUT)
+   * Checkout cart (change cart items status to CHECKED_OUT)
    * @param id - Cart ID
    * @returns Checked out cart
    */
@@ -241,15 +229,43 @@ export class CartService {
         throw new NotFoundException(`Cart with ID ${id} not found`);
       }
 
-      if (cart.status === ECartStatus.CHECKED_OUT) {
-        throw new BadRequestException('Cart is already checked out');
-      }
-
       if (!cart.cartItems || cart.cartItems.length === 0) {
         throw new BadRequestException('Cannot checkout empty cart');
       }
 
-      const updatedCart = await this.cartRepository.checkout(id);
+      // Check if there are any active items to checkout
+      const activeItems = cart.cartItems.filter((item: any) => item.status === ECartItemStatus.ACTIVE);
+
+      if (activeItems.length === 0) {
+        throw new BadRequestException('No active items to checkout');
+      }
+
+      // Update all active cart items to CHECKED_OUT
+      await this.prisma.cartItem.updateMany({
+        where: {
+          cartId: id,
+          status: ECartItemStatus.ACTIVE,
+        },
+        data: {
+          status: ECartItemStatus.CHECKED_OUT,
+        },
+      });
+
+      // Update cart checkedOutAt timestamp
+      const updatedCart = await this.prisma.cart.update({
+        where: { id },
+        data: {
+          checkedOutAt: new Date(),
+        },
+        include: {
+          user: true,
+          cartItems: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
 
       this.logger.log(`Cart checked out successfully: ${id}`);
       return CartMapper.prismaToDtoWithRelations(updatedCart);
@@ -260,7 +276,7 @@ export class CartService {
   }
 
   /**
-   * Clear cart (remove all items)
+   * Clear cart (remove all ACTIVE items only)
    * @param id - Cart ID
    * @returns Updated cart
    */
@@ -274,22 +290,33 @@ export class CartService {
         throw new NotFoundException(`Cart with ID ${id} not found`);
       }
 
-      if (cart.status === ECartStatus.CHECKED_OUT) {
-        throw new BadRequestException('Cannot clear checked out cart');
-      }
-
-      // Use transaction to remove all items and update total
+      // Use transaction to remove all ACTIVE items and update total
       const updatedCart = await this.prisma.$transaction(async (tx) => {
-        // Delete all cart items
+        // Delete only ACTIVE cart items (keep CHECKED_OUT items)
         await tx.cartItem.deleteMany({
-          where: { cartId: id },
+          where: { 
+            cartId: id,
+            status: ECartItemStatus.ACTIVE,
+          },
         });
 
-        // Update cart total to 0
+        // Recalculate cart total (will only count remaining ACTIVE items if any)
+        const remainingItems = await tx.cartItem.findMany({
+          where: { 
+            cartId: id,
+            status: ECartItemStatus.ACTIVE,
+          },
+        });
+
+        const total = remainingItems.reduce((sum, item) => {
+          return sum + item.quantity * item.salePrice;
+        }, 0);
+
+        // Update cart total
         return tx.cart.update({
           where: { id },
           data: {
-            totalAmount: 0,
+            totalAmount: total,
           },
           include: {
             user: true,
@@ -348,7 +375,6 @@ export class CartService {
 
       const {
         userId,
-        status,
         page = 1,
         limit = 10,
         sortBy = 'createdAt',
@@ -359,9 +385,6 @@ export class CartService {
       const where: Prisma.CartWhereInput = {};
       if (userId) {
         where.userId = userId;
-      }
-      if (status) {
-        where.status = status;
       }
 
       // Build order by

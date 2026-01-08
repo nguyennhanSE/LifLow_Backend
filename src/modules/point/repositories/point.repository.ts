@@ -5,7 +5,7 @@ import { PointNotFoundException } from '../exceptions/point-not-found.exception'
 import { PointValidationException } from '../exceptions/point-validation.exception';
 import { PointEntity } from '../entities/point.entity';
 
-export type PointWithRelations = Point & { user?: User | null };
+export type PointWithRelations = Point & { user?: User | null; orderGroup?: any };
 
 @Injectable()
 export class PointRepository {
@@ -16,7 +16,7 @@ export class PointRepository {
     includeRelations = true,
   ): Promise<PointWithRelations> {
     try {
-      const include: any = includeRelations ? { user: true } : undefined;
+      const include: any = includeRelations ? { user: true, orderGroup: true } : undefined;
       return (await this.prisma.point.create({
         data,
         include,
@@ -34,7 +34,7 @@ export class PointRepository {
     includeRelations?: boolean;
   }): Promise<PointWithRelations[]> {
     const { where, orderBy, skip, take, includeRelations = true } = params;
-    const include: any = includeRelations ? { user: true } : undefined;
+    const include: any = includeRelations ? { user: true, orderGroup: true } : undefined;
     return (await this.prisma.point.findMany({
       where,
       orderBy,
@@ -45,7 +45,7 @@ export class PointRepository {
   }
 
   async findById(id: string, includeRelations = true): Promise<PointWithRelations | null> {
-    const include: any = includeRelations ? { user: true } : undefined;
+    const include: any = includeRelations ? { user: true, orderGroup: true } : undefined;
     return (await this.prisma.point.findUnique({
       where: { id },
       include,
@@ -53,20 +53,20 @@ export class PointRepository {
   }
 
   async findByUserId(userId: string, includeRelations = true): Promise<PointWithRelations | null> {
-    const include: any = includeRelations ? { user: true } : undefined;
-    return (await this.prisma.point.findUnique({
+    const include: any = includeRelations ? { user: true, orderGroup: true } : undefined;
+    return (await this.prisma.point.findFirst({
       where: { userId },
       include,
     })) as PointWithRelations | null;
   }
 
-  async findByOrderNumber(
-    orderNumber: string,
+  async findByOrderGroupNumber(
+    orderGroupNumber: string,
     includeRelations = true,
   ): Promise<PointWithRelations | null> {
-    const include: any = includeRelations ? { user: true } : undefined;
-    return (await this.prisma.point.findFirst({
-      where: { orderNumber },
+    const include: any = includeRelations ? { user: true, orderGroup: true } : undefined;
+    return (await this.prisma.point.findUnique({
+      where: { orderGroupNumber },
       include,
     })) as PointWithRelations | null;
   }
@@ -77,7 +77,7 @@ export class PointRepository {
     includeRelations = true,
   ): Promise<PointEntity> {
     try {
-      const include: any = includeRelations ? { user: true } : undefined;
+      const include: any = includeRelations ? { user: true, orderGroup: true } : undefined;
       return (await this.prisma.point.update({
         where: { id },
         data,
@@ -105,9 +105,9 @@ export class PointRepository {
     return !!user;
   }
 
-  async orderExists(orderNumber: string): Promise<boolean> {
-    const order = await this.prisma.order.findUnique({ where: { orderNumber } });
-    return !!order;
+  async orderGroupExists(orderGroupNumber: string): Promise<boolean> {
+    const orderGroup = await this.prisma.orderGroup.findUnique({ where: { orderGroupNumber } });
+    return !!orderGroup;
   }
 
   private handlePrismaError(error: any, id?: string): never {

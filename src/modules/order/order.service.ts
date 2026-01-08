@@ -37,12 +37,13 @@ export class OrdersService {
   }
 
   /**
-   * Create new orders with points in a transaction
+   * Create new orders with points and coupons in a transaction
    * - Generates a unique orderNumber and orderGroupNumber when not provided
    * - Validates the user exists if ordererId is present
    * - Creates points for each order with orderNumber = orderGroupNumber
+   * - Creates or updates coupon history to USED status (by couponId)
    */
-  async create(createOrderDtos: CreateOrderDto[], points: number, userId: string): Promise<OrderResponseDto[]> {
+  async create(createOrderDtos: CreateOrderDto[], points: number, userId: string, couponIds: string[] = []): Promise<OrderResponseDto[]> {
     try {
       const user = await this.prisma.user.findUnique({
         where: {
@@ -77,6 +78,10 @@ export class OrdersService {
           orderGroup = await tx.orderGroup.create({
             data: {
               orderGroupNumber,
+              originalAmount: createOrderDtos.reduce((acc, curr) => acc + curr.totalOrderAmount, 0),
+              discountAmount: 0,
+              finalAmount: createOrderDtos.reduce((acc, curr) => acc + curr.totalPaymentAmount, 0),
+              pointsUsed: points,
             },
           });
         }
@@ -152,7 +157,7 @@ export class OrdersService {
             data: {
               date: today,
               userId: userId,
-              orderNumber: orderGroupNumber,
+              orderGroupNumber: orderGroupNumber,
               pointsType: 'USED',
               availablePointsBalance: points,
               content: `Order points for ${orderGroupNumber}`,
@@ -169,6 +174,97 @@ export class OrdersService {
             totalPurchaseAmount: { increment: createOrderDtos.reduce((acc, curr) => acc + curr.totalPaymentAmount, 0) },
           },
         });
+
+        // Process coupons: create or update coupon history to USED status
+        if (couponIds && couponIds.length > 0) {
+          const firstOrderId = createdOrders[0]?.id;
+          const totalPurchaseAmount = createOrderDtos.reduce((acc, curr) => acc + curr.totalPaymentAmount, 0);
+          
+          for (const couponId of couponIds) {
+            // Get coupon information
+            const coupon = await tx.coupon.findUnique({
+              where: { id: couponId },
+            });
+
+            if (!coupon) {
+              throw new OrderValidationException(`Coupon not found: ${couponId}`);
+            }
+
+            // Validate coupon is active
+            if (!coupon.isActive) {
+              throw new OrderValidationException(`Coupon is not active: ${couponId}`);
+            }
+
+            // Validate coupon date range
+            const now = new Date();
+            if (now < coupon.startDate || now > coupon.endDate) {
+              throw new OrderValidationException(`Coupon is not valid at this time: ${couponId}`);
+            }
+
+            // Validate minimum purchase amount
+            if (totalPurchaseAmount < coupon.minPurchaseAmount) {
+              throw new OrderValidationException(
+                `Purchase amount (${totalPurchaseAmount}) is less than minimum required (${coupon.minPurchaseAmount}) for coupon: ${couponId}`
+              );
+            }
+
+            // Calculate discount based on coupon type
+            let discountAmount = 0;
+            if (coupon.type === 'PERCENT' && coupon.discountRate) {
+              // Percentage discount
+              discountAmount = Math.floor(totalPurchaseAmount * (coupon.discountRate / 100));
+              if (coupon.maxDiscountAmount) {
+                discountAmount = Math.min(discountAmount, coupon.maxDiscountAmount);
+              }
+            } else if (coupon.type === 'AMOUNT' && coupon.discountAmount) {
+              // Fixed amount discount
+              discountAmount = coupon.discountAmount;
+            }
+
+            // Find existing coupon history for this user and coupon
+            let couponHistory = await tx.couponHistory.findFirst({
+              where: {
+                couponId: couponId,
+                userId: userId,
+              },
+            });
+
+            // If no coupon history exists, create one with ISSUED status first
+            if (!couponHistory) {
+              couponHistory = await tx.couponHistory.create({
+                data: {
+                  couponId: couponId,
+                  userId: userId,
+                  status: 'ISSUED',
+                  issuedAt: now,
+                  expiredAt: coupon.endDate,
+                },
+              });
+            }
+
+            // Validate coupon history status
+            if (couponHistory.status !== 'ISSUED') {
+              throw new OrderValidationException(`Coupon already used or cancelled: ${couponId}`);
+            }
+
+            // Check expiration
+            if (couponHistory.expiredAt && couponHistory.expiredAt < now) {
+              throw new OrderValidationException(`Coupon expired: ${couponId}`);
+            }
+
+            // Update coupon history to USED
+            await tx.couponHistory.update({
+              where: { id: couponHistory.id },
+              data: {
+                status: 'USED',
+                usedAt: now,
+                orderId: firstOrderId,
+                discountAppliedAmount: discountAmount,
+                purchaseAmountAtUse: totalPurchaseAmount,
+              },
+            });
+          }
+        }
 
         return createdOrders;
       });

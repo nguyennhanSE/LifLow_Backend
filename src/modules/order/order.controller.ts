@@ -42,16 +42,21 @@ export class OrdersController {
   @Post()
   @Roles(ERoleName.ADMIN)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new order' })
+  @ApiOperation({ summary: 'Create a new order with points and coupons' })
   @ApiBody({ type: CreateOrderDto })
   @ApiResponse({ status: 201, description: 'Order created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  @ApiResponse({ status: 404, description: 'User not found (ordererId)' })
-  async create(@Req() req: Request & { user: { id: string } }, @Body() createOrderDto: CreateOrderDto[], @Body() points: number) {
+  @ApiResponse({ status: 404, description: 'User or Coupon not found' })
+  async create(
+    @Req() req: Request & { user: { id: string } }, 
+    @Body() createOrderDto: CreateOrderDto[], 
+    @Body() points: number,
+    @Body() couponIds: string[], // Array of coupon IDs to apply
+  ) {
     const responseModel = new ResponseModel();
 
     try {
-      const order = await this.ordersService.create(createOrderDto, points, req.user.id);
+      const order = await this.ordersService.create(createOrderDto, points, req.user.id, couponIds || []);
       responseModel.setData(order);
     } catch (error) {
       throw error;

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { ECartItemStatus } from '../enums/cart.enum';
 
 // Using any due to Prisma type generation issues
 export type CartItemWithRelations = any;
@@ -19,7 +20,7 @@ export class CartItemRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Create a new cart item
+   * Create a new cart item with ACTIVE status by default
    */
   async create(
     cartId: string,
@@ -33,6 +34,7 @@ export class CartItemRepository {
         productId,
         quantity,
         salePrice,
+        status: ECartItemStatus.ACTIVE,
       },
       include: {
         product: true,
@@ -174,11 +176,14 @@ export class CartItemRepository {
   }
 
   /**
-   * Calculate total amount for all items in a cart
+   * Calculate total amount for all ACTIVE items in a cart
    */
   async calculateCartTotal(cartId: string): Promise<number> {
     const cartItems = await this.prisma.cartItem.findMany({
-      where: { cartId },
+      where: { 
+        cartId,
+        status: ECartItemStatus.ACTIVE, // Only count active items
+      },
     });
 
     return cartItems.reduce((sum, item) => {
@@ -187,14 +192,17 @@ export class CartItemRepository {
   }
 
   /**
-   * Calculate total amount for all items in a cart (transaction version)
+   * Calculate total amount for all ACTIVE items in a cart (transaction version)
    */
   async calculateCartTotalInTransaction(
     cartId: string,
     tx: Prisma.TransactionClient,
   ): Promise<number> {
     const cartItems = await tx.cartItem.findMany({
-      where: { cartId },
+      where: { 
+        cartId,
+        status: ECartItemStatus.ACTIVE, // Only count active items
+      },
     });
 
     return cartItems.reduce((sum, item) => {

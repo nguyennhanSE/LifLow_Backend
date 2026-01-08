@@ -44,7 +44,7 @@ model User {
   // Relations
   userRole UserRole[]
   userMembership UserMembership?
-  point Point?
+  point Point[]
   session Session[]
   orders Order[]
   recipes Recipe[]
@@ -229,7 +229,6 @@ model Order {
   // Relation to OrderItems (one order can have many items)
   product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
   cart Cart? @relation(fields: [cartId], references: [id], onDelete: SetNull)
-  point Point?
   orderGroup OrderGroup? @relation(fields: [orderGroupNumber], references: [orderGroupNumber], onDelete: SetNull)
   @@map("orders")
   @@index([orderNumber])
@@ -238,10 +237,22 @@ model Order {
 
 model OrderGroup {
   orderGroupNumber String @default("") @unique @map("order_group_number")
+  orderGroupName String @default("") @map("order_group_name")
+
+  originalAmount Int @map("original_amount")
+  discountAmount Int @map("discount_amount")
+  finalAmount Int @map("final_amount")
+  couponUsed String[] @map("coupon_used")
+  pointsUsed Int @map("points_used")
+  cartItemIds String[] @map("cart_item_ids")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
   orders Order[]
   payments Payment[]
+  points Point[]
+  
   @@index([orderGroupNumber])
   @@map("order_groups")
 }
@@ -249,9 +260,6 @@ model OrderGroup {
 model Cart {
   id String @id @default(uuid())
   userId String @unique @map("user_id")
-
-  status CartStatus @default(ACTIVE) @map("status")
-  
   totalAmount Int @default(0) @map("total_amount")
   checkedOutAt DateTime? @map("checked_out_at")
   
@@ -264,12 +272,11 @@ model Cart {
   orders Order[]
   
   @@index([userId])
-  @@index([status])
   @@map("carts")
 }
 
-enum CartStatus {
-  ACTIVE
+enum CartItemStatus {
+  ACTIVE  
   CHECKED_OUT
 }
 
@@ -280,6 +287,7 @@ model CartItem {
   quantity Int @default(1) @map("quantity")
   
   salePrice Int @map("sale_price")
+  status CartItemStatus @default(ACTIVE) @map("status")
   
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -299,10 +307,10 @@ model CartItem {
 model Point {
   id String @id @default(uuid())
   date String? @db.VarChar(50) @map("date") // 일자 (Date) - character varying(50)
-  userId String? @unique @db.VarChar(50) @map("user_id") // 아이디 (ID) - character varying(50)
+  userId String? @db.VarChar(50) @map("user_id") // 아이디 (ID) - character varying(50)
   membershipLevel String? @db.VarChar(50) @map("membership_level") // 회원등급 (Membership Level) - character varying(50)
   content String? @db.VarChar(50) @map("content") // 내용 (Content/Details) - character varying(50)
-  orderNumber String? @unique @db.VarChar(50) @map("order_number") // 주문번호 (Order Number) - character varying(50)
+  orderGroupNumber String? @unique @db.VarChar(50) @map("order_group_number") // 주문번호 (Order Number) - character varying(50)
   pointsType String? @db.VarChar(50) @map("points_type") // 적립금 유형 (Accumulated Points Type) - character varying(50)
   availablePointsIncrease Int? @map("available_points_increase") // 가용적립금 증가 (Available Points Increase) - integer
   availablePointsDeduction Int? @map("available_points_deduction") // 가용적립금 차감 (Available Points Deduction) - integer
@@ -310,12 +318,12 @@ model Point {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relation to User (1-1 relationship) - set to null when user is deleted
+  // Relation to User (many-to-one relationship) - set to null when user is deleted
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-  order Order? @relation(fields: [orderNumber], references: [orderNumber], onDelete: SetNull)
+  orderGroup OrderGroup? @relation(fields: [orderGroupNumber], references: [orderGroupNumber], onDelete: SetNull)
   @@map("points")
 }
-// Product
+// Product  
 model Product {
   id String @id @default(uuid())
   productCode String? @map("product_code") // 상품코드
@@ -744,7 +752,6 @@ enum PaymentType {
   
   // User & Order
   userId String @map("user_id")
-  subscriptionId String? @map("subscription_id") // 정기결제용
   orderGroupNumber String @map("order_group_number") // 가맹점 주문번호
   
   // Toss Payment Keys
