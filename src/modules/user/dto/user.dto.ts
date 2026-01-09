@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
+import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
 import { Transform } from "class-transformer";
 import { trim, toLower } from "../../../utils/helper";
 import { ERoleName } from "../../roles/enums/role.enum";
@@ -314,7 +314,7 @@ export class GetAdminListQueryDto {
 export class GetUserInfoDto {
     @ApiPropertyOptional({
         description: 'Include user orders in response',
-        example: true,
+        example: false,
         type: Boolean,
         default: false
     })
@@ -329,7 +329,7 @@ export class GetUserInfoDto {
 
     @ApiPropertyOptional({
         description: 'Include user roles and permissions in response',
-        example: true,
+        example: false,
         type: Boolean,
         default: false
     })
@@ -346,7 +346,7 @@ export class GetUserInfoDto {
         description: 'Include user membership information in response',
         example: true,
         type: Boolean,
-        default: false
+        default: true
     })
     @IsOptional()
     @Transform(({ value }) => {
@@ -359,7 +359,7 @@ export class GetUserInfoDto {
 
     @ApiPropertyOptional({
         description: 'Include user point information in response',
-        example: true,
+        example: false,
         type: Boolean,
         default: false
     })
@@ -374,7 +374,7 @@ export class GetUserInfoDto {
 
     @ApiPropertyOptional({
         description: 'Include user carts in response',
-        example: true,
+        example: false,
         type: Boolean,
         default: false
     })
@@ -389,7 +389,7 @@ export class GetUserInfoDto {
 
     @ApiPropertyOptional({
         description: 'Include user payments in response',
-        example: true,
+        example: false,
         type: Boolean,
         default: false
     })
@@ -404,7 +404,7 @@ export class GetUserInfoDto {
 
     @ApiPropertyOptional({
         description: 'Include user product reviews in response',
-        example: true,
+        example: false,
         type: Boolean,
         default: false
     })
@@ -419,7 +419,7 @@ export class GetUserInfoDto {
 
     @ApiPropertyOptional({
         description: 'Include user product inquiries in response',
-        example: true,
+        example: false,
         type: Boolean,
         default: false
     })
@@ -434,7 +434,7 @@ export class GetUserInfoDto {
 
     @ApiPropertyOptional({
         description: 'Include user coupon histories in response',
-        example: true,
+        example: false,
         type: Boolean,
         default: false
     })
@@ -449,7 +449,7 @@ export class GetUserInfoDto {
 
     @ApiPropertyOptional({
         description: 'Include user recipes in response',
-        example: true,
+        example: false,
         type: Boolean,
         default: false
     })
@@ -461,4 +461,113 @@ export class GetUserInfoDto {
     })
     @IsBoolean({ message: 'includeRecipes must be a boolean' })
     includeRecipes?: boolean;
+}
+
+export class UpdateUserProfileDto {
+    @ApiPropertyOptional({ description: 'User full name', example: 'John Doe' })
+    @IsOptional() 
+    @IsString() 
+    @IsNotEmpty() 
+    @trim() 
+    @MaxLength(100)
+    name?: string;
+
+    @ApiPropertyOptional({ description: 'User email address', example: 'john.doe@gmail.com' })
+    @IsOptional() 
+    @IsEmail() 
+    @trim()
+    email?: string;
+
+    @ApiPropertyOptional({ description: 'Phone number', example: '010-1234-5678' })
+    @IsOptional() 
+    @IsString() 
+    @trim()
+    phoneNumber?: string;
+
+    // @ApiPropertyOptional({ description: 'User age', example: 30 })
+    // @IsOptional()
+    // @IsNumber()
+    // @Min(1)
+    // age?: number;
+}
+
+export class CreateShippingAddressDto {
+    @ApiProperty({ 
+        description: 'Delivery address label (e.g., home, work)', 
+        example: 'home',
+        maxLength: 100
+    })
+    @IsString() 
+    @IsNotEmpty() 
+    @trim() 
+    @MaxLength(100)
+    deliveryAddress!: string;
+
+    @ApiProperty({ description: 'Recipient name', example: 'John Doe' })
+    @IsString() 
+    @IsNotEmpty() 
+    @trim() 
+    @MaxLength(100)
+    recipientName!: string;
+
+    @ApiProperty({ 
+        description: 'Contact information (mobile phone)', 
+        example: '010-1234-5678',
+        pattern: '^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$'
+    })
+    @IsString() 
+    @IsNotEmpty() 
+    @trim()
+    mobilePhone!: string;
+
+    @ApiProperty({ 
+        description: 'Phone number (optional landline)', 
+        example: '02-1234-5678'
+    })
+    @IsOptional()
+    @IsString() 
+    @trim()
+    phoneNumber?: string;
+
+    @ApiProperty({ 
+        description: 'Postal code (zip code, 5 digits)', 
+        example: 12345,
+        minimum: 10000,
+        maximum: 99999
+    })
+    @IsNumber()
+    @Min(10000)
+    @Max(99999)
+    postalCode!: number;
+
+    @ApiProperty({ 
+        description: 'Address (base address from search)', 
+        example: '서울특별시 강남구 테헤란로 123',
+        maxLength: 500
+    })
+    @IsString() 
+    @IsNotEmpty() 
+    @trim() 
+    @MaxLength(500)
+    address!: string;
+
+    @ApiProperty({ 
+        description: 'Detailed address (building/lake, etc.)', 
+        example: '456호',
+        maxLength: 500
+    })
+    @IsString() 
+    @IsNotEmpty() 
+    @trim() 
+    @MaxLength(500)
+    addressFull!: string;
+
+    @ApiPropertyOptional({ 
+        description: 'Set as default shipping address', 
+        example: false,
+        default: false
+    })
+    @IsOptional()
+    @IsBoolean()
+    setAsDefault?: boolean;
 }

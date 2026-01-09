@@ -91,7 +91,7 @@ export class OrdersService {
           // Generate orderNumber for each order
           let orderNumber = (createOrderDto as any).orderNumber;
           if (!orderNumber) {
-            orderNumber = await this.generateUniqueOrderNumber();
+            orderNumber = await this.generateUniqueOrderNumber(orderGroupNumber);
           }
           
           // Map CreateOrderDto to Prisma OrderCreateInput
@@ -749,44 +749,44 @@ export class OrdersService {
   }
 
   /**
-   * Generate order number with date prefix (e.g., 20251231-01, 20251231-02, ...)
+   * Generate order number under an orderGroupNumber
+   * (e.g., orderGroupNumber=20260107-02 -> orderNumber=20260107-02-01)
    */
-  async generateOrderNumber(): Promise<string> {
-    // Get today's date in YYYYMMDD format
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const datePrefix = `${year}${month}${day}`;
-    
-    // Get the last order number for today
-    const lastOrderNumber = await this.orderRepository.getLastOrderNumber(datePrefix);
-    
+  async generateOrderNumber(orderGroupNumber: string): Promise<string> {
+    if (!orderGroupNumber) {
+      throw new InternalServerErrorException('orderGroupNumber is required to generate orderNumber');
+    }
+
+    const prefix = `${orderGroupNumber}-`;
+    // Get the last order number for this order group
+    const lastOrderNumber = await this.orderRepository.getLastOrderNumber(prefix);
+
     let nextNumber = 1;
-    
+
     if (lastOrderNumber) {
-      // Extract number from format "YYYYMMDD-NN"
-      const match = lastOrderNumber.match(/^(\d{8})-(\d+)$/);
-      if (match && match[1] === datePrefix) {
-        nextNumber = parseInt(match[2], 10) + 1;
-      } else {
-        // If format doesn't match, start from 01 for today
-        nextNumber = 1;
+      // Extract the incremental number from format "<orderGroupNumber>-NN"
+      if (lastOrderNumber.startsWith(prefix)) {
+        const suffix = lastOrderNumber.slice(prefix.length);
+        const parsed = parseInt(suffix, 10);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          nextNumber = parsed + 1;
+        }
       }
     }
-    
-    // Format with zero-padding (e.g., 20251231-01, 20251231-02, ..., 20251231-100)
-    return `${datePrefix}-${nextNumber.toString().padStart(2, '0')}`;
+
+    // Format with zero-padding (e.g., 20260107-02-01, 20260107-02-02, ...)
+    return `${prefix}${nextNumber.toString().padStart(2, '0')}`;
   }
 
   /**
    * Ensure generated order number is unique
    */
   async generateUniqueOrderNumber(
+    orderGroupNumber: string,
     maxAttempts = 5,
   ): Promise<string> {
     for (let i = 0; i < maxAttempts; i++) {
-      const orderNumber = await this.generateOrderNumber();
+      const orderNumber = await this.generateOrderNumber(orderGroupNumber);
       const exists = await this.orderRepository.count({ orderNumber });
       if (exists === 0) {
         return orderNumber;

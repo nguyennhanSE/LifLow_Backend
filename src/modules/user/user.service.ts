@@ -143,7 +143,7 @@ export class UserService {
   /**
    * Get user points
    */
-  async getUserPoints(userId: string): Promise<{totalUsedPoints: number, availablePoints: number}> {
+  async getUserPoints(userId: string) {
     try {
       return await this.userRepository.getUserPoints(userId);
     } catch (error) {
@@ -170,6 +170,102 @@ export class UserService {
       return await this.userRepository.getUserInfo(userId, options);
     } catch (error) {
       console.error('Error in getUserInfo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user orders with pagination and product details
+   */
+  async getUserOrders(userId: string, pagination: { offset: number; limit: number }): Promise<{
+    orders: any[];
+    total: number;
+    offset: number;
+    limit: number;
+  }> {
+    try {
+      return await this.userRepository.getUserOrders(userId, pagination);
+    } catch (error) {
+      console.error('Error in getUserOrders:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user coupons (available and used)
+   */
+  async getUserCoupons(userId: string): Promise<{
+    availableCoupons: any[];
+    usedCoupons: any[];
+  }> {
+    try {
+      return await this.userRepository.getUserCoupons(userId);
+    } catch (error) {
+      console.error('Error in getUserCoupons:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update user profile (basic info only)
+   */
+  async updateUserProfile(userId: string, updateData: {
+    name?: string;
+    email?: string;
+    phoneNumber?: string;
+    age?: number;
+  }): Promise<UserEntity> {
+    try {
+      // Check if user exists
+      await this.findOne(userId);
+
+      // Check if email is being updated and if it's already taken
+      if (updateData.email) {
+        const existingUser = await this.userRepository.getUserByEmail(updateData.email);
+        if (existingUser && existingUser.id !== userId) {
+          throw new BadRequestException('Email is already taken by another user');
+        }
+      }
+
+      return await this.userRepository.updateUser(userId, updateData);
+    } catch (error) {
+      console.error('Error in updateUserProfile:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user shipping address (only one address per user)
+   */
+  async getUserShippingAddresses(userId: string): Promise<any> {
+    try {
+      return await this.userRepository.getUserShippingAddresses(userId);
+    } catch (error) {
+      console.error('Error in getUserShippingAddresses:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create user shipping address
+   */
+  async createUserShippingAddress(userId: string, addressData: {
+    deliveryAddress: string;
+    recipientName: string;
+    mobilePhone: string;
+    phoneNumber?: string;
+    postalCode: number;
+    address: string;
+    addressFull: string;
+    setAsDefault?: boolean;
+  }): Promise<any> {
+    try {
+      // Check if user exists
+      await this.findOne(userId);
+
+      return await this.userRepository.createUserShippingAddress(userId, addressData);
+    } catch (error) {
+      console.error('Error in createUserShippingAddress:', error);
       throw error;
     }
   }

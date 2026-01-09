@@ -52,6 +52,10 @@ export class ConfirmPaymentDto {
   @ApiProperty({ description: '결제 금액' })
   @IsNumber()
   amount: number;
+
+  @ApiProperty({ description: '주문 그룹 번호' })
+  @IsString()
+  deliveryFee: number;
 }
 
 // DTO for canceling payment
@@ -115,6 +119,7 @@ export interface TossCancelInfo {
 }
 
 export interface TossPaymentResponse {
+  deliveryFee: number;
   mId: string;
   version: string;
   paymentKey: string;

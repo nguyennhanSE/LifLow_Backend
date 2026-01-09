@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto } from './dto/user.dto';
+import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto, UpdateUserProfileDto, CreateShippingAddressDto } from './dto/user.dto';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { toResponse } from './mapper/user.mapper';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { ResponseModel } from '../../libs/models/response/response.model';
 import { PermissionsService } from '../permissions/permissions.service';
 import { UpdateUserPermissionsDto } from '../permissions/dto/permissions.dto';
@@ -405,7 +405,6 @@ export class UserController {
   @Get('/me/points')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
   @ApiOperation({ summary: 'Get user order number' })
-  @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'User order number retrieved successfully' })
   async getUserPoints(@Req() req: Request & { user?: TokenPayload }) {
     const responseModel = new ResponseModel();
@@ -451,4 +450,152 @@ export class UserController {
     }
     return responseModel;
   }
+
+  @Get('/me/orders')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Get user orders with pagination' })
+  @ApiResponse({ status: 200, description: 'User orders retrieved successfully' })
+  @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Offset for pagination', example: 0 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Limit for pagination', example: 10 })
+  async getUserOrders(
+    @Req() req: Request & { user?: TokenPayload },
+    @Query('offset') offset?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+      
+      if (!requestingUserId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+
+      // Parse pagination params
+      const parsedOffset = offset ? parseInt(offset, 10) : 0;
+      const parsedLimit = limit ? parseInt(limit, 10) : 10;
+
+      // Validate pagination params
+      if (isNaN(parsedOffset) || parsedOffset < 0) {
+        throw new BadRequestException('Invalid offset parameter');
+      }
+
+      if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+        throw new BadRequestException('Invalid limit parameter (must be between 1 and 100)');
+      }
+
+      // Get user orders with product details
+      const orders = await this.userService.getUserOrders(requestingUserId, {
+        offset: parsedOffset,
+        limit: parsedLimit,
+      });
+
+      responseModel.setData(orders);
+    } catch (error) {
+      console.error('Error in getUserOrders:', error);
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  @Get('/me/coupons')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Get user available and used coupons' })
+  @ApiResponse({ status: 200, description: 'User coupons retrieved successfully' })
+  async getUserCoupons(@Req() req: Request & { user?: TokenPayload }) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+      
+      if (!requestingUserId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+
+      const coupons = await this.userService.getUserCoupons(requestingUserId);
+      responseModel.setData(coupons);
+    } catch (error) {
+      console.error('Error in getUserCoupons:', error);
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  @Patch('/me')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Update user profile (basic info)' })
+  @ApiResponse({ status: 200, description: 'User profile updated successfully' })
+  async updateUserProfile(
+    @Req() req: Request & { user?: TokenPayload },
+    @Body() updateProfileDto: UpdateUserProfileDto,
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+      
+      if (!requestingUserId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+
+      const updatedUser = await this.userService.updateUserProfile(requestingUserId, updateProfileDto);
+      const result = toResponse(updatedUser);
+      responseModel.setData(result);
+    } catch (error) {
+      console.error('Error in updateUserProfile:', error);
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  @Get('/me/shipping-address')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Get user shipping address' })
+  @ApiResponse({ status: 200, description: 'User shipping address retrieved successfully (returns null if no address found)' })
+  async getUserShippingAddresses(@Req() req: Request & { user?: TokenPayload }) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+      
+      if (!requestingUserId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+
+      const address = await this.userService.getUserShippingAddresses(requestingUserId);
+      responseModel.setData(address); // Will be null if no address exists
+    } catch (error) {
+      console.error('Error in getUserShippingAddresses:', error);
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  @Post('/me/shipping-address')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Create or update user shipping address' })
+  @ApiResponse({ status: 201, description: 'Shipping address created/updated successfully' })
+  async createUserShippingAddress(
+    @Req() req: Request & { user?: TokenPayload },
+    @Body() createAddressDto: CreateShippingAddressDto,
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+      
+      if (!requestingUserId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+
+      const address = await this.userService.createUserShippingAddress(requestingUserId, createAddressDto);
+      responseModel.setData(address);
+    } catch (error) {
+      console.error('Error in createUserShippingAddress:', error);
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  
 }

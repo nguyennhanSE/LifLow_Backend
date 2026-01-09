@@ -53,7 +53,29 @@ model User {
   payments Payment[]
   productReviews ProductReviews[]
   productInquiries ProductInquiries[]
+  userShippingAddress UserShippingAddress[]
   @@map("users")
+}
+
+model UserShippingAddress {
+  id String @id @default(uuid()) @unique
+  userId String @unique
+  recipientName String @map("recipient_name")
+  // address
+  deliveryAddress String @map("delivery_address")
+  address String @map("address_name")
+  addressFull String @map("address_full")
+  postalCode Int @map("postal_code")
+  mobilePhone String @map("mobile_phone")
+  phoneNumber String @map("phone_number")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  setAsDefault Boolean @default(false) @map("set_as_default")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_shipping_addresses")
 }
 
 model UserMembership {
@@ -245,6 +267,7 @@ model OrderGroup {
   couponUsed String[] @map("coupon_used")
   pointsUsed Int @map("points_used")
   cartItemIds String[] @map("cart_item_ids")
+  deliveryFee Int @default(0) @map("delivery_fee")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -773,6 +796,7 @@ enum PaymentType {
   method String? @map("method") // 카드, 가상계좌, 계좌이체, 휴대폰 등
   currency String @default("KRW") @map("currency")
   orderName String @map("order_name") // 주문명
+  deliveryFee Int @default(0) @map("delivery_fee") // 배송비
   
   // Dates
   requestedAt DateTime @map("requested_at") // 결제 요청 시각

@@ -23,6 +23,9 @@ export class PaymentResponseDto {
   @ApiProperty()
   balanceAmount: number;
 
+  @ApiProperty()
+  deliveryFee?: number;
+
   @ApiProperty({ enum: PaymentStatus })
   status: PaymentStatus;
 
@@ -75,6 +78,12 @@ export class InitiatePaymentResponseDto {
 
   @ApiProperty({ description: '실패 URL' })
   failUrl: string;
+
+  @ApiProperty({ description: '배송비' })
+  deliveryFee?: number;
+
+  @ApiProperty({ description: '사용자 배송 주소 ID', required: false })
+  userShippingAddressId?: string;
 }
 
 export class PaymentListResponseDto {

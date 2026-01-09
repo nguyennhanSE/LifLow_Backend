@@ -538,15 +538,39 @@ export class UserRepository {
   /**
    * Get user points
    */
-  async getUserPoints(userId: string): Promise<{totalUsedPoints: number, availablePoints: number}> {
+  async getUserPoints(userId: string) {
     try {
-      const result = await this.prisma.point.aggregate({
-        where: { userId },
-        _sum: { availablePointsIncrease: true, availablePointsDeduction: true },
+      // Get user information
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phoneNumber: true,
+          age: true,
+          membershipLevel: true,
+          totalUsedPoints: true,
+          availablePoints: true,
+          registrationDate: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Get all points records
+      const points = await this.prisma.point.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+
       return {
-        totalUsedPoints: result._sum.availablePointsIncrease || 0,
-        availablePoints: result._sum.availablePointsDeduction || 0,
+        user,
+        points,
       };
     } catch (error) {
       console.error('Prisma error in getUserPoints:', error);
@@ -642,6 +666,190 @@ export class UserRepository {
       return user;
     } catch (error) {
       console.error('Prisma error in getUserInfo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user orders with pagination and product details
+   */
+  async getUserOrders(userId: string, pagination: { offset: number; limit: number }): Promise<{
+    orders: any[];
+    total: number;
+    offset: number;
+    limit: number;
+  }> {
+    try {
+      // Verify user exists
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new NotFoundException(`User with id ${userId} not found`);
+      }
+
+      // Get orders with product details
+      const [orders, total] = await Promise.all([
+        this.prisma.order.findMany({
+          where: { ordererId: userId },
+          include: {
+            product: true,
+            orderGroup: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: pagination.offset,
+          take: pagination.limit,
+        }),
+        this.prisma.order.count({
+          where: { ordererId: userId },
+        }),
+      ]);
+
+      return {
+        orders,
+        total,
+        offset: pagination.offset,
+        limit: pagination.limit,
+      };
+    } catch (error) {
+      console.error('Prisma error in getUserOrders:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user coupons (available and used)
+   */
+  async getUserCoupons(userId: string): Promise<{
+    availableCoupons: any[];
+    usedCoupons: any[];
+  }> {
+    try {
+      // Get user's membership to check target grades
+      const userMembership = await this.prisma.userMembership.findFirst({
+        where: {
+          userId,
+          // startDate: { lte: new Date() },
+          // endDate: { gte: new Date() },
+        },
+        include: {
+          membership: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const membershipName = userMembership?.membershipName || '';
+
+      // Get available coupons (active, not expired, and target grades match)
+      const now = new Date();
+      
+      // First, let's get ALL active coupons to debug
+      const allActiveCoupons = await this.prisma.coupon.findMany({
+        where: { isActive: true },
+      });
+      console.log('🔍 Debug - All active coupons:', JSON.stringify(allActiveCoupons, null, 2));
+      
+      const availableCoupons = await this.prisma.coupon.findMany({
+        where: {
+          isActive: true,
+          // startDate: { lte: now },
+          // endDate: { gte: now },
+          OR: [
+            { targetGrades: { isEmpty: true } }, // No target grade restriction
+            { targetGrades: { has: membershipName } }, // Matches user's membership
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      console.log('🔍 Debug - Available coupons after filter:', JSON.stringify(availableCoupons, null, 2));
+
+      // Get used coupons from coupon history
+      const usedCouponHistories = await this.prisma.couponHistory.findMany({
+        where: {
+          userId,
+          status: 'USED',
+        },
+        include: {
+          coupon: true,
+        },
+        orderBy: { usedAt: 'desc' },
+      });
+
+      const usedCoupons = usedCouponHistories.map(history => ({
+        ...history.coupon,
+        usedAt: history.usedAt,
+        discountAppliedAmount: history.discountAppliedAmount,
+      }));
+
+      return {
+        availableCoupons,
+        usedCoupons,
+      };
+    } catch (error) {
+      console.error('Prisma error in getUserCoupons:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user shipping address (only one address per user due to unique constraint)
+   */
+  async getUserShippingAddresses(userId: string): Promise<any> {
+    try {
+      return await this.prisma.userShippingAddress.findUnique({
+        where: { userId },
+      }) || [];
+    } catch (error) {
+      console.error('Prisma error in getUserShippingAddresses:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create user shipping address
+   */
+  async createUserShippingAddress(userId: string, addressData: {
+    deliveryAddress: string;
+    recipientName: string;
+    mobilePhone: string;
+    phoneNumber?: string;
+    postalCode: number;
+    address: string;
+    addressFull: string;
+    setAsDefault?: boolean;
+  }): Promise<any> {
+    try {
+      // Prepare data for database
+      const { phoneNumber, setAsDefault, ...restData } = addressData;
+      const dbData = {
+        ...restData,
+        phoneNumber: phoneNumber || '', // Default to empty string if not provided
+        setAsDefault: setAsDefault ?? false, // Default to false if not provided
+      };
+      
+      // Check if user already has a shipping address (since userId is unique)
+      const existingAddress = await this.prisma.userShippingAddress.findUnique({
+        where: { userId },
+      });
+
+      if (existingAddress) {
+        // Update existing address instead of creating new one
+        return await this.prisma.userShippingAddress.update({
+          where: { userId },
+          data: dbData,
+        });
+      }
+
+      // Create new address
+      return await this.prisma.userShippingAddress.create({
+        data: {
+          ...dbData,
+          userId,
+        },
+      });
+    } catch (error) {
+      console.error('Prisma error in createUserShippingAddress:', error);
       throw error;
     }
   }

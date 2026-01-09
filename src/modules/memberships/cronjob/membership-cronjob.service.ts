@@ -18,7 +18,7 @@ export class MembershipRecalculationService {
   /**
    * Scheduled cron job that runs daily at 2 AM to recalculate user memberships
    */
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  @Cron(CronExpression.EVERY_HOUR) // every 1 hour
   async handleScheduledMembershipRecalculation() {
     this.logger.log('Starting scheduled membership recalculation...');
     await this.recalculateAllUserMemberships();

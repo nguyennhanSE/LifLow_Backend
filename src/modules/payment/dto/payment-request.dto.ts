@@ -139,6 +139,15 @@ export class ConfirmPaymentRequestDto {
   @ApiProperty({ description: '사용자 ID' })
   @IsString()
   userId: string;
+
+  @ApiProperty({ description: '배송비' })
+  @IsNumber()
+  deliveryFee: number;
+
+  @ApiPropertyOptional({ description: '수령인 주소 ID (선택 사항)' })
+  @IsOptional()
+  @IsString()
+  userShippingAddressId?: string;
 }
 
 export class CancelPaymentRequestDto {

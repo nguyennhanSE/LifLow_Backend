@@ -24,6 +24,7 @@ import {
 import { TossPaymentResponse } from './dto/toss-payment.dto';
 import { OrdersService } from '../order/order.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EOrderSituation } from '../order/enum/order.enum';
 
 @Injectable()
 export class PaymentService {
@@ -46,11 +47,15 @@ export class PaymentService {
     cartItemIds: string[],
     couponIds?: string[],
     points?: number,
+    deliveryFee?: number,
+    userShippingAddressId?: string,
   ): Promise<InitiatePaymentResponseDto> {
     this.logger.log(`Initiating payment for user: ${userId}`, {
       cartItemIds,
       couponIds,
       points,
+      deliveryFee,
+      userShippingAddressId,
     });
 
     try {
@@ -202,6 +207,7 @@ export class PaymentService {
           couponUsed: appliedCoupons,
           cartItemIds,
           pointsUsed: points || 0,
+          deliveryFee: deliveryFee || 0,
         },
       });
 
@@ -215,6 +221,8 @@ export class PaymentService {
         originalAmount,
         discountAmount: totalDiscountAmount,
         finalAmount,
+        deliveryFee,
+        userShippingAddressId,
       });
 
       return {
@@ -226,6 +234,8 @@ export class PaymentService {
         customerKey,
         successUrl,
         failUrl,
+        deliveryFee,
+        userShippingAddressId,
       };
     } catch (error) {
       this.logger.error('Failed to initiate payment', error);
@@ -258,6 +268,7 @@ export class PaymentService {
         paymentKey: dto.paymentKey,
         orderId: dto.orderGroupNumber,
         amount: dto.amount,
+        deliveryFee: dto.deliveryFee,
       });
       this.logger.log('Payment confirmed with Toss successfully');
 
@@ -290,6 +301,45 @@ export class PaymentService {
         if (!user) {
           throw new NotFoundException(`User with ID ${dto.userId} not found`);
         }
+
+        // 2.2.1. Get User Shipping Address
+        let shippingAddress: {
+          id: string;
+          userId: string;
+          recipientName: string;
+          deliveryAddress: string;
+          address: string;
+          addressFull: string;
+          postalCode: number;
+          mobilePhone: string;
+          phoneNumber: string;
+          setAsDefault: boolean;
+        } | null = null;
+        
+        if (dto.userShippingAddressId) {
+          // Get specific shipping address by ID
+          const address = await tx.userShippingAddress.findUnique({
+            where: { id: dto.userShippingAddressId },
+          });
+
+          if (!address) {
+            throw new NotFoundException(`Shipping address with ID ${dto.userShippingAddressId} not found`);
+          }
+
+          // Verify that the shipping address belongs to the user
+          if (address.userId !== dto.userId) {
+            throw new BadRequestException('Shipping address does not belong to this user');
+          }
+          
+          shippingAddress = address;
+        } else {
+          // Get default shipping address by userId
+          shippingAddress = await tx.userShippingAddress.findUnique({
+            where: { userId: dto.userId },
+          });
+        }
+
+        this.logger.log(`Shipping address found: ${shippingAddress ? 'Yes' : 'No (will use user info as fallback)'}`);
 
         // 2.3. Get Cart
         const cart = await tx.cart.findUnique({
@@ -354,7 +404,9 @@ export class PaymentService {
         const createdOrders: any[] = [];
 
         for (const cartItem of cartItems) {
-          const orderNumber = this.generateUniqueOrderNumber();
+          const orderNumber = await this.ordersService.generateUniqueOrderNumber(
+            dto.orderGroupNumber,
+          );
           const totalOrderAmount = cartItem.salePrice * cartItem.quantity;
           let totalDiscount = 0;
 
@@ -387,17 +439,23 @@ export class PaymentService {
           // Create order with discounted amount
           const orderData: Prisma.OrderCreateInput = {
             orderNumber,
+            orderGroup: {
+              connect: { orderGroupNumber: dto.orderGroupNumber },
+            },
             totalOrderAmount,
             totalPaymentAmount,
             productName: cartItem.product?.productName || '',
             productNameWithOptions: cartItem.product?.productName || '',
             quantity: cartItem.quantity,
             salePrice: cartItem.salePrice,
-            recipient: user.name,
-            recipientAddressFull: '',
-            recipientPostalCode: 0,
-            recipientMobilePhone: user.phoneNumber || '',
+            // Use shipping address if available, otherwise fallback to user info
+            recipient: shippingAddress?.recipientName || user.name,
+            recipientAddressFull: shippingAddress?.addressFull || '',
+            recipientPostalCode: shippingAddress?.postalCode || 0,
+            recipientMobilePhone: shippingAddress?.mobilePhone || user.phoneNumber || '',
+            recipientPhoneNumber: shippingAddress?.phoneNumber || '',
             deliveryMessage: '',
+            situation: EOrderSituation.ORDER_PAYMENT_COMPLETED,
             orderDate: today,
             ordererName: user.name,
             ordererMobilePhone: user.phoneNumber || '',
@@ -410,9 +468,6 @@ export class PaymentService {
             },
             user: {
               connect: { id: dto.userId },
-            },
-            orderGroup: {
-              connect: { orderGroupNumber: dto.orderGroupNumber },
             },
           };
 
@@ -541,6 +596,7 @@ export class PaymentService {
             vat: tossPayment.vat,
             taxFreeAmount: tossPayment.taxFreeAmount,
             taxExemptionAmount: tossPayment.taxExemptionAmount,
+            deliveryFee: tossPayment.deliveryFee,
             status: this.mapTossStatusToPaymentStatus(tossPayment.status),
             type: this.mapTossTypeToPaymentType(tossPayment.type),
             method: tossPayment.method,
@@ -612,20 +668,6 @@ export class PaymentService {
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
-  }
-
-  private generateUniqueOrderNumber(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    
-    return `ORD${year}${month}${day}${hours}${minutes}${seconds}${milliseconds}${random}`;
   }
 
   /**
