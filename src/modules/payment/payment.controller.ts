@@ -83,9 +83,10 @@ export class PaymentController {
       const userId = req.user.sub;
       const payment = await this.paymentService.initiatePayment(
         userId, 
-        initiatePaymentDto.cartItemIds, 
-        initiatePaymentDto.couponIds, 
-        initiatePaymentDto.points
+        initiatePaymentDto.cartItems, 
+        initiatePaymentDto.points,
+        initiatePaymentDto.deliveryFee,
+        initiatePaymentDto.userShippingAddressId
       );
       responseModel.setData(payment);
       return responseModel;
@@ -104,11 +105,12 @@ export class PaymentController {
   })
   @ApiResponse({ status: 400, description: 'Payment confirmation failed' })
   async confirmPayment(
-    @Body() confirmDto: any,
+    @Body() confirmDto: ConfirmPaymentRequestDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<PaymentResponseDto> {
-    confirmDto.userId = req.user.sub;
-    return this.paymentService.confirmPayment(confirmDto);
+    // Set userId from authenticated request
+    const dto = { ...confirmDto, userId: req.user.sub };
+    return this.paymentService.confirmPayment(dto);
   }
 
   @Post('cancel')

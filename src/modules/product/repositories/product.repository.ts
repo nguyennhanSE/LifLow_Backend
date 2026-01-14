@@ -8,7 +8,7 @@ import { CreateProductDto, CreateProductSpecialOfferDto, UpdateProductDto } from
 
 export interface ProductFilters {
   search?: string;
-  category?: string;
+  category?: number;
   brand?: string;
   saleStatus?: string;
   displayStatus?: string;
@@ -45,7 +45,6 @@ export class ProductRepository {
       include: {
         productSpecialOffer: true,
         productDiscount: true,
-        productCategory: true,
         banner: true,
       },
     });
@@ -62,7 +61,6 @@ export class ProductRepository {
       include: {
         productSpecialOffer: true,
         productDiscount: true,
-        productCategory: true,
         banner: true,
       },
     });
@@ -112,7 +110,7 @@ export class ProductRepository {
       ];
     }
 
-    // Category filter
+    // Category filter - exact match with single category
     if (filters.category) {
       where.productCategoryNumber = filters.category;
     }
@@ -143,7 +141,7 @@ export class ProductRepository {
       // Extract fields that should not be in product table
       const {
         hsCode,
-        categories,
+        category,
         discountRate,
         discountStartDate,
         discountEndDate,
@@ -155,7 +153,7 @@ export class ProductRepository {
       if (hsCode !== undefined) {
         createData.hsCode = hsCode !== null ? BigInt(String(hsCode)) : null;
       }
-      createData.displayStatus = 'ACTIVE';
+      createData.displayStatus = 'Y';
 
       // Create product
       const product = await this.prisma.product.create({
@@ -374,11 +372,10 @@ export class ProductRepository {
       },
     });
 
-    // Group by category
-    const categoryGroups = await this.prisma.product.groupBy({
-      by: ['productCategoryNumber'],
-      _count: {
-        id: true,
+    // Get all products with categories to count by category
+    const productsWithCategories = await this.prisma.product.findMany({
+      select: {
+        productCategoryNumber: true,
       },
       where: {
         productCategoryNumber: {
@@ -411,8 +408,12 @@ export class ProductRepository {
     });
 
     const byCategory: Record<string, number> = {};
-    categoryGroups.forEach((group) => {
-      byCategory[group.productCategoryNumber || 'null'] = group._count.id;
+    // Count each category across all products
+    productsWithCategories.forEach((product) => {
+      if (product.productCategoryNumber !== null && product.productCategoryNumber !== undefined) {
+        const key = String(product.productCategoryNumber);
+        byCategory[key] = (byCategory[key] || 0) + 1;
+      }
     });
 
     return {
@@ -486,6 +487,12 @@ export class ProductRepository {
     return productSpecialOffer;
   }
 
+  async deleteProductSpecialOffer(productId: string): Promise<any> {
+    return await this.prisma.productSpecialOffer.delete({
+      where: { productId },
+    });
+  }
+
   /**
    * Find products with active special offers
    */
@@ -529,7 +536,6 @@ export class ProductRepository {
       include: {
         productSpecialOffer: true,
         productDiscount: true,
-        productCategory: true,
         banner: true,
       },
     });

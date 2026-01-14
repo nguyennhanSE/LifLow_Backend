@@ -107,8 +107,8 @@ export class ProductInquiryAnswerMapper {
       inquiryInfo.id = entity.productInquiry.id;
       inquiryInfo.productId = entity.productInquiry.productId;
       inquiryInfo.authorId = entity.productInquiry.authorId;
-      inquiryInfo.title = entity.productInquiry.title;
-      inquiryInfo.content = entity.productInquiry.content;
+      inquiryInfo.title = entity.productInquiry.title || '';
+      inquiryInfo.content = entity.productInquiry.content || '';
       inquiryInfo.createdAt = entity.productInquiry.createdAt;
       dto.productInquiry = inquiryInfo;
     } else {

@@ -17,29 +17,32 @@ datasource db {
 model User {
   id String @id @unique // ID is unique and also serves as username
   password String? @map("password")
-  name String
-  membershipLevel String?
-  age Int?
-  email String
-  phoneNumber String @map("phone_number")
-  totalUsedPoints Int @default(0) @map("total_used_points")
-  availablePoints Int @default(0) @map("available_points")
-  registrationDate String @map("registration_date") // Join Date
+  name String?
+  membershipLevel String? @map("membership_level")
+  age Int? @map("age")
+  email String?
+  phoneNumber String? @map("phone_number")
+  totalUsedPoints Int? @default(0) @map("total_used_points")
+  availablePoints Int? @default(0) @map("available_points")
+  registrationDate String? @map("registration_date") // Join Date
   dormancyDate String? @map("dormancy_date") // Date account marked inactive
   withdrawalDate String? @map("withdrawal_date")
   withdrawalType String? @map("withdrawal_type")
   reasonForWithdrawal String? @map("reason_for_withdrawal")
+
+  avatarURL String? @map("avatar_url")
   createdAt DateTime? @default(now()) @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
+
   // Payment Information
-  totalPurchaseAmount Int @default(0) @map("total_purchase_amount")
+  totalPurchaseAmount Int? @default(0) @map("total_purchase_amount")
   // Permissions
-  dashboardAccess Boolean @default(false) @map("dashboard_access")
-  memberAccess Boolean @default(false) @map("member_access")
-  productAccess Boolean @default(false) @map("product_access")
-  orderAccess Boolean @default(false) @map("order_access")
-  recipeAccess Boolean @default(false) @map("recipe_access")
-  bannerAccess Boolean @default(false) @map("banner_access")
+  dashboardAccess Boolean? @default(false) @map("dashboard_access")
+  memberAccess Boolean? @default(false) @map("member_access")
+  productAccess Boolean? @default(false) @map("product_access")
+  orderAccess Boolean? @default(false) @map("order_access")
+  recipeAccess Boolean? @default(false) @map("recipe_access")
+  bannerAccess Boolean? @default(false) @map("banner_access")
   
   // Relations
   userRole UserRole[]
@@ -54,6 +57,7 @@ model User {
   productReviews ProductReviews[]
   productInquiries ProductInquiries[]
   userShippingAddress UserShippingAddress[]
+  announcement Announcement[]
   @@map("users")
 }
 
@@ -105,11 +109,13 @@ model UserMembership {
 
 model Membership {
   id String @id @default(uuid())
-  name String @unique
+  name String? @unique
+  nickName String? @map("nick_name")
+  basePeriod Int? @map("base_period")
   description String?
-  minPrice Int @map("min_price")
+  minPrice Int? @map("min_price")
   userMembership UserMembership[]
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime? @default(now()) @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
 
   @@map("memberships")
@@ -214,37 +220,42 @@ enum OrderSituation {
 // Order
 model Order {
   id String @id @default(uuid())
-  cartId String @map("cart_id")
-  orderNumber String @default("") @unique @map("order_number") // 1. 주문번호 (Order Number) - text, default
+  cartId String? @map("cart_id")
+  orderNumber String? @default("") @unique @map("order_number") // 1. 주문번호 (Order Number) - text, default
   orderGroupNumber String? @map("order_group_number") // 2. 주문그룹번호 (Order Group Number) - text, default
-  totalOrderAmount Int @map("total_order_amount") // 3. 총 주문금액 (Total Order Amount) - int4
-  totalPaymentAmount Int @map("total_payment_amount") // 4. 총 결제금액 (Total Payment Amount) - int4
-  productId String @map("product_id") // 5. 상품번호 (Product Number) - int4
-  productName String @default("") @map("product_name") // 6. 주문상품명 (Ordered Product Name) - text, default
-  productNameWithOptions String @default("") @map("product_name_with_options") // 7. 주문상품명(옵션포) (Ordered Product Name with Options) - text, default
-  quantity Int @map("quantity") // 8. 수량 (Quantity) - int4
-  recipient String @default("") @map("recipient") // 9. 수령인 (Recipient) - text, default
-  recipientAddressFull String @default("") @map("recipient_address_full") // 10. 수령인 주소(전체) (Recipient Address Full) - text, default
-  recipientPostalCode Int @map("recipient_postal_code") // 11. 수령인 우편번호 (Recipient Postal Code) - int4
-  recipientMobilePhone String @default("") @map("recipient_mobile_phone") // 12. 수령인 휴대전화 (Recipient Mobile Phone) - text, default
-  recipientPhoneNumber String @default("") @map("recipient_phone_number") // 13. 수령인 전화번호 (Recipient Phone Number) - text, default
-  deliveryMessage String @default("") @map("delivery_message") // 14. 배송메시지 (Delivery Message) - text, default
-  salePrice Int @map("sale_price") // 15. 판매가 (Sale Price) - int4
-  paymentType String @default("") @map("payment_type") // 16. 결제구분 (Payment Type) - text, default
-  paymentMethod String @default("") @map("payment_method") // 17. 결제수단 (Payment Method) - text, default
-  orderDate String @default("") @map("order_date") // 18. 발주일 (Order Date) - text, default
-  ordererName String @default("") @map("orderer_name") // 19. 주문자명 (Orderer Name) - text, default
-  ordererMobilePhone String @default("") @map("orderer_mobile_phone") // 20. 주문자 휴대전화 (Orderer Mobile Phone) - text, default
+  totalOrderAmount Int? @map("total_order_amount") // 3. 총 주문금액 (Total Order Amount) - int4
+  totalPaymentAmount Int? @map("total_payment_amount") // 4. 총 결제금액 (Total Payment Amount) - int4
+  productClientId String? @map("product_client_id") // 5. 상품번호 (Product Number) - int4
+  productName String? @default("") @map("product_name") // 6. 주문상품명 (Ordered Product Name) - text, default
+  productNameWithOptions String? @default("") @map("product_name_with_options") // 7. 주문상품명(옵션포) (Ordered Product Name with Options) - text, default
+  quantity Int? @map("quantity") // 8. 수량 (Quantity) - int4
+  recipient String? @default("") @map("recipient") // 9. 수령인 (Recipient) - text, default
+  recipientAddressFull String? @default("") @map("recipient_address_full") // 10. 수령인 주소(전체) (Recipient Address Full) - text, default
+  recipientPostalCode Int? @map("recipient_postal_code") // 11. 수령인 우편번호 (Recipient Postal Code) - int4
+  recipientMobilePhone String? @default("") @map("recipient_mobile_phone") // 12. 수령인 휴대전화 (Recipient Mobile Phone) - text, default
+  recipientPhoneNumber String? @default("") @map("recipient_phone_number") // 13. 수령인 전화번호 (Recipient Phone Number) - text, default
+  deliveryMessage String? @default("") @map("delivery_message") // 14. 배송메시지 (Delivery Message) - text, default
+  salePrice Int? @map("sale_price") // 15. 판매가 (Sale Price) - int4
+  paymentType String? @default("") @map("payment_type") // 16. 결제구분 (Payment Type) - text, default
+  paymentMethod String? @default("") @map("payment_method") // 17. 결제수단 (Payment Method) - text, default
+  orderDate String? @default("") @map("order_date") // 18. 발주일 (Order Date) - text, default
+  ordererName String? @default("") @map("orderer_name") // 19. 주문자명 (Orderer Name) - text, default
+  ordererMobilePhone String? @default("") @map("orderer_mobile_phone") // 20. 주문자 휴대전화 (Orderer Mobile Phone) - text, default
   ordererId String? @map("orderer_id") // 21. 주문자ID (Orderer ID) - text, default (nullable for relation)
-  desiredDeliveryDate String @default("") @map("desired_delivery_date") // 22. 희망배송일 (Desired Delivery Date) - text, default
-  membershipLevelAtOrderTime String @default("") @map("membership_level_at_order_time") // 23. 주문 시 회원등급 (Membership Level at Order Time) - text, default
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  desiredDeliveryDate String? @default("") @map("desired_delivery_date") // 22. 희망배송일 (Desired Delivery Date) - text, default
+  membershipLevelAtOrderTime String? @default("") @map("membership_level_at_order_time") // 23. 주문 시 회원등급 (Membership Level at Order Time) - text, default
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
 
   // Extension
+  productId String? @map("product_id")
   situation OrderSituation? @map("situation") // 상황
   courierCompany String? @map("courier_company") // 택배사
   invoiceNumber String? @map("invoice_number") // 송장번호
+  couponUsed String[] @map("coupon_used")
+  discountAmount Int @default(0) @map("discount_amount")
+
   // Relation to User (optional, handles null ordererId)
   user User? @relation(fields: [ordererId], references: [id], onDelete: SetNull)
   couponHistories CouponHistory[]
@@ -264,10 +275,10 @@ model OrderGroup {
   originalAmount Int @map("original_amount")
   discountAmount Int @map("discount_amount")
   finalAmount Int @map("final_amount")
-  couponUsed String[] @map("coupon_used")
   pointsUsed Int @map("points_used")
   cartItemIds String[] @map("cart_item_ids")
   deliveryFee Int @default(0) @map("delivery_fee")
+
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -333,13 +344,13 @@ model Point {
   userId String? @db.VarChar(50) @map("user_id") // 아이디 (ID) - character varying(50)
   membershipLevel String? @db.VarChar(50) @map("membership_level") // 회원등급 (Membership Level) - character varying(50)
   content String? @db.VarChar(50) @map("content") // 내용 (Content/Details) - character varying(50)
-  orderGroupNumber String? @unique @db.VarChar(50) @map("order_group_number") // 주문번호 (Order Number) - character varying(50)
+  orderGroupNumber String? @db.VarChar(50) @map("order_group_number") // 주문번호 (Order Number) - character varying(50)
   pointsType String? @db.VarChar(50) @map("points_type") // 적립금 유형 (Accumulated Points Type) - character varying(50)
   availablePointsIncrease Int? @map("available_points_increase") // 가용적립금 증가 (Available Points Increase) - integer
   availablePointsDeduction Int? @map("available_points_deduction") // 가용적립금 차감 (Available Points Deduction) - integer
   availablePointsBalance Int? @map("available_points_balance") // 가용적립금 잔액 (Available Points Balance) - integer
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
 
   // Relation to User (many-to-one relationship) - set to null when user is deleted
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -351,9 +362,11 @@ model Product {
   id String @id @default(uuid())
   productCode String? @map("product_code") // 상품코드
   ownProductCode String? @map("own_product_code") // 자체 상품코드
-  displayStatus String? @default("ACTIVE") @map("display_status") // 진열상태
+  displayStatus String? @default("Y") @map("display_status") // 진열상태
   saleStatus String? @map("sale_status") // 판매상태
-  productCategoryNumber String? @map("product_category_number") // 상품분류 번호
+
+  productClientCategory Int[] @map("product_client_category") // 상품분류 번호
+
   productCategoryNewProductArea String? @map("product_category_new_product_area") // 상품분류 신상품영역
   productCategoryRecommendedProductArea String? @map("product_category_recommended_product_area") // 상품분류 추천상품영역
   productName String? @db.VarChar(128) @map("product_name") // 상품명
@@ -398,7 +411,7 @@ model Product {
   imageRegistrationThumbnail String? @map("image_registration_thumbnail") // 이미지등록(축소)
   manufacturer String? @map("manufacturer") // 제조사
   supplier String? @map("supplier") // 공급사
-  brand String? @map("brand") // 브랜드
+  brand String? @map("brand") // 브랜f드
   trend String? @map("trend") // 트렌드
   ownClassificationCode String? @map("own_classification_code") // 자체분류 코드
   manufacturingDate String? @map("manufacturing_date") // 제조일자
@@ -433,7 +446,7 @@ model Product {
   individualPaymentMethodSetting String? @map("individual_payment_method_setting") // 개별결제수단설정
   productDeliveryTypeCode String? @map("product_delivery_type_code") // 상품배송유형 코드
   storePickupSetting String? @map("store_pickup_setting") // 스토어픽업 설정
-  productTotalWeight Int? @map("product_total_weight") // 상품 전체중량(kg)
+  productTotalWeight Float? @map("product_total_weight") // 상품 전체중량(kg)
   hsCode BigInt? @map("hs_code") // HS코드
   additionalItem01TodayDepartureDeliveryUsage String? @map("additional_item_01_today_departure_delivery_usage") // 추가항목01_오늘출발 배송 사용설정
   additionalItem02TodayDepartureDeliveryTime String? @map("additional_item_02_today_departure_delivery_time") // 추가항목02_오늘출발 배송 시간설정
@@ -441,14 +454,14 @@ model Product {
   additionalItem04Origin String? @map("additional_item_04_origin") // 추가항목04_원산지
   additionalItem05Event String? @map("additional_item_05_event") // 추가항목05_이벤트
   additionalItem06ParcelDelivery String? @map("additional_item_06_parcel_delivery") // 추가항목06_택배배송
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
 
   // extension
+  productCategoryNumber Int? @map("product_category_number")
   ctaButtonUrl String? @db.VarChar(500) @map("cta_button_url")
   // relation 
   orders Order[]
-  productCategory Category? @relation(fields: [productCategoryNumber], references: [productCategoryNumber], onDelete: SetNull)
   banner Banner[]
   // productRecipes ProductRecipe[]
   productSpecialOffer ProductSpecialOffer?
@@ -458,6 +471,9 @@ model Product {
   productInquiries ProductInquiries[]
   @@map("products")
 }
+
+
+
 model ProductReviews {
   id String @id @default(uuid())
   productId String @map("product_id")
@@ -465,8 +481,8 @@ model ProductReviews {
   review String @map("review")
   rating Float @map("rating")
   imageUrl String? @map("image_url")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
 
   // Relations
   product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -515,8 +531,9 @@ model ProductInquiries {
   id String @id @default(uuid())
   productId String @map("product_id")
   authorId String @map("author_id")
-  title String @map("title")
-  content String @map("content")
+  title String? @map("title")
+  content String? @map("content")
+  status String? @default("pending") @map("status")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -539,14 +556,12 @@ model ProductInquiryAnswers {
 }
 
 model Category {
-  productCategoryNumber String @id @unique @db.VarChar(50) @map("product_category_number")
+  productCategoryNumber Int @id @unique @default(autoincrement()) @map("product_category_number")
   name CategoryType @unique @map("name")
   description String? @db.Text
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // relation
-  products Product[]
   @@map("categories")
 }
 
@@ -692,7 +707,6 @@ model CouponHistory {
 }
 // Banner
 enum BannerType {
-  ALL               // All (모든 배너)
   MAIN_PRODUCTS      // Main Products (메인 상품)
   CATEGORY          // Category (카테고리)
   FOOTER            // Footer
@@ -714,14 +728,9 @@ enum CategoryType {
 
 model Banner {
   id String @id @default(uuid())
-
-  productCategoryNumber String? @map("product_category_number")
-  // NOTE: productId chỉ được sử dụng cho banner type MAIN_PRODUCTS
-  // Chỉ có MAIN_PRODUCTS banner mới có productId, các loại banner khác không có
-  // NOTE: productId should only be used for MAIN_PRODUCTS banner type
-  // Only MAIN_PRODUCTS banners have productId, other banner types should not have it
   productId String? @map("product_id")
-  // categoryType CategoryType? @map("category_type") // 카테고리 타입
+  
+  category String? @map("category") // 카테고리
   type BannerType @map("type") // 배너 타입
   status BannerStatus @default(ACTIVE) @map("status") // 배너 상태
   
@@ -747,7 +756,6 @@ model Banner {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations - Only MAIN_PRODUCTS banners should have product relation
-  // Relations - Chỉ MAIN_PRODUCTS banners mới có quan hệ với Product
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   @@index([type])
   @@index([status])
@@ -839,4 +847,44 @@ enum PaymentType {
   @@index([requestedAt])
   @@index([userId])
   @@map("payments")
+}
+
+model Policy {
+  id String @id @default(uuid())
+  status String @default("inactive") @map("status")
+  paymentInformation String @map("payment_information")
+  deliveryInformation String @map("delivery_information")
+  exchangeInformation String @map("exchange_information")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("policy")
+}
+
+enum AnnouncementType {
+  GENERAL
+  RECIPE
+  USER
+}
+
+model Announcement {
+  id String @id @default(uuid())
+  title String @map("title")
+  type AnnouncementType @map("type")
+  authorName String? @map("author_name")
+  isFixed Boolean @default(false) @map("is_fixed")
+  imageUrl String? @map("image_url")
+  content String @map("content")
+  authorId String? @map("author_id")
+  views Int @default(0) @map("views")
+  status String? @default("active") @map("status")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  @@index([authorId])
+  @@index([status])
+  @@index([type])
+  @@map("announcements")
 }

@@ -70,11 +70,14 @@ export class ProductInquiryResponseDto {
   @ApiProperty({ description: 'Author ID', example: '123e4567-e89b-12d3-a456-426614174000' })
   authorId!: string;
 
-  @ApiProperty({ description: 'Inquiry title', example: 'Question about product ingredients' })
-  title!: string;
+  @ApiPropertyOptional({ description: 'Inquiry title', example: 'Question about product ingredients' })
+  title?: string | null;
 
-  @ApiProperty({ description: 'Inquiry content text', example: 'Is this product suitable for vegetarians?' })
-  content!: string;
+  @ApiPropertyOptional({ description: 'Inquiry content text', example: 'Is this product suitable for vegetarians?' })
+  content?: string | null;
+
+  @ApiPropertyOptional({ description: 'Inquiry status', example: 'pending', default: 'pending' })
+  status?: string | null;
 
   @ApiProperty({ description: 'Created at timestamp' })
   createdAt!: Date;

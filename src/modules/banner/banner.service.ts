@@ -313,10 +313,10 @@ export class BannerService {
       
       await this.validateProductExists(createBannerDto.productId);
       
-      // Validate that productCategoryNumber is also provided when productId is provided
-      if (!createBannerDto.productCategoryNumber) {
+      // Validate that category is also provided when productId is provided
+      if (!createBannerDto.category) {
         throw new BadRequestException(
-          'productCategoryNumber is required when productId is provided',
+          'category is required when productId is provided',
         );
       }
     }
@@ -365,10 +365,10 @@ export class BannerService {
 
       await this.validateProductExists(updateBannerDto.productId);
       
-      // Validate that productCategoryNumber is also provided when productId is provided
-      if (!updateBannerDto.productCategoryNumber) {
+      // Validate that category is also provided when productId is provided
+      if (!updateBannerDto.category) {
         throw new BadRequestException(
-          'productCategoryNumber is required when productId is provided',
+          'category is required when productId is provided',
         );
       }
     }

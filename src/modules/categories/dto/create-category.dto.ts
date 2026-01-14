@@ -1,18 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength, MinLength, IsOptional, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { CategoryType } from '@prisma/client';
 
 export class CreateCategoryDto {
-  @ApiProperty({
-    description: 'Product category number (unique identifier)',
-    example: 'CAT001',
-    maxLength: 50,
+  @ApiPropertyOptional({
+    description: 'Product category number (unique identifier, auto-generated if not provided)',
+    example: 1,
   })
-  @IsNotEmpty({ message: 'Product category number is required' })
-  @IsString({ message: 'Product category number must be a string' })
-  @MinLength(1, { message: 'Product category number must not be empty' })
-  @MaxLength(50, { message: 'Product category number must not exceed 50 characters' })
-  productCategoryNumber!: string;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Product category number must be an integer' })
+  @Min(1, { message: 'Product category number must be at least 1' })
+  productCategoryNumber?: number;
 
   @ApiProperty({
     description: 'Category name',

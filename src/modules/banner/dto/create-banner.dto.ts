@@ -57,14 +57,14 @@ export class CreateBannerDto {
   status?: EBannerStatus;
 
   @ApiPropertyOptional({
-    description: 'Product category number',
-    example: 'CAT001',
+    description: 'Category type',
+    example: 'LIVESTOCK',
     maxLength: 50,
   })
   @IsOptional()
   @IsString()
   @MaxLength(50)
-  productCategoryNumber?: string;
+  category?: string;
 
   @ApiPropertyOptional({
     description: 'Product ID (UUID) - Chỉ được sử dụng cho banner type MAIN_PRODUCTS. Only allowed for MAIN_PRODUCTS banner type.',

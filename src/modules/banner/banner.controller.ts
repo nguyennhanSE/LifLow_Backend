@@ -653,7 +653,7 @@ export class BannerController {
   @ApiParam({
     name: 'category',
     type: String,
-    description: 'Category type or "ALL" to get banners with null productCategoryNumber',
+    description: 'Category type or "ALL" to get banners with null category',
     example: 'LIVESTOCK',
   })
   @ApiResponse({

@@ -9,9 +9,14 @@ import { ProductInquiryMapper } from '../mappers/product-inquiry.mapper';
 
 /**
  * Type for ProductInquiry with all relations
- * Using any due to Prisma type generation complexity
  */
-export type ProductInquiryWithRelations = any;
+export type ProductInquiryWithRelations = Prisma.ProductInquiriesGetPayload<{
+  include: {
+    user: true;
+    product: true;
+    productInquiryAnswers: true;
+  };
+}>;
 
 /**
  * Repository for ProductInquiries entity
@@ -20,6 +25,20 @@ export type ProductInquiryWithRelations = any;
 @Injectable()
 export class ProductInquiriesRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getDashboardStats(): Promise<{
+    total: number;
+    pending: number;
+    completed: number;
+  }> {
+    const [total, pending, completed] = await Promise.all([
+      this.prisma.productInquiries.count(),
+      this.prisma.productInquiries.count({ where: { status: 'pending' } }),
+      this.prisma.productInquiries.count({ where: { status: 'completed' } }),
+    ]);
+
+    return { total, pending, completed };
+  }
 
   /**
    * Create a new product inquiry
@@ -90,6 +109,7 @@ export class ProductInquiriesRepository {
       productId,
       authorId,
       hasAnswer,
+      status,
       search,
     } = queryDto;
 
@@ -107,6 +127,11 @@ export class ProductInquiriesRepository {
     // Filter by authorId
     if (authorId) {
       where.authorId = authorId;
+    }
+
+    // Filter by status
+    if (status) {
+      where.status = status.trim().toLowerCase();
     }
 
     // Filter by hasAnswer (whether the inquiry has at least one answer)
@@ -180,13 +205,13 @@ export class ProductInquiriesRepository {
         product: true,
         productInquiryAnswers: true,
       },
-    }) as ProductInquiryWithRelations;
+    });
 
     if (!inquiry) {
       return null;
     }
 
-    return ProductInquiryMapper.toEntityWithRelations(inquiry);
+    return ProductInquiryMapper.toEntityWithRelations(inquiry as ProductInquiryWithRelations);
   }
 
   /**
@@ -281,13 +306,13 @@ export class ProductInquiriesRepository {
           },
         },
       },
-    }) as ProductInquiryWithRelations;
+    });
 
     if (!inquiry) {
       return null;
     }
 
-    return ProductInquiryMapper.toEntityWithRelations(inquiry);
+    return ProductInquiryMapper.toEntityWithRelations(inquiry as ProductInquiryWithRelations);
   }
 
   /**
@@ -316,6 +341,10 @@ export class ProductInquiriesRepository {
 
       if (updateDto.content !== undefined) {
         data.content = updateDto.content;
+      }
+
+      if (updateDto.status !== undefined) {
+        data.status = updateDto.status.trim().toLowerCase();
       }
 
       // Update the inquiry

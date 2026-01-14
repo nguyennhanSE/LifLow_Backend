@@ -9,6 +9,8 @@ function toMembershipEntity(membership: any): MembershipEntity {
   return {
     id: membership.id,
     name: membership.name,
+    nickName: membership.nickName,
+    basePeriod: membership.basePeriod,
     description: membership.description,
     minPrice: membership.minPrice,
     createdAt: membership.createdAt,
@@ -82,6 +84,7 @@ export class MembershipRepository {
     if (options.search) {
       where.OR = [
         { name: { contains: options.search, mode: 'insensitive' } },
+        { nickName: { contains: options.search, mode: 'insensitive' } },
         { description: { contains: options.search, mode: 'insensitive' } },
       ];
     }

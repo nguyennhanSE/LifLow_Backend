@@ -140,7 +140,7 @@ export class KakaoOAuthService {
 
     const existing = await this.prisma.user.findFirst({ where: { email } });
     if (existing) {
-      return { id: existing.id, email: existing.email, name: existing.name };
+      return { id: existing.id, email: existing.email || '', name: existing.name || '' };
     }
 
     // Create USER role mapping (if not exists, fail fast)
@@ -179,7 +179,7 @@ export class KakaoOAuthService {
       return user;
     });
 
-    return { id: created.id, email: created.email, name: created.name };
+    return { id: created.id, email: created.email || '', name: created.name || '' };
   }
 }
 

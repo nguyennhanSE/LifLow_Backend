@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { PaymentStatus, PaymentType } from '@prisma/client';
+import { CartItemCouponDto } from './payment-request.dto';
 
 export class PaymentResponseDto {
   @ApiProperty()
@@ -84,6 +85,9 @@ export class InitiatePaymentResponseDto {
 
   @ApiProperty({ description: '사용자 배송 주소 ID', required: false })
   userShippingAddressId?: string;
+
+  @ApiProperty({ description: '장바구니 아이템과 쿠폰 매핑', type: [CartItemCouponDto] })
+  cartItemCoupons: CartItemCouponDto[];
 }
 
 export class PaymentListResponseDto {

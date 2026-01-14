@@ -1,14 +1,11 @@
-import { Category, Product, Prisma, ProductSpecialOffer, Banner } from "@prisma/client";
+import { Product, Prisma, ProductSpecialOffer, Banner } from "@prisma/client";
 import { ProductEntity, ProductSpecialOfferEntity } from "../entities/product.entity";
-import { toCategoryEntity } from "src/modules/categories/mapper/category.mapper";
-import { CategoryEntity } from "src/modules/categories/entities/category.entity";
 import { BannerMapper } from "src/modules/banner/mappers/banner.mapper";
 
-type ProductWithCategory = Prisma.ProductGetPayload<{
+type ProductWithRelations = Prisma.ProductGetPayload<{
   include: { 
     productSpecialOffer: true,
     productDiscount: true,
-    productCategory: true,
     banner: true
   }
 }>
@@ -45,7 +42,7 @@ export function toProductEntity(product: Product): ProductEntity {
     ownProductCode: product.ownProductCode,
     displayStatus: product.displayStatus,
     saleStatus: product.saleStatus,
-    productCategoryNumber: product.productCategoryNumber,
+    productCategoryNumber: product.productCategoryNumber ?? null,
     productCategoryNewProductArea: product.productCategoryNewProductArea,
     productCategoryRecommendedProductArea: product.productCategoryRecommendedProductArea,
     productName: product.productName,
@@ -140,10 +137,9 @@ export function toProductEntity(product: Product): ProductEntity {
   };
 }
 
-export function toProductEntityWithRelations(product: ProductWithCategory): ProductEntity {
+export function toProductEntityWithRelations(product: ProductWithRelations): ProductEntity {
   return {
     ...toProductEntity(product),
-    category: product.productCategory ? toCategoryEntity(product.productCategory) : null,
     productSpecialOffer: product.productSpecialOffer ? toProductSpecialOfferEntity(product.productSpecialOffer) : null,
     productDiscount: product.productDiscount ? {
       id: product.productDiscount.id,

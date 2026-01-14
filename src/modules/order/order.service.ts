@@ -119,6 +119,8 @@ export class OrdersService {
             situation: (createOrderDto as any).situation,
             courierCompany: (createOrderDto as any).courierCompany,
             invoiceNumber: (createOrderDto as any).invoiceNumber,
+            couponUsed: couponIds || [],
+            discountAmount: (createOrderDto as any).discountAmount || 0,
             cart: {
               connect: { id: createOrderDto.cartId },
             },
@@ -479,6 +481,8 @@ export class OrdersService {
             상황: (order as any).situation || '',
             택배사: order.courierCompany || '',
             송장번호: order.invoiceNumber || '',
+            사용쿠폰: Array.isArray((order as any).couponUsed) ? (order as any).couponUsed.join(', ') : '',
+            할인금액: (order as any).discountAmount ?? 0,
             생성일: order.createdAt?.toISOString?.() || '',
             수정일: order.updatedAt?.toISOString?.() || '',
           });
@@ -703,31 +707,25 @@ export class OrdersService {
    * Generate a sequential order group number with date prefix (e.g., 20251117-01, 20251117-02, ...)
    */
   async generateOrderGroupNumber(): Promise<string> {
-    // Get today's date in YYYYMMDD format
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     const datePrefix = `${year}${month}${day}`;
     
-    // Get the last order group number for today
     const lastOrderGroupNumber = await this.orderRepository.getLastOrderGroupNumber(datePrefix);
     
     let nextNumber = 1;
     
     if (lastOrderGroupNumber) {
-      // Extract number from format "YYYYMMDD-NN"
       const match = lastOrderGroupNumber.match(/^(\d{8})-(\d+)$/);
       if (match && match[1] === datePrefix) {
         nextNumber = parseInt(match[2], 10) + 1;
-      } else {
-        // If format doesn't match, start from 01 for today
-        nextNumber = 1;
       }
     }
     
-    // Format with zero-padding (e.g., 20251117-01, 20251117-02, ..., 20251117-100)
-    return `${datePrefix}-${nextNumber.toString().padStart(2, '0')}`;
+    // Pad to 7 digits minimum, but allow expansion if needed
+    return `${datePrefix}-${nextNumber.toString().padStart(7, '0')}`;
   }
 
   /**

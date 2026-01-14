@@ -1,4 +1,3 @@
-import { CategoryEntity } from "src/modules/categories/entities/category.entity";
 import { ProductDiscountEntity } from "src/modules/product-discount/entities/product-discount.entity";
 import { BannerEntity } from "src/modules/banner/entities/banner.entity";
 
@@ -8,7 +7,7 @@ export class ProductEntity {
   ownProductCode?: string | null;
   displayStatus?: string | null;
   saleStatus?: string | null;
-  productCategoryNumber?: string | null;
+  productCategoryNumber?: number | null;
   productCategoryNewProductArea?: string | null;
   productCategoryRecommendedProductArea?: string | null;
   productName?: string | null;
@@ -96,12 +95,11 @@ export class ProductEntity {
   additionalItem04Origin?: string | null;
   additionalItem05Event?: string | null;
   additionalItem06ParcelDelivery?: string | null;
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
   // extension
   ctaButtonUrl?: string | null;
   // relation
-  category?: CategoryEntity | null;
   productSpecialOffer?: ProductSpecialOfferEntity | null;
   productDiscount?: ProductDiscountEntity | null;
   banner?: BannerEntity[] | null;

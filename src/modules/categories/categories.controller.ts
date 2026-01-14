@@ -80,7 +80,7 @@ export class CategoriesController {
     const responseModel = new ResponseModel();
 
     try {
-      const category = await this.categoriesService.findOne(productCategoryNumber);
+      const category = await this.categoriesService.findOne(+productCategoryNumber);
       responseModel.setData(category);
     } catch (error) {
       throw error;
@@ -103,7 +103,7 @@ export class CategoriesController {
     const responseModel = new ResponseModel();
 
     try {
-      const category = await this.categoriesService.update(productCategoryNumber, updateCategoryDto);
+      const category = await this.categoriesService.update(+productCategoryNumber, updateCategoryDto);
       responseModel.setData(category);
     } catch (error) {
       throw error;
@@ -122,7 +122,7 @@ export class CategoriesController {
     const responseModel = new ResponseModel();
 
     try {
-      const result = await this.categoriesService.remove(productCategoryNumber);
+      const result = await this.categoriesService.remove(+productCategoryNumber);
       responseModel.setData(result);
     } catch (error) {
       throw error;

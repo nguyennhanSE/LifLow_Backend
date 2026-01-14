@@ -68,9 +68,9 @@ export class CategoryFilterDto {
 export class CategoryResponseDto {
   @ApiProperty({
     description: 'Product category number (unique identifier)',
-    example: 'CAT001',
+    example: 1,
   })
-  productCategoryNumber!: string;
+  productCategoryNumber!: number;
 
   @ApiProperty({
     description: 'Category name',

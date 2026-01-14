@@ -4,32 +4,32 @@ import { ProductEntity } from '../../product/entities/product.entity';
 
 export class OrderEntity {
   id!: string;
-  cartId!: string;
-  orderNumber!: string;
+  cartId?: string | null;
+  orderNumber?: string | null;
   orderGroupNumber?: string | null;
-  totalOrderAmount!: number;
-  totalPaymentAmount!: number;
-  productId!: string;
-  productName!: string;
-  productNameWithOptions!: string;
-  quantity!: number;
-  recipient!: string;
-  recipientAddressFull!: string;
-  recipientPostalCode!: number;
-  recipientMobilePhone!: string;
-  recipientPhoneNumber!: string;
-  deliveryMessage!: string;
-  salePrice!: number;
-  paymentType!: string;
-  paymentMethod!: string;
-  orderDate!: string;
-  ordererName!: string;
-  ordererMobilePhone!: string;
+  totalOrderAmount?: number | null;
+  totalPaymentAmount?: number | null;
+  productId?: string | null;
+  productName?: string | null;
+  productNameWithOptions?: string | null;
+  quantity?: number | null;
+  recipient?: string | null;
+  recipientAddressFull?: string | null;
+  recipientPostalCode?: number | null;
+  recipientMobilePhone?: string | null;
+  recipientPhoneNumber?: string | null;
+  deliveryMessage?: string | null;
+  salePrice?: number | null;
+  paymentType?: string | null;
+  paymentMethod?: string | null;
+  orderDate?: string | null;
+  ordererName?: string | null;
+  ordererMobilePhone?: string | null;
   ordererId?: string | null;
-  desiredDeliveryDate!: string;
-  membershipLevelAtOrderTime!: string;
-  createdAt!: Date;
-  updatedAt!: Date;
+  desiredDeliveryDate?: string | null;
+  membershipLevelAtOrderTime?: string | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
 
   // Extensions
   user?: UserEntity | null;
@@ -38,10 +38,20 @@ export class OrderEntity {
   courierCompany?: string | null;
   invoiceNumber?: string | null;
   orderGroup?: OrderGroupEntity | null;
+  couponUsed?: string[] | null;
+  discountAmount?: number | null;
 }
 
 export class OrderGroupEntity {
   orderGroupNumber!: string;
-  createdAt!: Date;
-  updatedAt!: Date;
+  orderGroupName?: string | null;
+  originalAmount?: number | null;
+  discountAmount?: number | null;
+  finalAmount?: number | null;
+  couponUsed?: string[] | null;
+  cartItemIds?: string[] | null;
+  pointsUsed?: number | null;
+  deliveryFee?: number | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
 }

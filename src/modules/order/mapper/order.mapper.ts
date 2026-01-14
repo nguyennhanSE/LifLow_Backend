@@ -43,6 +43,8 @@ export function toOrderEntity(order: Order): OrderEntity {
     situation: order.situation as EOrderSituation,
     courierCompany: order.courierCompany,
     invoiceNumber: order.invoiceNumber,
+    couponUsed: order.couponUsed,
+    discountAmount: order.discountAmount,
   };
 }
 

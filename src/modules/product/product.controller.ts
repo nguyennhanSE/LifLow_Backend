@@ -112,11 +112,10 @@ export class ProductController {
           description: 'Product code',
           example: 'PROD001',
         },
-        categories: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Categories',
-          example: ['CAT001', 'CAT002'],
+        category: {
+          type: 'number',
+          description: 'Category number',
+          example: 1,
         },
         brand: {
           type: 'string',

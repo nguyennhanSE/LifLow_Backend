@@ -123,6 +123,22 @@ export class CreatePaymentDto {
   metadata?: any;
 }
 
+/**
+ * Cart item with associated coupons
+ */
+export class CartItemCouponDto {
+  @ApiProperty({ description: '장바구니 아이템 ID', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @IsNotEmpty({ message: 'Cart item ID is required' })
+  @IsString({ message: 'Cart item ID must be a string' })
+  cartItemId!: string;
+
+  @ApiPropertyOptional({ description: '해당 장바구니 아이템에 사용할 쿠폰 ID 배열', type: [String], example: [] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  couponIds?: string[];
+}
+
 export class ConfirmPaymentRequestDto {
   @ApiProperty({ description: '결제 키 (Toss에서 전달)' })
   @IsString()
@@ -148,6 +164,13 @@ export class ConfirmPaymentRequestDto {
   @IsOptional()
   @IsString()
   userShippingAddressId?: string;
+
+  @ApiPropertyOptional({ description: '장바구니 아이템과 쿠폰 매핑', type: [CartItemCouponDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CartItemCouponDto)
+  cartItemCoupons?: CartItemCouponDto[];
 }
 
 export class CancelPaymentRequestDto {
@@ -209,20 +232,26 @@ export class PreparePaymentRequestDto {
 }
 
 export class InitiatePaymentRequestDto {
-  @ApiProperty({ description: '장바구니 ID 배열', type: [String] })
+  @ApiProperty({ description: '장바구니 아이템과 쿠폰 정보 배열', type: [CartItemCouponDto] })
   @IsArray()
-  @IsString({ each: true })
-  cartItemIds!: string[];
-
-  @ApiPropertyOptional({ description: '사용할 쿠폰 ID 배열', type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  couponIds?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => CartItemCouponDto)
+  cartItems!: CartItemCouponDto[];
 
   @ApiPropertyOptional({ description: '사용할 포인트' })
   @IsOptional()
   @IsNumber()
   @Min(0, { message: 'Points must be at least 0' })
   points?: number;
+
+  @ApiPropertyOptional({ description: '배송비 (KRW)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0, { message: 'Delivery fee must be at least 0' })
+  deliveryFee?: number;
+
+  @ApiPropertyOptional({ description: '수령인 주소 ID (선택 사항)' })
+  @IsOptional()
+  @IsString()
+  userShippingAddressId?: string;
 }

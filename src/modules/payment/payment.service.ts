@@ -7,7 +7,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus, PaymentType, Prisma } from '@prisma/client';
+import { PaymentStatus, PaymentType, Prisma, Coupon } from '@prisma/client';
 import { TossPaymentApiService } from './services/toss-payment-api.service';
 import { PaymentRepository } from './repositories/payment.repository';
 import {
@@ -44,15 +44,13 @@ export class PaymentService {
    */
   async initiatePayment(
     userId: string,
-    cartItemIds: string[],
-    couponIds?: string[],
+    cartItems: Array<{ cartItemId: string; couponIds?: string[] }>,
     points?: number,
     deliveryFee?: number,
     userShippingAddressId?: string,
   ): Promise<InitiatePaymentResponseDto> {
     this.logger.log(`Initiating payment for user: ${userId}`, {
-      cartItemIds,
-      couponIds,
+      cartItems,
       points,
       deliveryFee,
       userShippingAddressId,
@@ -71,16 +69,29 @@ export class PaymentService {
       if (!user) {
         throw new NotFoundException(`User with ID ${userId} not found`);
       }
-
+      const availablePoints = user?.availablePoints ?? 0;
+      
       // 2. Validate points
-      if (points && points > 0 && points > user.availablePoints) {
-        throw new BadRequestException(
-          `Insufficient points. Available: ${user.availablePoints}, Requested: ${points}`,
-        );
+      if (points && points > 0) {
+        if (availablePoints === 0) {
+          throw new BadRequestException('Available points is 0');
+        }
+        if (points > availablePoints) {
+          throw new BadRequestException(
+            `Insufficient points. Available: ${availablePoints}, Requested: ${points}`,
+          );
+        }
       }
 
-      // 3. Fetch cart items with product details
-      const cartItems = await this.prisma.cartItem.findMany({
+      // 3. Extract cart item IDs and validate
+      const cartItemIds = cartItems.map(item => item.cartItemId);
+      
+      if (cartItemIds.length === 0) {
+        throw new BadRequestException('At least one cart item is required');
+      }
+
+      // 4. Fetch cart items with product details
+      const fetchedCartItems = await this.prisma.cartItem.findMany({
         where: {
           id: { in: cartItemIds },
           status: 'ACTIVE',
@@ -95,82 +106,87 @@ export class PaymentService {
         },
       });
 
-      if (cartItems.length === 0) {
+      if (fetchedCartItems.length === 0) {
         throw new NotFoundException('No active cart items found');
       }
 
-      if (cartItems.length !== cartItemIds.length) {
+      if (fetchedCartItems.length !== cartItemIds.length) {
         throw new BadRequestException('Some cart items are not available');
       }
 
-      // 4. Calculate original amount (sum of salePrice * quantity)
-      const originalAmount = cartItems.reduce((sum, item) => {
+      // 5. Calculate original amount (sum of salePrice * quantity)
+      const originalAmount = fetchedCartItems.reduce((sum, item) => {
         return sum + item.salePrice * item.quantity;
       }, 0);
 
-      // 5. Apply coupon discounts
-      let couponDiscountAmount = 0;
-      const appliedCoupons: string[] = [];
+      // 6. Process coupons per cart item
+      const cartItemCouponMap: Record<string, string[]> = {}; // cartItemId -> couponIds[]
+      const cartItemDiscountMap: Record<string, number> = {}; // cartItemId -> discount amount
+      let totalCouponDiscount = 0;
 
-      if (couponIds && couponIds.length > 0) {
-        // Fetch valid coupons
-        const coupons = await this.prisma.coupon.findMany({
-          where: {
-            id: { in: couponIds },
-            isActive: true,
-            startDate: { lte: new Date() },
-            // endDate: { gte: new Date() },
-          },
-        });
+      // Build a map of cart items for quick lookup
+      const cartItemMap = new Map(
+        fetchedCartItems.map(item => [item.id, item])
+      );
 
-        // Check if user has these coupons in their history
-        // const couponHistories = await this.prisma.couponHistory.findMany({
-        //   where: {
-        //     userId,
-        //     couponId: { in: coupons.map(c => c.id) },
-        //     status: 'ISSUED', // Only unused coupons
-        //   },
-        // });
-
-        // const availableCouponIds = new Set(couponHistories.map(h => h.couponId));
-
-        // Calculate discount for each coupon
-        for (const coupon of coupons) {
-          // if (!availableCouponIds.has(coupon.id)) {
-          //   throw new BadRequestException(
-          //     `Coupon ${coupon.code} is not available for this user`,
-          //   );
-          // }
-
-          // // Check minimum purchase amount
-          // if (originalAmount < coupon.minPurchaseAmount) {
-          //   throw new BadRequestException(
-          //     `Minimum purchase amount ${coupon.minPurchaseAmount} not met for coupon ${coupon.code}`,
-          //   );
-          // }
-
-          let discount = 0;
-          if (coupon.type === 'PERCENT') {
-            // Percentage discount
-            discount = Math.floor((originalAmount * (coupon.discountRate || 0)) / 100);
-            
-            // Apply max discount limit if set
-            if (coupon.maxDiscountAmount && discount > coupon.maxDiscountAmount) {
-              discount = coupon.maxDiscountAmount;
-            }
-          } else if (coupon.type === 'AMOUNT') {
-            // Fixed amount discount
-            discount = coupon.discountAmount || 0;
-          }
-
-          couponDiscountAmount += discount;
-          appliedCoupons.push(coupon.id);
+      // Process each cart item and its coupons
+      for (const cartItemInput of cartItems) {
+        const cartItem = cartItemMap.get(cartItemInput.cartItemId);
+        
+        if (!cartItem) {
+          continue; // Should not happen due to earlier validation
         }
+
+        const itemAmount = cartItem.salePrice * cartItem.quantity;
+        let itemDiscount = 0;
+        const itemCouponIds: string[] = [];
+
+        // Process coupons for this cart item
+        if (cartItemInput.couponIds && cartItemInput.couponIds.length > 0) {
+          // Fetch valid coupons for this cart item
+          const coupons = await this.prisma.coupon.findMany({
+            where: {
+              id: { in: cartItemInput.couponIds },
+              isActive: true,
+              startDate: { lte: new Date() },
+            },
+          });
+
+          // Calculate discount for each coupon
+          for (const coupon of coupons) {
+            let discount = 0;
+
+            if (coupon.type === 'PERCENT') {
+              // Percentage discount
+              discount = Math.floor((itemAmount * (coupon.discountRate || 0)) / 100);
+              
+              // Apply max discount limit if set
+              if (coupon.maxDiscountAmount && discount > coupon.maxDiscountAmount) {
+                discount = coupon.maxDiscountAmount;
+              }
+            } else if (coupon.type === 'AMOUNT') {
+              // Fixed amount discount
+              discount = coupon.discountAmount || 0;
+            }
+
+            itemDiscount += discount;
+            itemCouponIds.push(coupon.id);
+
+            this.logger.log(`Cart item ${cartItem.id}: Applied coupon ${coupon.code} with discount ${discount} KRW`);
+          }
+        }
+
+        // Store the results
+        cartItemCouponMap[cartItem.id] = itemCouponIds;
+        cartItemDiscountMap[cartItem.id] = itemDiscount;
+        totalCouponDiscount += itemDiscount;
+
+        this.logger.log(`Cart item ${cartItem.id}: Total discount ${itemDiscount} KRW (${itemCouponIds.length} coupons)`);
       }
 
-      // 6. Calculate final amount
+      // 7. Calculate final amount
       const pointsDiscount = points ? points : 0;
-      const totalDiscountAmount = couponDiscountAmount + pointsDiscount;
+      const totalDiscountAmount = totalCouponDiscount + pointsDiscount;
       const finalAmount = originalAmount - totalDiscountAmount;
 
       // Ensure final amount is not negative
@@ -180,23 +196,23 @@ export class PaymentService {
         );
       }
 
-      // 7. Generate unique order group number
+      // 8. Generate unique order group number
       const orderGroupNumber = await this.ordersService.generateUniqueOrderGroupNumber();
 
-      // 8. Generate customerKey for Toss
+      // 9. Generate customerKey for Toss
       const customerKey = `customer_${userId}`;
 
-      // 9. Create order group name
-      const productNames = cartItems
+      // 10. Create order group name
+      const productNames = fetchedCartItems
         .slice(0, 2)
         .map(item => item.product?.productName || 'Unknown Product')
         .join(', ');
       const orderGroupName = 
-        cartItems.length > 2
-          ? `${productNames} 외 ${cartItems.length - 2}건`
+        fetchedCartItems.length > 2
+          ? `${productNames} 외 ${fetchedCartItems.length - 2}건`
           : productNames;
 
-      // 10. Create OrderGroup in database
+      // 11. Create OrderGroup in database
       await this.prisma.orderGroup.create({
         data: {
           orderGroupNumber,
@@ -204,22 +220,24 @@ export class PaymentService {
           originalAmount,
           discountAmount: totalDiscountAmount,
           finalAmount,
-          couponUsed: appliedCoupons,
           cartItemIds,
           pointsUsed: points || 0,
           deliveryFee: deliveryFee || 0,
         },
       });
 
-      // 11. Build response with URLs for Toss
+      // 12. Build response with URLs for Toss
       const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
       const successUrl = `${frontendUrl}/payment/success`;
       const failUrl = `${frontendUrl}/payment/fail`;
 
       this.logger.log('Payment initiated successfully', {
         orderGroupNumber,
+        cartItemsCount: cartItems.length,
         originalAmount,
-        discountAmount: totalDiscountAmount,
+        couponDiscount: totalCouponDiscount,
+        pointsDiscount,
+        totalDiscountAmount,
         finalAmount,
         deliveryFee,
         userShippingAddressId,
@@ -236,6 +254,10 @@ export class PaymentService {
         failUrl,
         deliveryFee,
         userShippingAddressId,
+        cartItemCoupons: cartItems.map(item => ({
+          cartItemId: item.cartItemId,
+          couponIds: item.couponIds,
+        })),
       };
     } catch (error) {
       this.logger.error('Failed to initiate payment', error);
@@ -384,24 +406,48 @@ export class PaymentService {
 
         const membershipLevelAtOrderTime = userMembership?.membershipName || '';
 
-        // 2.6. Fetch and prepare coupons if couponUsed exists
+        // 2.6. Build cart item -> coupon mapping
         const today = this.formatLocalYyyyMmDd(new Date());
-        let coupons: any[] = [];
+        const cartItemCouponMap: Map<string, string[]> = new Map(); // cartItemId -> couponIds
+        const allCouponIds = new Set<string>();
+
+        // Process cart item coupons from DTO
+        if (dto.cartItemCoupons && dto.cartItemCoupons.length > 0) {
+          for (const item of dto.cartItemCoupons) {
+            if (item.couponIds && item.couponIds.length > 0) {
+              cartItemCouponMap.set(item.cartItemId, item.couponIds);
+              item.couponIds.forEach(id => allCouponIds.add(id));
+            }
+          }
+        }
+
+        // Fetch all unique coupons
+        let couponMap: Map<string, Coupon> = new Map();
         
-        if (orderGroup.couponUsed && orderGroup.couponUsed.length > 0) {
-          this.logger.log(`Fetching ${orderGroup.couponUsed.length} coupons from database`);
+        if (allCouponIds.size > 0) {
+          this.logger.log(`Fetching ${allCouponIds.size} unique coupons from database`);
           
-          coupons = await tx.coupon.findMany({
+          const coupons = await tx.coupon.findMany({
             where: {
-              id: { in: orderGroup.couponUsed },
+              id: { in: Array.from(allCouponIds) },
             },
           });
 
+          couponMap = new Map(coupons.map(c => [c.id, c]));
           this.logger.log(`Found ${coupons.length} valid coupons`);
         }
 
         // 2.7. Calculate discount for each cart item and create orders
-        const createdOrders: any[] = [];
+        interface CreatedOrder {
+          id: string;
+          orderNumber: string;
+          totalOrderAmount: number;
+          totalPaymentAmount: number;
+          appliedDiscount: number;
+          appliedCouponIds: string[];
+        }
+
+        const createdOrders: CreatedOrder[] = [];
 
         for (const cartItem of cartItems) {
           const orderNumber = await this.ordersService.generateUniqueOrderNumber(
@@ -409,9 +455,20 @@ export class PaymentService {
           );
           const totalOrderAmount = cartItem.salePrice * cartItem.quantity;
           let totalDiscount = 0;
+          const appliedCouponIds: string[] = [];
 
-          // Calculate total discount from all coupons for this cart item
-          for (const coupon of coupons) {
+          // Get coupons for this specific cart item
+          const cartItemCouponIds = cartItemCouponMap.get(cartItem.id) || [];
+
+          // Calculate total discount from coupons for this cart item
+          for (const couponId of cartItemCouponIds) {
+            const coupon = couponMap.get(couponId);
+            
+            if (!coupon) {
+              this.logger.warn(`Coupon ${couponId} not found, skipping`);
+              continue;
+            }
+
             let discountAmount = 0;
 
             // Calculate discount based on coupon type
@@ -430,6 +487,7 @@ export class PaymentService {
             }
 
             totalDiscount += discountAmount;
+            appliedCouponIds.push(coupon.id);
             this.logger.log(`Coupon ${coupon.code} discount for cart item ${cartItem.id}: -${discountAmount} KRW`);
           }
 
@@ -448,8 +506,10 @@ export class PaymentService {
             productNameWithOptions: cartItem.product?.productName || '',
             quantity: cartItem.quantity,
             salePrice: cartItem.salePrice,
+            couponUsed: appliedCouponIds, // Store applied coupon IDs for this order
+            discountAmount: totalDiscount,
             // Use shipping address if available, otherwise fallback to user info
-            recipient: shippingAddress?.recipientName || user.name,
+            recipient: shippingAddress?.recipientName || user.name || '',
             recipientAddressFull: shippingAddress?.addressFull || '',
             recipientPostalCode: shippingAddress?.postalCode || 0,
             recipientMobilePhone: shippingAddress?.mobilePhone || user.phoneNumber || '',
@@ -457,7 +517,7 @@ export class PaymentService {
             deliveryMessage: '',
             situation: EOrderSituation.ORDER_PAYMENT_COMPLETED,
             orderDate: today,
-            ordererName: user.name,
+            ordererName: user.name || '',
             ordererMobilePhone: user.phoneNumber || '',
             membershipLevelAtOrderTime,
             cart: {
@@ -475,19 +535,33 @@ export class PaymentService {
             data: orderData,
           });
 
-          createdOrders.push({ ...order, appliedDiscount: totalDiscount });
+          createdOrders.push({ 
+            id: order.id,
+            orderNumber: order.orderNumber || orderNumber,
+            totalOrderAmount: order.totalOrderAmount || totalOrderAmount,
+            totalPaymentAmount: order.totalPaymentAmount || totalPaymentAmount,
+            appliedDiscount: totalDiscount,
+            appliedCouponIds,
+          });
 
-          this.logger.log(`Created order ${orderNumber}: ${totalOrderAmount} KRW -> ${totalPaymentAmount} KRW (discount: ${totalDiscount})`);
+          this.logger.log(`Created order ${orderNumber}: ${totalOrderAmount} KRW -> ${totalPaymentAmount} KRW (discount: ${totalDiscount}, coupons: ${appliedCouponIds.length})`);
         }
 
         this.logger.log(`Created ${createdOrders.length} orders`);
 
         // 2.8. Save coupon history for each coupon and order
-        if (coupons.length > 0) {
+        if (allCouponIds.size > 0) {
           this.logger.log('Saving coupon history');
 
           for (const order of createdOrders) {
-            for (const coupon of coupons) {
+            // Only process coupons that were actually applied to this order
+            for (const couponId of order.appliedCouponIds) {
+              const coupon = couponMap.get(couponId);
+              
+              if (!coupon) {
+                continue;
+              }
+
               // Calculate discount amount for this order
               let discountAmount = 0;
 
@@ -556,7 +630,7 @@ export class PaymentService {
               orderGroupNumber: dto.orderGroupNumber,
               pointsType: 'USED',
               availablePointsDeduction: orderGroup.pointsUsed,
-              availablePointsBalance: user.availablePoints - orderGroup.pointsUsed,
+              availablePointsBalance: (user?.availablePoints || 0) - orderGroup.pointsUsed,
               content: `Points used for order ${dto.orderGroupNumber}`,
             },
           });

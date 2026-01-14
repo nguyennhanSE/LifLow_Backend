@@ -4,9 +4,9 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 
 interface MembershipTier {
   id: string;
-  name: string;
+  name: string | null;
   description: string | null;
-  minPrice: number;
+  minPrice: number | null;
 }
 
 @Injectable()
@@ -17,8 +17,12 @@ export class MembershipRecalculationService {
 
   /**
    * Scheduled cron job that runs daily at 2 AM to recalculate user memberships
+   * DISABLED: Uncomment @Cron decorator to enable
    */
-  @Cron(CronExpression.EVERY_HOUR) // every 1 hour
+  @Cron(CronExpression.EVERY_DAY_AT_2AM, {
+    name: 'membership-recalculation',
+    timeZone: 'Asia/Seoul',
+  }) // every day at 2 AM
   async handleScheduledMembershipRecalculation() {
     this.logger.log('Starting scheduled membership recalculation...');
     await this.recalculateAllUserMemberships();
@@ -65,7 +69,7 @@ export class MembershipRecalculationService {
       for (const user of users) {
         try {
           // Update user's totalPurchaseAmount field to match calculated amount
-          await this.syncUserTotalPurchaseAmount(user.id, user.totalPurchaseAmount);
+          // await this.syncUserTotalPurchaseAmount(user.id, user.totalPurchaseAmount);
 
           const result = await this.recalculateUserMembership(
             user.id,
@@ -139,7 +143,6 @@ export class MembershipRecalculationService {
     const existingMembership = await this.prisma.userMembership.findFirst({
       where: {
         userId: userId,
-        membershipId: appropriateTier.id,
         status: 'normal',
       },
       orderBy: {
@@ -151,86 +154,52 @@ export class MembershipRecalculationService {
     const oneYearFromNow = new Date();
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
 
-    // If user already has this membership and it's still active, check if it needs updating
-    if (existingMembership) {
-      // If the membership is still valid and active, just ensure User.membershipLevel is in sync
-      if (existingMembership.endDate > now && existingMembership.status === 'normal') {
-        // Still update User.membershipLevel to ensure consistency
-        await this.updateUserMembershipLevel(userId, appropriateTier.name);
-        return { action: 'unchanged' };
-      }
-
-      // Update the existing membership (extend validity period)
-      await this.prisma.userMembership.update({
-        where: {
-          id: existingMembership.id,
-        },
-        data: {
-          endDate: oneYearFromNow,
-          status: 'normal',
-          updatedAt: now,
-        },
-      });
-
-      // Update User.membershipLevel field
-      await this.updateUserMembershipLevel(userId, appropriateTier.name);
-
-      this.logger.debug(
-        `Updated membership for user ${userId} to ${appropriateTier.name}`
-      );
-      return { action: 'updated' };
+    // If user already has the correct membership tier and it's still active, no update needed
+    if (existingMembership && 
+        existingMembership.membershipId === appropriateTier.id && 
+        existingMembership.endDate > now && 
+        existingMembership.status === 'normal') {
+      // Still update User.membershipLevel to ensure consistency
+      await this.updateUserMembershipLevel(userId, appropriateTier.name || '');
+      return { action: 'unchanged' };
     }
 
-    // Check if user has a different active membership
-    const otherActiveMembership = await this.prisma.userMembership.findFirst({
+    // If membership tier has changed or membership expired, update it
+    await this.prisma.userMembership.upsert({
       where: {
         userId: userId,
-        status: 'normal',
-        endDate: { gte: now },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    // If user has a different active membership, expire it
-    if (otherActiveMembership) {
-      await this.prisma.userMembership.update({
-        where: {
-          id: otherActiveMembership.id,
-        },
-        data: {
-          status: 'expired',
-          endDate: now,
-          updatedAt: now,
-        },
-      });
-
-      this.logger.debug(
-        `Expired old membership ${otherActiveMembership.membershipName} for user ${userId}`
-      );
-    }
-
-    // Create new membership for the user
-    await this.prisma.userMembership.create({
-      data: {
+      create: {
         userId: userId,
         membershipId: appropriateTier.id,
-        membershipName: appropriateTier.name,
+        membershipName: appropriateTier.name || '',
         membershipDescription: appropriateTier.description || '',
         status: 'normal',
         startDate: now,
         endDate: oneYearFromNow,
       },
+      update: {
+        membershipId: appropriateTier.id,
+        membershipName: appropriateTier.name || '',
+        membershipDescription: appropriateTier.description || '',
+        status: 'normal',
+        startDate: now,
+        endDate: oneYearFromNow,
+        updatedAt: now,
+      },
     });
 
     // Update User.membershipLevel field
-    await this.updateUserMembershipLevel(userId, appropriateTier.name);
+    await this.updateUserMembershipLevel(userId, appropriateTier.name || '');
+
+    const action = existingMembership && existingMembership.membershipId !== appropriateTier.id 
+      ? 'updated' 
+      : 'created';
 
     this.logger.debug(
-      `Created new membership ${appropriateTier.name} for user ${userId}`
+      `${action === 'updated' ? 'Updated' : 'Created'} membership ${appropriateTier.name || 'Unknown'} for user ${userId}`
     );
-    return { action: 'created' };
+    return { action };
   }
 
   /**
@@ -277,21 +246,19 @@ export class MembershipRecalculationService {
   }
 
   /**
-   * Get all users with their total purchase amounts from orders
+   * Get all users with their total purchase amounts from users table
    */
   private async getUsersWithPurchaseAmounts(): Promise<
     Array<{ id: string; totalPurchaseAmount: number }>
   > {
-    // Calculate total purchase amount per user from orders
+    // Get total purchase amount directly from users table
     const result = await this.prisma.$queryRaw<
       Array<{ id: string; total_purchase_amount: string }>
     >`
       SELECT 
         u.id,
-        COALESCE(SUM(o.total_payment_amount), 0) as total_purchase_amount
+        COALESCE(u.total_purchase_amount, 0) as total_purchase_amount
       FROM users u
-      LEFT JOIN orders o ON u.id = o.orderer_id
-      GROUP BY u.id
     `;
 
     return result.map((row) => ({
@@ -308,16 +275,21 @@ export class MembershipRecalculationService {
     purchaseAmount: number,
     tiers: MembershipTier[]
   ): MembershipTier | null {
+    // Filter out tiers with invalid data
+    const validTiers = tiers.filter(tier => 
+      tier.name && tier.minPrice !== null && tier.minPrice !== undefined
+    );
+
     // Tiers should be sorted by minPrice descending
     // Return the first tier where purchase amount >= minPrice
-    for (const tier of tiers) {
-      if (purchaseAmount >= tier.minPrice) {
+    for (const tier of validTiers) {
+      if (purchaseAmount >= (tier.minPrice || 0)) {
         return tier;
       }
     }
 
     // If no tier matches, return the lowest tier (last in the sorted array)
-    return tiers.length > 0 ? tiers[tiers.length - 1] : null;
+    return validTiers.length > 0 ? validTiers[validTiers.length - 1] : null;
   }
 
   /**
@@ -350,13 +322,13 @@ export class MembershipRecalculationService {
     const allTiers = await this.getMembershipTiers();
 
     // Find the next tier (lower minPrice)
-    const sortedTiers = [...allTiers].sort((a, b) => b.minPrice - a.minPrice);
+    const sortedTiers = [...allTiers].sort((a, b) => (b.minPrice || 0) - (a.minPrice || 0));
     const updatedTierIndex = sortedTiers.findIndex((t) => t.id === updatedTierId);
     const nextLowerTier = sortedTiers[updatedTierIndex + 1];
 
     // Determine the range of users to update
-    const minAmount = nextLowerTier ? nextLowerTier.minPrice : 0;
-    const maxAmount = updatedTier.minPrice;
+    const minAmount = nextLowerTier ? (nextLowerTier.minPrice || 0) : 0;
+    const maxAmount = updatedTier.minPrice || 0;
 
     // For simplicity, we'll just recalculate all users
     // In a production system, you might want to optimize this by only processing affected users

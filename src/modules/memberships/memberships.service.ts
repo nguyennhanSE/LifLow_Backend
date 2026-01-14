@@ -8,6 +8,7 @@ import {
   UpdateUserMembershipDto,
   QueryMembershipDto,
   QueryUserMembershipsDto,
+  BulkUpdateMembershipItemDto,
 } from './dto/membership.dto';
 import { MembershipEntity, UserMembershipEntity } from './entities/membership.entity';
 import { IPaginate } from '../../libs/models/paginate/pagimate.model';
@@ -306,5 +307,93 @@ export class MembershipsService {
     
     this.logger.log(`Membership recalculation result: ${JSON.stringify(result)}`);
     return result;
+  }
+
+  // ============= BULK UPDATE MEMBERSHIPS =============
+
+  /**
+   * Bulk update memberships
+   * Process multiple membership updates in one request
+   */
+  async bulkUpdateMemberships(
+    updates: BulkUpdateMembershipItemDto[]
+  ): Promise<{
+    totalProcessed: number;
+    successful: number;
+    failed: number;
+    results: Array<{
+      membershipId: string;
+      success: boolean;
+      data?: MembershipEntity;
+      error?: string;
+    }>;
+  }> {
+    this.logger.log(`Processing bulk update for ${updates.length} memberships`);
+
+    const results: Array<{
+      membershipId: string;
+      success: boolean;
+      data?: MembershipEntity;
+      error?: string;
+    }> = [];
+
+    let successful = 0;
+    let failed = 0;
+
+    // Process each update
+    for (const update of updates) {
+      try {
+        const { membershipId, nickName, minPrice, basePeriod } = update;
+        
+        // Check if membership exists
+        const membership = await this.membershipRepository.getMembershipById(membershipId);
+        if (!membership) {
+          throw new NotFoundException(`Membership with id "${membershipId}" not found`);
+        }
+
+        // Prepare update data
+        const updateData: UpdateMembershipDto = {};
+        if (nickName !== undefined) updateData.nickName = nickName;
+        if (minPrice !== undefined) updateData.minPrice = minPrice;
+        if (basePeriod !== undefined) updateData.basePeriod = basePeriod;
+
+        // Update the membership
+        const updatedMembership = await this.membershipRepository.updateMembership(
+          membershipId,
+          updateData
+        );
+        
+        results.push({
+          membershipId,
+          success: true,
+          data: updatedMembership,
+        });
+        
+        successful++;
+        this.logger.log(`Successfully updated membership: ${membershipId}`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        results.push({
+          membershipId: update.membershipId,
+          success: false,
+          error: errorMessage,
+        });
+        
+        failed++;
+        this.logger.error(`Failed to update membership ${update.membershipId}: ${errorMessage}`);
+      }
+    }
+
+    const summary = {
+      totalProcessed: updates.length,
+      successful,
+      failed,
+      results,
+    };
+
+    this.logger.log(`Bulk update completed: ${successful} successful, ${failed} failed`);
+    
+    return summary;
   }
 }

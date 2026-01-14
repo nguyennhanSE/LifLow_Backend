@@ -43,14 +43,14 @@ export function toUserEntity(user: User): UserEntity {
   return {
     id: user.id,
     password: user.password,
-    name: user.name,
+    name: user.name ?? '',
     age: user.age,
     membershipLevel: user.membershipLevel,
-    email: user.email,
-    phoneNumber: user.phoneNumber,
-    totalUsedPoints: user.totalUsedPoints,
-    availablePoints: user.availablePoints,
-    registrationDate: user.registrationDate,
+    email: user.email ?? undefined,
+    phoneNumber: user.phoneNumber ?? undefined,
+    totalUsedPoints: user.totalUsedPoints ?? undefined,
+    availablePoints: user.availablePoints ?? undefined,
+    registrationDate: user.registrationDate ?? undefined,
     dormancyDate: user.dormancyDate,
     withdrawalDate: user.withdrawalDate,
     withdrawalType: user.withdrawalType,
@@ -76,43 +76,43 @@ export function toUserEntityWithRelations(user: UserWithRelations): UserEntity {
   const permissions: PermissionInfo[] = [];
   
   const permissionMapping: Array<{
-    flag: boolean;
+    flag: boolean | null;
     permission: EPermissions;
     name: string;
     description: string;
   }> = [
     {
-      flag: user.dashboardAccess,
+      flag: user.dashboardAccess ?? false,
       permission: EPermissions.DASHBOARD_ACCESS,
       name: 'Dashboard Access',
       description: 'Access to dashboard and analytics',
     },
     {
-      flag: user.memberAccess,
+      flag: user.memberAccess ?? false,
       permission: EPermissions.MEMBER_MANAGEMENT,
       name: 'Member Management',
       description: 'Manage member information (view, create, update, delete)',
     },
     {
-      flag: user.productAccess,
+      flag: user.productAccess ?? false,
       permission: EPermissions.PRODUCT_MANAGEMENT,
       name: 'Product Management',
       description: 'Manage product information (view, create, update, delete)',
     },
     {
-      flag: user.orderAccess,
+      flag: user.orderAccess ?? false,
       permission: EPermissions.ORDER_MANAGEMENT,
       name: 'Order Management',
       description: 'Manage order information (view, create, update, delete)',
     },
     {
-      flag: user.recipeAccess,
+      flag: user.recipeAccess ?? false,
       permission: EPermissions.RECIPE_MANAGEMENT,
       name: 'Recipe Management',
       description: 'Manage recipe information (view, create, update, delete)',
     },
     {
-      flag: user.bannerAccess,
+      flag: user.bannerAccess ?? false,
       permission: EPermissions.BANNER_MANAGEMENT,
       name: 'Banner Management',
       description: 'Manage banner information (view, create, update, delete)',
@@ -148,14 +148,14 @@ export function toUserEntityWithRelations(user: UserWithRelations): UserEntity {
   return {
     id: user.id,
     password: user.password,
-    name: user.name,
+    name: user.name ?? '',
     age: user.age,
     membershipLevel: user.membershipLevel,
-    email: user.email,
-    phoneNumber: user.phoneNumber,
-    totalUsedPoints: user.totalUsedPoints,
-    availablePoints: user.availablePoints,
-    registrationDate: user.registrationDate,
+    email: user.email ?? undefined,
+    phoneNumber: user.phoneNumber ?? undefined,
+    totalUsedPoints: user.totalUsedPoints ?? undefined,
+    availablePoints: user.availablePoints ?? undefined,
+    registrationDate: user.registrationDate ?? undefined,
     dormancyDate: user.dormancyDate,
     withdrawalDate: user.withdrawalDate,
     withdrawalType: user.withdrawalType,
@@ -201,7 +201,7 @@ export function toPrismaUserCreateInput(dto: CreateUserDto & {password?: string;
 export function toUserMembershipInfo(userMembership: UserMembership & { membership: Membership }): UserMembershipInfo {
   return {
     id: userMembership.membership.id,
-    name: userMembership.membership.name,
+    name: userMembership.membership.name ?? '',
     description: userMembership.membership.description,
     status: userMembership.status,
     startDate: userMembership.startDate,

@@ -8,9 +8,12 @@ import { ProductInquiryAnswerMapper } from '../mappers/product-inquiry-answer.ma
 
 /**
  * Type for ProductInquiryAnswer with all relations
- * Using any due to Prisma type generation complexity
  */
-export type ProductInquiryAnswerWithRelations = any;
+export type ProductInquiryAnswerWithRelations = Prisma.ProductInquiryAnswersGetPayload<{
+  include: {
+    productInquiry: true;
+  };
+}>;
 
 /**
  * Repository for ProductInquiryAnswers entity
@@ -35,16 +38,21 @@ export class ProductInquiryAnswersRepository {
         throw new NotFoundException(`Inquiry with ID ${inquiryId} not found`);
       }
 
-      // Create the answer with relations
-      const answer = await this.prisma.productInquiryAnswers.create({
-        data: {
-          inquiryId: inquiryId,
-          answer: createDto.answer,
-        },
-        include: {
-          productInquiry: true,
-        },
-      });
+      const [, answer] = await this.prisma.$transaction([
+        this.prisma.productInquiries.update({
+          where: { id: inquiryId },
+          data: { status: 'completed' },
+        }),
+        this.prisma.productInquiryAnswers.create({
+          data: {
+            inquiryId: inquiryId,
+            answer: createDto.answer,
+          },
+          include: {
+            productInquiry: true,
+          },
+        }),
+      ]);
 
       return ProductInquiryAnswerMapper.toEntityWithInquiry(answer);
     } catch (error) {
@@ -89,7 +97,7 @@ export class ProductInquiryAnswersRepository {
       include: {
         productInquiry: true,
       },
-    }) as ProductInquiryAnswerWithRelations;
+    });
 
     if (!answer) {
       return null;
@@ -217,7 +225,7 @@ export class ProductInquiryAnswersRepository {
       include: {
         productInquiry: true,
       },
-    }) as ProductInquiryAnswerWithRelations;
+    });
 
     if (!answer) {
       return null;
@@ -239,7 +247,7 @@ export class ProductInquiryAnswersRepository {
       include: {
         productInquiry: true,
       },
-    }) as ProductInquiryAnswerWithRelations;
+    });
 
     if (!answer) {
       return null;

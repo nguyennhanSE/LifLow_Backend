@@ -11,8 +11,8 @@ export class PointEntity {
   availablePointsIncrease?: number | null;
   availablePointsDeduction?: number | null;
   availablePointsBalance?: number | null;
-  createdAt!: Date;
-  updatedAt!: Date;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
 
   // Relations
   user?: UserEntity | null;

@@ -4,7 +4,7 @@ import { UserEntity } from "../entities/user.entity";
 import { CreateUserDto, UserFilterDto } from "../dto/user.dto";
 import { toUserEntity, toPrismaUserCreateInput, toUserEntityWithRelations } from "../mapper/user.mapper";
 import { IPaginate, PaginateOptions } from "../../../libs/models/paginate/pagimate.model";
-import { Prisma } from "@prisma/client";
+import { Prisma, User } from "@prisma/client";
 import { ERoleName } from "../../roles/enums/role.enum";
 import { BadRequestException } from "@nestjs/common";
 import { OrderRepository } from "../../order/repositories/order.repository";
@@ -251,7 +251,7 @@ export class UserRepository {
     const sortBy = options.sortBy || 'createdAt';
     const counted = options.counted ?? true;
 
-    const { q: search, email, searchField, role } = filter;
+    const { q: search, email, searchField, role, status, nickName } = filter;
 
     // Build where clause
     const where: Prisma.UserWhereInput = {};
@@ -269,6 +269,22 @@ export class UserRepository {
 
     if (email) {
       where.email = email;
+    }
+
+    // Filter by membership status and/or nickName
+    if (status || nickName) {
+      where.userMembership = {};
+      if (status) {
+        where.userMembership.status = status;
+      }
+      if (nickName) {
+        where.userMembership.membership = {
+          nickName: {
+            contains: nickName,
+            mode: 'insensitive',
+          },
+        };
+      }
     }
 
     if (search) {
@@ -386,7 +402,7 @@ export class UserRepository {
     const sortBy = options.sortBy || 'createdAt';
     const counted = options.counted ?? true;
 
-    const { q: search, email, searchField, role } = filter;
+    const { q: search, email, searchField, role, status, nickName } = filter;
 
     // Build where clause
     const where: Prisma.UserWhereInput = {};
@@ -427,6 +443,22 @@ export class UserRepository {
 
     if (email) {
       where.email = email;
+    }
+
+    // Filter by membership status and/or nickName
+    if (status || nickName) {
+      where.userMembership = {};
+      if (status) {
+        where.userMembership.status = status;
+      }
+      if (nickName) {
+        where.userMembership.membership = {
+          nickName: {
+            contains: nickName,
+            mode: 'insensitive',
+          },
+        };
+      }
     }
 
     if (search) {
@@ -663,7 +695,7 @@ export class UserRepository {
         }
       }
 
-      return user;
+      return toUserEntity(user);
     } catch (error) {
       console.error('Prisma error in getUserInfo:', error);
       throw error;

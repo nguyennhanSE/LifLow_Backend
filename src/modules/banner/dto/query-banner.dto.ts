@@ -40,22 +40,13 @@ export class QueryBannerDto {
   productId?: string;
 
   @ApiPropertyOptional({
-    description: 'Filter by product category number',
-    example: 'CAT001',
+    description: 'Filter by category',
+    example: 'LIVESTOCK',
     maxLength: 50,
   })
   @IsOptional()
   @IsString()
-  productCategoryNumber?: string;
-
-  @ApiPropertyOptional({
-    description: 'Filter by category type',
-    enum: ECategoryType,
-    example: ECategoryType.LIVESTOCK,
-  })
-  @IsOptional()
-  @IsEnum(ECategoryType)
-  categoryType?: ECategoryType;
+  category?: string;
 
   @ApiPropertyOptional({
     description: 'Search by title or badge text (case-insensitive)',

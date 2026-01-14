@@ -64,7 +64,9 @@ export class UserController {
         q: search, 
         email, 
         searchField,
-        role
+        role,
+        status,
+        nickName
       } = q;
 
       const pageNum = page ? (typeof page === 'string' ? parseInt(page, 10) : page) : 1;
@@ -77,11 +79,16 @@ export class UserController {
           sort: sort || 'asc', 
           sortBy: sortBy || 'createdAt' 
         },
-        { q: search, email, searchField, role: role === 'ALL' ? undefined : role },
+        { 
+          q: search, 
+          email, 
+          searchField, 
+          role: role === 'ALL' ? undefined : role,
+          status,
+          nickName
+        },
         { counted: counted ?? true },
       );
-
-      console.log('data', data);
       const lastDocs = await Promise.all(data.docs.map(async e => {return { ...e, orderNumber: await this.orderRepository.getOrderNumber(e.id) }}));
       const docs = lastDocs.map(e => toResponse(e));
 

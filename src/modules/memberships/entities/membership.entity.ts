@@ -1,6 +1,8 @@
 export class MembershipEntity {
   id!: string;
   name!: string;
+  nickName?: string | null;
+  basePeriod?: number | null;
   description?: string | null;
   minPrice!: number;
   createdAt!: Date;

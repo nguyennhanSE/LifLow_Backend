@@ -29,12 +29,15 @@ import { CartsModule } from './modules/carts/carts.module';
 import { PointModule } from './modules/point/point.module';
 import { ProductReviewsModule } from './modules/product-reviews/product-reviews.module';
 import { ProductInquiriesModule } from './modules/product-inquiries/product-inquiries.module';
+import { PolicyModule } from './modules/policy/policy.module';
+import { AnnouncementsModule } from './modules/announcements/announcements.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(), // Enable scheduled tasks (cron jobs)
     AuthModule,
     UserModule,
+    AnnouncementsModule,
     PointModule,
     ProductModule, // Product CRUD operations
     ProductDiscountModule,
@@ -55,6 +58,7 @@ import { ProductInquiriesModule } from './modules/product-inquiries/product-inqu
     CategoriesModule,
     CartsModule,
     PaymentModule,
+    PolicyModule,
   ],
   controllers: [AppController],
   providers: [

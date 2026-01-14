@@ -3,8 +3,8 @@ import { CouponHistoryEntity, CouponInfo, UserInfo, OrderInfo } from '../entitie
 import { CouponHistoryStatus } from '../../coupons/enums/coupon.enum';
 import { toCouponEntity } from '../../coupons/mapper/coupon.mapper';
 
-type UserSelect = { id: string; name: string; email: string };
-type OrderSelect = { id: string; orderNumber: string; totalPaymentAmount: number };
+type UserSelect = { id: string; name?: string | null; email?: string | null };
+type OrderSelect = { id: string; orderNumber?: string | null; totalPaymentAmount?: number | null };
 
 type CouponHistoryWithRelations = CouponHistory & {
   coupon?: Coupon | null;
@@ -60,8 +60,8 @@ export function toCouponHistoryEntityWithRelations(
   if (history.user) {
     entity.user = {
       id: history.user.id,
-      name: history.user.name,
-      email: history.user.email,
+      name: history.user.name ?? null,
+      email: history.user.email ?? null,
     };
   }
 
@@ -69,8 +69,8 @@ export function toCouponHistoryEntityWithRelations(
   if (history.order) {
     entity.order = {
       id: history.order.id,
-      orderNumber: history.order.orderNumber,
-      totalPaymentAmount: history.order.totalPaymentAmount,
+      orderNumber: history.order.orderNumber ?? null,
+      totalPaymentAmount: history.order.totalPaymentAmount ?? null,
     };
   }
 

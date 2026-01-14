@@ -33,13 +33,13 @@ export class CouponInfo {
 }
 export class UserInfo {
   id!: string;
-  name!: string;
-  email!: string;
+  name?: string | null;
+  email?: string | null;
 }
 
 export class OrderInfo {
   id!: string;
-  orderNumber!: string;
-  totalPaymentAmount!: number;
+  orderNumber?: string | null;
+  totalPaymentAmount?: number | null;
 }
 

@@ -8,9 +8,11 @@ import {
   IsEnum, 
   MaxLength,
   IsInt,
-  Min
+  Min,
+  ValidateNested,
+  IsArray
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { trim } from '../../../utils/helper';
 
 // ============= CREATE MEMBERSHIP DTO =============
@@ -25,6 +27,27 @@ export class CreateMembershipDto {
   @trim()
   @MaxLength(100)
   name!: string;
+
+  @ApiPropertyOptional({
+    description: 'Membership nickname',
+    example: 'VIP Member',
+    maxLength: 100
+  })
+  @IsOptional()
+  @IsString()
+  @trim()
+  @MaxLength(100)
+  nickName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Base period for membership (in days)',
+    example: 365,
+    minimum: 0
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  basePeriod?: number;
 
   @ApiPropertyOptional({
     description: 'Membership description',
@@ -60,6 +83,27 @@ export class UpdateMembershipDto {
   @trim()
   @MaxLength(100)
   name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Membership nickname',
+    example: 'VIP Member',
+    maxLength: 100
+  })
+  @IsOptional()
+  @IsString()
+  @trim()
+  @MaxLength(100)
+  nickName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Base period for membership (in days)',
+    example: 365,
+    minimum: 0
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  basePeriod?: number;
 
   @ApiPropertyOptional({
     description: 'Membership description',
@@ -300,5 +344,73 @@ export class QueryUserMembershipsDto {
   @IsOptional()
   @IsUUID()
   membershipId?: string;
+}
+
+// ============= BULK UPDATE MEMBERSHIPS DTO =============
+export class BulkUpdateMembershipItemDto {
+  @ApiProperty({
+    description: 'Membership ID to update',
+    example: '550e8400-e29b-41d4-a716-446655440000'
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  membershipId!: string;
+
+  @ApiPropertyOptional({
+    description: 'Membership nickname',
+    example: 'VIP Member',
+    maxLength: 100
+  })
+  @IsOptional()
+  @IsString()
+  @trim()
+  @MaxLength(100)
+  nickName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Minimum purchase amount (in Korean Won) required for this membership tier',
+    example: 500000,
+    minimum: 0
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minPrice?: number;
+
+  @ApiPropertyOptional({
+    description: 'Base period for membership (in days)',
+    example: 365,
+    minimum: 0
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  basePeriod?: number;
+}
+
+export class BulkUpdateMembershipDto {
+  @ApiProperty({
+    description: 'Array of membership updates',
+    type: [BulkUpdateMembershipItemDto],
+    example: [
+      {
+        membershipId: '550e8400-e29b-41d4-a716-446655440000',
+        nickName: 'VIP Member',
+        minPrice: 500000,
+        basePeriod: 365
+      },
+      {
+        membershipId: '550e8400-e29b-41d4-a716-446655440001',
+        nickName: 'Gold Member',
+        minPrice: 300000,
+        basePeriod: 180
+      }
+    ]
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BulkUpdateMembershipItemDto)
+  @IsNotEmpty()
+  updates!: BulkUpdateMembershipItemDto[];
 }
 

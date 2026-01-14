@@ -17,10 +17,13 @@ export class ProductInquiryEntity {
   authorId!: string;
 
   /** Inquiry title (maps to title in database) */
-  title!: string;
+  title?: string | null;
 
   /** Inquiry content text (maps to content in database) */
-  content!: string;
+  content?: string | null;
+
+  /** Inquiry status (maps to status in database) */
+  status?: string | null;
 
   /** Timestamp when the inquiry was created (maps to created_at in database) */
   createdAt!: Date;

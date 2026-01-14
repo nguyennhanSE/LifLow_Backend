@@ -105,7 +105,7 @@ export class ProductService {
     // Extract discount data from product data
     const {
       hsCode,
-      categories,
+      category,
       discountRate,
       discountStartDate,
       discountEndDate,
@@ -122,21 +122,15 @@ export class ProductService {
           createProductData.hsCode = hsCode !== null ? BigInt(String(hsCode)) : null;
         }
 
+        // Add category to create data if provided
+        if (category !== undefined) {
+          createProductData.productCategoryNumber = category;
+        }
+
         // Create product
         const product = await tx.product.create({
           data: createProductData,
         });
-
-        // Update product with category if provided (use first category from array)
-        // Note: Product now has direct relation to Category via productCategoryNumber
-        if (categories && categories.length > 0) {
-          await tx.product.update({
-            where: { id: product.id },
-            data: {
-              productCategoryNumber: categories[0], // Use first category
-            },
-          });
-        }
 
         // Create discount if discount data is provided
         if (hasDiscountData && discountRate !== undefined && discountRate !== null) {
@@ -456,17 +450,44 @@ export class ProductService {
   }
 
   async updateProductSpecialOffer(id: string, data: CreateProductSpecialOfferDto): Promise<ProductEntity> {
-    // Verify product and product special offer exists
+    // Verify product exists
     const product = await this.productRepository.findById(id);
     if (!product) {
       throw new NotFoundException(`Product with id ${id} not found`);
     }
+
     const productSpecialOffer = await this.productRepository.getProductSpecialOfferByProductId(id);
-    if (!productSpecialOffer) {
-      return await this.productRepository.createProductSpecialOffer(id, data);
+
+    // If status is false, delete the productSpecialOffer (if it exists)
+    if (data.status === false) {
+      if (productSpecialOffer) {
+        await this.productRepository.deleteProductSpecialOffer(id);
+      }
+      // Return the product without special offer
+      const updatedProduct = await this.productRepository.findById(id);
+      if (!updatedProduct) {
+        throw new NotFoundException(`Product with id ${id} not found after deletion`);
+      }
+      return updatedProduct;
     }
+
+    // If productSpecialOffer doesn't exist, create it
+    if (!productSpecialOffer) {
+      await this.productRepository.createProductSpecialOffer(id, data);
+      const updatedProduct = await this.productRepository.findById(id);
+      if (!updatedProduct) {
+        throw new NotFoundException(`Product with id ${id} not found after creation`);
+      }
+      return updatedProduct;
+    }
+
     // Update product special offer
-    return await this.productRepository.updateProductSpecialOffer(id, data);
+    await this.productRepository.updateProductSpecialOffer(id, data);
+    const updatedProduct = await this.productRepository.findById(id);
+    if (!updatedProduct) {
+      throw new NotFoundException(`Product with id ${id} not found after update`);
+    }
+    return updatedProduct;
   }
 
   /**

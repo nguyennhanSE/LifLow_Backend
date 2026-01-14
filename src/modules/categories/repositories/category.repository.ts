@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { CategoryType, Prisma } from '@prisma/client';
 import { CategoryEntity } from '../entities/category.entity';
-import { toCategoryEntity, toCategoryEntityWithProducts } from '../mapper/category.mapper';
+import { toCategoryEntity } from '../mapper/category.mapper';
 import { DuplicateError } from '../../../utils/customErrors';
 
 @Injectable()
@@ -36,30 +36,24 @@ export class CategoryRepository {
       orderBy,
       skip,
       take,
-      include: {
-        products: true,
-      },
     });
 
-    return categories.map(category => toCategoryEntityWithProducts(category));
+    return categories.map(category => toCategoryEntity(category));
   }
 
   /**
    * Find category by productCategoryNumber
    */
-  async findByProductCategoryNumber(productCategoryNumber: string): Promise<CategoryEntity> {
+  async findByProductCategoryNumber(productCategoryNumber: number): Promise<CategoryEntity> {
     const category = await this.prisma.category.findUnique({
       where: { productCategoryNumber },
-      include: {
-        products: true,
-      },
     });
 
-    if (!category) {
+    if (!category) {  
       throw new NotFoundException(`Category with productCategoryNumber ${productCategoryNumber} not found`);
     }
 
-    return toCategoryEntityWithProducts(category);
+    return toCategoryEntity(category);
   }
 
   /**
@@ -121,19 +115,16 @@ export class CategoryRepository {
    * Create a new category
    */
   async create(data: {
-    productCategoryNumber: string;
+    productCategoryNumber?: number;
     name: CategoryType;
     description?: string | null;
   }): Promise<CategoryEntity> {
     try {
       const category = await this.prisma.category.create({
         data,
-        include: {
-          products: true,
-        },
       });
 
-      return toCategoryEntityWithProducts(category);
+      return toCategoryEntity(category);
     } catch (error: any) {
       // Handle Prisma unique constraint violation
       if (error.code === 'P2002') {
@@ -148,9 +139,9 @@ export class CategoryRepository {
    * Update an existing category
    */
   async update(
-    productCategoryNumber: string,
+    productCategoryNumber: number,
     data: {
-      name?: string;
+      name?: CategoryType;
       description?: string | null;
     }
   ): Promise<CategoryEntity> {
@@ -158,15 +149,12 @@ export class CategoryRepository {
       const category = await this.prisma.category.update({
         where: { productCategoryNumber },
         data: {
-          name: data.name as CategoryType,
+          name: data.name,
           description: data.description,
-        },
-        include: {
-          products: true,
         },
       });
 
-      return toCategoryEntityWithProducts(category);
+      return toCategoryEntity(category);
     } catch (error: any) {
       // Handle record not found
       if (error.code === 'P2025') {
@@ -179,7 +167,7 @@ export class CategoryRepository {
   /**
    * Delete a category by productCategoryNumber
    */
-  async delete(productCategoryNumber: string): Promise<void> {
+  async delete(productCategoryNumber: number): Promise<void> {
     try {
       await this.prisma.category.delete({
         where: { productCategoryNumber },
@@ -196,7 +184,7 @@ export class CategoryRepository {
   /**
    * Check if category exists by productCategoryNumber
    */
-  async existsByProductCategoryNumber(productCategoryNumber: string): Promise<boolean> {
+  async existsByProductCategoryNumber(productCategoryNumber: number): Promise<boolean> {
     const count = await this.prisma.category.count({
       where: { productCategoryNumber },
     });

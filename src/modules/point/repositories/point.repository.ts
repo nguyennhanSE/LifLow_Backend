@@ -65,7 +65,7 @@ export class PointRepository {
     includeRelations = true,
   ): Promise<PointWithRelations | null> {
     const include: any = includeRelations ? { user: true, orderGroup: true } : undefined;
-    return (await this.prisma.point.findUnique({
+    return (await this.prisma.point.findFirst({
       where: { orderGroupNumber },
       include,
     })) as PointWithRelations | null;

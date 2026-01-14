@@ -359,4 +359,20 @@ export class ProductInquiriesService {
       throw error;
     }
   }
+
+  async getDashboardStats(): Promise<{
+    total: number;
+    pending: number;
+    completed: number;
+  }> {
+    try {
+      this.logger.log('Fetching product inquiries dashboard stats');
+      return await this.productInquiriesRepository.getDashboardStats();
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch dashboard stats: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      throw error;
+    }
+  }
 }

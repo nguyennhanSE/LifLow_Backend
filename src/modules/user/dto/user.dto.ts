@@ -162,6 +162,22 @@ export class UserFilterDto {
     @IsOptional()
     @IsEnum(RoleFilterOptions, { message: 'Role must be one of: ADMIN, GENERAL_MANAGER, MANAGER, MD, CS_MANAGER, USER, ALL' })
     role?: RoleFilterType;
+
+    @ApiPropertyOptional({
+        description: 'Filter by membership status',
+        example: 'normal',
+        enum: ['normal', 'inactive', 'stop']
+    })
+    @IsOptional()
+    @IsEnum(['normal', 'inactive', 'stop'], { message: 'Status must be one of: normal, inactive, stop' })
+    status?: 'normal' | 'inactive' | 'stop';
+
+    @ApiPropertyOptional({
+        description: 'Filter/search by membership nickname',
+        example: 'VIP Member'
+    })
+    @IsOptional() @IsString() @trim()
+    nickName?: string;
 }
 
 export class GetUsersQueryDto {
@@ -252,6 +268,25 @@ export class GetUsersQueryDto {
     @IsString()
     @trim()
     searchField?: string;
+
+    @ApiPropertyOptional({
+        description: 'Filter by membership status',
+        example: 'normal',
+        enum: ['normal', 'inactive', 'stop']
+    })
+    @IsOptional()
+    @IsEnum(['normal', 'inactive', 'stop'], { message: 'Status must be one of: normal, inactive, stop' })
+    status?: 'normal' | 'inactive' | 'stop';
+
+    @ApiPropertyOptional({
+        description: 'Filter/search by membership nickname',
+        example: 'VIP Member',
+        type: String
+    })
+    @IsOptional()
+    @IsString()
+    @trim()
+    nickName?: string;
 }
 
 export class GetAdminListQueryDto {

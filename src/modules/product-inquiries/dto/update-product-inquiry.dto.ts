@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/swagger';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsOptional, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { CreateProductInquiryDto } from './create-product-inquiry.dto';
 
 /**
@@ -27,4 +28,13 @@ export class UpdateProductInquiryDto extends PartialType(CreateProductInquiryDto
   @IsString({ message: 'Content must be a string' })
   @MaxLength(2000, { message: 'Content cannot exceed 2000 characters' })
   content?: string;
+
+  @ApiPropertyOptional({
+    description: 'Inquiry status',
+    example: 'completed',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsString({ message: 'Status must be a string' })
+  status?: string;
 }

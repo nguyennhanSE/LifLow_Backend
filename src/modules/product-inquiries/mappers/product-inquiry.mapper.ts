@@ -15,8 +15,9 @@ type ProductInquiryBase = {
   id: string;
   productId: string;
   authorId: string;
-  title: string;
-  content: string;
+  title: string | null;
+  content: string | null;
+  status: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -86,6 +87,7 @@ export class ProductInquiryMapper {
     entity.authorId = prismaInquiry.authorId;
     entity.title = prismaInquiry.title;
     entity.content = prismaInquiry.content;
+    entity.status = prismaInquiry.status;
     entity.createdAt = prismaInquiry.createdAt;
     entity.updatedAt = prismaInquiry.updatedAt;
     return entity;
@@ -172,6 +174,7 @@ export class ProductInquiryMapper {
       authorId: prismaInquiry.authorId,
       title: prismaInquiry.title,
       content: prismaInquiry.content,
+      status: prismaInquiry.status,
       createdAt: prismaInquiry.createdAt,
       updatedAt: prismaInquiry.updatedAt,
     });
@@ -227,6 +230,7 @@ export class ProductInquiryMapper {
     dto.authorId = entity.authorId;
     dto.title = entity.title;
     dto.content = entity.content;
+    dto.status = entity.status ?? null;
     dto.createdAt = entity.createdAt;
     dto.updatedAt = entity.updatedAt;
     

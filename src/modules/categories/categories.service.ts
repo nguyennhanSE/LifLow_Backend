@@ -66,7 +66,7 @@ export class CategoriesService {
   /**
    * Get single category by productCategoryNumber
    */
-  async findOne(productCategoryNumber: string): Promise<CategoryResponseDto> {
+  async findOne(productCategoryNumber: number): Promise<CategoryResponseDto> {
     const category = await this.categoryRepository.findByProductCategoryNumber(productCategoryNumber);
 
     if (!category) {
@@ -81,7 +81,7 @@ export class CategoriesService {
    */
   async create(data: CreateCategoryDto): Promise<CategoryResponseDto> {
     // Check for duplicate productCategoryNumber
-    const exists = await this.categoryRepository.existsByProductCategoryNumber(data.productCategoryNumber);
+    const exists = await this.categoryRepository.existsByProductCategoryNumber(data.productCategoryNumber || 0);
     if (exists) {
       throw new DuplicateError(`Category with productCategoryNumber ${data.productCategoryNumber} already exists`);
     }
@@ -98,7 +98,7 @@ export class CategoriesService {
   /**
    * Update an existing category
    */
-  async update(productCategoryNumber: string, data: UpdateCategoryDto): Promise<CategoryResponseDto> {
+  async update(productCategoryNumber: number, data: UpdateCategoryDto): Promise<CategoryResponseDto> {
     // Check if category exists
     const existingCategory = await this.categoryRepository.findByProductCategoryNumber(productCategoryNumber);
     if (!existingCategory) {
@@ -113,7 +113,7 @@ export class CategoriesService {
   /**
    * Delete a category
    */
-  async remove(productCategoryNumber: string): Promise<{ message: string }> {
+  async remove(productCategoryNumber: number): Promise<{ message: string }> {
     // Verify category exists
     const category = await this.categoryRepository.findByProductCategoryNumber(productCategoryNumber);
     if (!category) {

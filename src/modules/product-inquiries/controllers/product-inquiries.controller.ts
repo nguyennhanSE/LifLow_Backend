@@ -142,6 +142,41 @@ export class ProductInquiriesController {
   }
 
   /**
+   * Dashboard stats for product inquiries by status
+   */
+  @Get('dashboard')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get product inquiries dashboard stats',
+    description:
+      'Returns product inquiry counts by status for dashboard usage.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard stats retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        total: { type: 'number', example: 120 },
+        pending: { type: 'number', example: 45 },
+        completed: { type: 'number', example: 75 },
+      },
+    },
+  })
+  async getDashboard() {
+    const responseModel = new ResponseModel();
+
+    try {
+      const stats = await this.productInquiriesService.getDashboardStats();
+      responseModel.setData(stats);
+    } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  /**
    * Get a single product inquiry by ID with all answers
    * Public endpoint
    */
@@ -692,5 +727,7 @@ export class ProductInquiriesController {
 
     return responseModel;
   }
+
+  
 }
 

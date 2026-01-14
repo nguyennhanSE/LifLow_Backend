@@ -36,6 +36,15 @@ export class QueryProductInquiriesDto {
   hasAnswer?: boolean;
 
   @ApiPropertyOptional({
+    description: 'Filter by inquiry status',
+    example: 'pending',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsString({ message: 'Status must be a string' })
+  status?: string;
+
+  @ApiPropertyOptional({
     description: 'Search in inquiry title or content (case-insensitive)',
     example: 'vegetarian',
   })

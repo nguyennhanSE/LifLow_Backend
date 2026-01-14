@@ -4,8 +4,8 @@ import { Type } from 'class-transformer';
 
 // Enums for status fields
 export enum DisplayStatus {
-  DISPLAYED = '진열함',
-  NOT_DISPLAYED = '진열안함',
+  Y = 'Y',
+  N = 'N',
 }
 
 export enum SaleStatus {
@@ -26,12 +26,12 @@ export class CreateProductDto {
   @IsNotEmpty({ message: 'Product code is required' })
   productCode!: string;
   
-  // categories[]
-  @ApiPropertyOptional({ description: 'Categories', example: ['CAT001', 'CAT002'] })
+  // category - single category number
+  @ApiPropertyOptional({ description: 'Category number', example: 1 })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  categories?: string[];
+  @Type(() => Number)
+  @IsInt()
+  category?: number;
 
   @ApiPropertyOptional({ description: 'Brand name', example: 'Juwangsan' })
   @IsOptional()
@@ -167,10 +167,11 @@ export class ProductListQueryDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by category number', example: 'CAT001' })
+  @ApiPropertyOptional({ description: 'Filter by category number', example: 1 })
   @IsOptional()
-  @IsString()
-  category?: string;
+  @Type(() => Number)
+  @IsInt()
+  category?: number;
 
   @ApiPropertyOptional({ description: 'Filter by brand', example: 'Juwangsan' })
   @IsOptional()
@@ -239,10 +240,10 @@ export class UpdateProductStatusDto {
   @ApiPropertyOptional({
     description: 'Display status',
     enum: DisplayStatus,
-    example: DisplayStatus.DISPLAYED,
+    example: DisplayStatus.Y,
   })
   @IsOptional()
-  @IsEnum(DisplayStatus, { message: 'Display status must be either "진열함" or "진열안함"' })
+  @IsEnum(DisplayStatus, { message: 'Display status must be either "Y" or "N"' })
   displayStatus?: DisplayStatus;
 
   @ApiPropertyOptional({

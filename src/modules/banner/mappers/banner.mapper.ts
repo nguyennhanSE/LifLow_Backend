@@ -24,7 +24,7 @@ export class BannerMapper {
     entity.type = prismaBanner.type as EBannerType;
     entity.status = prismaBanner.status as EBannerStatus;
     entity.productId = prismaBanner.productId;
-    entity.productCategoryNumber = prismaBanner.productCategoryNumber;
+    entity.category = prismaBanner.category;
     entity.title = prismaBanner.title;
     entity.badgeText = prismaBanner.badgeText;
     entity.mainText = prismaBanner.mainText;

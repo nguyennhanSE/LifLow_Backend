@@ -245,6 +245,25 @@ export class CreateOrderDto {
   @IsString({ message: 'Courier company must be a string' })
   @MaxLength(50, { message: 'Courier company must not exceed 50 characters' })
   courierCompany?: string;
+
+  @ApiPropertyOptional({
+    description: 'List of coupon IDs used for this order',
+    example: ['coupon-id-1', 'coupon-id-2'],
+    type: [String],
+  })
+  @IsOptional()
+  couponUsed?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Total discount amount applied to this order',
+    example: 5000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Discount amount must be an integer' })
+  @Min(0, { message: 'Discount amount must be at least 0' })
+  discountAmount?: number;
 }
 
 // ============================================
@@ -536,6 +555,25 @@ export class UpdateOrderDto {
   @IsString({ message: 'Invoice number must be a string' })
   @MaxLength(50, { message: 'Invoice number must not exceed 50 characters' })
   invoiceNumber?: string;
+
+  @ApiPropertyOptional({
+    description: 'List of coupon IDs used for this order',
+    example: ['coupon-id-1', 'coupon-id-2'],
+    type: [String],
+  })
+  @IsOptional()
+  couponUsed?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Total discount amount applied to this order',
+    example: 5000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Discount amount must be an integer' })
+  @Min(0, { message: 'Discount amount must be at least 0' })
+  discountAmount?: number;
 }
 
 // ============================================
@@ -545,86 +583,92 @@ export class OrderResponseDto {
   @ApiProperty({ description: 'Order ID (UUID)', example: '123e4567-e89b-12d3-a456-426614174000' })
   id!: string;
 
-  @ApiProperty({ description: 'Cart ID (UUID)', example: '123e4567-e89b-12d3-a456-426614174000' })
-  cartId!: string;
+  @ApiPropertyOptional({ description: 'Cart ID (UUID)', example: '123e4567-e89b-12d3-a456-426614174000' })
+  cartId?: string | null;
 
-  @ApiProperty({ description: 'Order number', example: 'ORD-2025-001234' })
-  orderNumber!: string;
+  @ApiPropertyOptional({ description: 'Order number', example: 'ORD-2025-001234' })
+  orderNumber?: string | null;
 
   @ApiPropertyOptional({ description: 'Order group number', example: 'GRP-2025-001234' })
   orderGroupNumber?: string | null;
 
-  @ApiProperty({ description: 'Total order amount in KRW', example: 150000 })
-  totalOrderAmount!: number;
+  @ApiPropertyOptional({ description: 'Total order amount in KRW', example: 150000 })
+  totalOrderAmount?: number | null;
 
-  @ApiProperty({ description: 'Total payment amount in KRW', example: 145000 })
-  totalPaymentAmount!: number;
+  @ApiPropertyOptional({ description: 'Total payment amount in KRW', example: 145000 })
+  totalPaymentAmount?: number | null;
 
-  @ApiProperty({ description: 'Product', example: { id: '123e4567-e89b-12d3-a456-426614174000', productName: 'Organic Apple 1kg', productCode: '1234567890', productPrice: 10000, salePrice: 12000, consumerPrice: 8000, supplyPrice: 6000, modelName: 'Apple 1kg' } })
-  productId!: string;
+  @ApiPropertyOptional({ description: 'Product', example: { id: '123e4567-e89b-12d3-a456-426614174000', productName: 'Organic Apple 1kg', productCode: '1234567890', productPrice: 10000, salePrice: 12000, consumerPrice: 8000, supplyPrice: 6000, modelName: 'Apple 1kg' } })
+  productId?: string | null;
 
-  @ApiProperty({ description: 'Product name', example: 'Organic Apple 1kg' })
-  productName!: string;
+  @ApiPropertyOptional({ description: 'Product name', example: 'Organic Apple 1kg' })
+  productName?: string | null;
 
-  @ApiProperty({ description: 'Product name with options', example: 'Organic Apple 1kg (Red, Gift Box)' })
-  productNameWithOptions!: string;
+  @ApiPropertyOptional({ description: 'Product name with options', example: 'Organic Apple 1kg (Red, Gift Box)' })
+  productNameWithOptions?: string | null;
 
-  @ApiProperty({ description: 'Order quantity', example: 5 })
-  quantity!: number;
+  @ApiPropertyOptional({ description: 'Order quantity', example: 5 })
+  quantity?: number | null;
 
-  @ApiProperty({ description: 'Recipient name', example: '김철수' })
-  recipient!: string;
+  @ApiPropertyOptional({ description: 'Recipient name', example: '김철수' })
+  recipient?: string | null;
 
-  @ApiProperty({ description: 'Full recipient address', example: '서울특별시 강남구 테헤란로 123, 456호' })
-  recipientAddressFull!: string;
+  @ApiPropertyOptional({ description: 'Full recipient address', example: '서울특별시 강남구 테헤란로 123, 456호' })
+  recipientAddressFull?: string | null;
 
-  @ApiProperty({ description: 'Recipient postal code', example: 12345 })
-  recipientPostalCode!: number;
+  @ApiPropertyOptional({ description: 'Recipient postal code', example: 12345 })
+  recipientPostalCode?: number | null;
 
-  @ApiProperty({ description: 'Recipient mobile phone', example: '010-1234-5678' })
-  recipientMobilePhone!: string;
+  @ApiPropertyOptional({ description: 'Recipient mobile phone', example: '010-1234-5678' })
+  recipientMobilePhone?: string | null;
 
-  @ApiProperty({ description: 'Recipient phone number', example: '02-1234-5678' })
-  recipientPhoneNumber!: string;
+  @ApiPropertyOptional({ description: 'Recipient phone number', example: '02-1234-5678' })
+  recipientPhoneNumber?: string | null;
 
-  @ApiProperty({ description: 'Delivery message', example: '문 앞에 놔주세요' })
-  deliveryMessage!: string;
+  @ApiPropertyOptional({ description: 'Delivery message', example: '문 앞에 놔주세요' })
+  deliveryMessage?: string | null;
 
-  @ApiProperty({ description: 'Sale price per unit in KRW', example: 29000 })
-  salePrice!: number;
+  @ApiPropertyOptional({ description: 'Sale price per unit in KRW', example: 29000 })
+  salePrice?: number | null;
 
-  @ApiProperty({ description: 'Payment type', example: '선결제' })
-  paymentType!: string;
+  @ApiPropertyOptional({ description: 'Payment type', example: '선결제' })
+  paymentType?: string | null;
 
-  @ApiProperty({ description: 'Payment method', example: '신용카드' })
-  paymentMethod!: string;
+  @ApiPropertyOptional({ description: 'Payment method', example: '신용카드' })
+  paymentMethod?: string | null;
 
-  @ApiProperty({ description: 'Order date', example: '2025-12-10' })
-  orderDate!: string;
+  @ApiPropertyOptional({ description: 'Order date', example: '2025-12-10' })
+  orderDate?: string | null;
 
-  @ApiProperty({ description: 'Orderer name', example: '박영희' })
-  ordererName!: string;
+  @ApiPropertyOptional({ description: 'Orderer name', example: '박영희' })
+  ordererName?: string | null;
 
-  @ApiProperty({ description: 'Orderer mobile phone', example: '010-9876-5432' })
-  ordererMobilePhone!: string;
+  @ApiPropertyOptional({ description: 'Orderer mobile phone', example: '010-9876-5432' })
+  ordererMobilePhone?: string | null;
 
   @ApiPropertyOptional({ description: 'Orderer user ID (UUID)', example: '123e4567-e89b-12d3-a456-426614174000' })
   ordererId?: string | null;
 
-  @ApiProperty({ description: 'Desired delivery date', example: '2025-12-15' })
-  desiredDeliveryDate!: string;
+  @ApiPropertyOptional({ description: 'Desired delivery date', example: '2025-12-15' })
+  desiredDeliveryDate?: string | null;
 
-  @ApiProperty({ description: 'Membership level at order time', example: 'GOLD' })
-  membershipLevelAtOrderTime!: string;
+  @ApiPropertyOptional({ description: 'Membership level at order time', example: 'GOLD' })
+  membershipLevelAtOrderTime?: string | null;
 
-  @ApiProperty({ description: 'Order creation timestamp', example: '2025-12-10T10:30:00.000Z' })
-  createdAt!: Date;
+  @ApiPropertyOptional({ description: 'Order creation timestamp', example: '2025-12-10T10:30:00.000Z' })
+  createdAt?: Date | null;
 
-  @ApiProperty({ description: 'Order last update timestamp', example: '2025-12-10T10:30:00.000Z' })
-  updatedAt!: Date;
+  @ApiPropertyOptional({ description: 'Order last update timestamp', example: '2025-12-10T10:30:00.000Z' })
+  updatedAt?: Date | null;
 
   @ApiPropertyOptional({ description: 'Associated user information' })
   user?: any;
+
+  @ApiPropertyOptional({ description: 'List of coupon IDs used for this order', example: ['coupon-id-1', 'coupon-id-2'], type: [String] })
+  couponUsed?: string[] | null;
+
+  @ApiPropertyOptional({ description: 'Total discount amount applied to this order', example: 5000 })
+  discountAmount?: number | null;
 }
 
 // ============================================
