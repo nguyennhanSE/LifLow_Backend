@@ -4,6 +4,7 @@ import { ProductDiscountService } from './product-discount.service';
 import { CreateProductDiscountDto } from './dto/create-product-discount.dto';
 import { UpdateProductDiscountDto } from './dto/update-product-discount.dto';
 import { Roles } from '../../libs/decorator/roles.decorator';
+import { Public } from '../../libs/decorator/public.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { successResponse } from '../../utils/responseFormatter';
 import { ResponseModel } from '../../libs/models/response/response.model';
@@ -36,7 +37,7 @@ export class ProductDiscountController {
   }
 
   @Get()
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @Public()
   @ApiOperation({ summary: 'Get all product discounts' })
   @ApiResponse({ status: 200, description: 'Product discounts retrieved successfully' })
   async findAll() {
@@ -54,7 +55,7 @@ export class ProductDiscountController {
   }
 
   @Get('product/:productId')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @Public()
   @ApiOperation({ summary: 'Get product discount by product ID' })
   @ApiParam({ name: 'productId', description: 'Product ID' })
   @ApiResponse({ status: 200, description: 'Product discount retrieved successfully' })
@@ -74,7 +75,7 @@ export class ProductDiscountController {
   }
 
   @Get(':id')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @Public()
   @ApiOperation({ summary: 'Get product discount by ID' })
   @ApiParam({ name: 'id', description: 'Product discount ID' })
   @ApiResponse({ status: 200, description: 'Product discount retrieved successfully' })

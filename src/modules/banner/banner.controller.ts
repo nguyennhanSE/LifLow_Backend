@@ -45,6 +45,7 @@ import { EBannerType } from './enums/banner.enum';
 import { ECategoryType } from '../categories/enums/category.enum';
 import { BannerTasksService } from './tasks/banner-tasks.service';
 import { Roles } from '../../libs/decorator/roles.decorator';
+import { Public } from '../../libs/decorator/public.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { BannerEntity } from './entities/banner.entity';
 import { ResponseModel } from 'src/libs/models/response';
@@ -109,7 +110,7 @@ export class BannerController {
    * GET /banners
    */
   @Get()
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @Public()
   @ApiOperation({
     summary: 'Get all banners with filtering and pagination',
     description:
@@ -207,7 +208,7 @@ export class BannerController {
    * GET /banners/type/:type
    */
   @Get('type/:type')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @Public()
   @ApiOperation({
     summary: 'Get active banners by type for frontend display',
     description:
@@ -255,7 +256,7 @@ export class BannerController {
    * GET /banners/:id
    */
   @Get(':id')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @Public()
   @ApiOperation({
     summary: 'Get banner by ID',
     description: 'Retrieve a single banner by its UUID, including product details if associated.',
@@ -577,7 +578,7 @@ export class BannerController {
    * GET /banners/tasks/status
    */
   @Get('tasks/status')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @Public()
   @ApiOperation({
     summary: 'Get status of all scheduled banner tasks',
     description:
@@ -645,7 +646,7 @@ export class BannerController {
   }
 
   @Get('category/:category')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @Public()
   @ApiOperation({
     summary: 'Get banners by category',
     description: 'Retrieve banners by category',

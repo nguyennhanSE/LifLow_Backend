@@ -158,7 +158,7 @@ export class RecipeController {
    * Get all recipes with pagination and filters (public)
    */
   @Get('/list')
-  @Roles(ERoleName.USER, ERoleName.ADMIN)
+  @Public()
   @ApiOperation({
     summary: 'Get paginated list of recipes',
     description: 'Retrieves a paginated list of recipes with optional filtering, sorting, and search.',

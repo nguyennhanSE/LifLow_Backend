@@ -6,6 +6,7 @@ import { ProductService } from './product.service';
 import { ProductListQueryDto, CreateProductDto, UpdateProductDto, BulkDeleteProductDto, UpdateProductStatusDto, ProductBulkUpdateStatusDto,CreateProductSpecialOfferDto } from './dto/product.dto';
 import { paginationResponse } from '../../utils/responseFormatter';
 import { Roles } from '../../libs/decorator/roles.decorator';
+import { Public } from '../../libs/decorator/public.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { uploadProductImages } from '../../middlewares/uploadMiddleware';
 import { ResponseModel } from '../../libs/models/response/response.model';
@@ -17,7 +18,7 @@ export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Get('/list')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @Public()
   @ApiOperation({ summary: 'Get paginated list of products with filters' })
   @ApiResponse({ status: 200, description: 'Products retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - invalid query parameters' })
@@ -43,7 +44,7 @@ export class ProductController {
   }
 
   @Get('special-offers')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @Public()
   @ApiOperation({ summary: 'Get paginated list of products with active special offers' })
   @ApiResponse({ status: 200, description: 'Special offers retrieved successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - invalid query parameters' })
@@ -69,7 +70,7 @@ export class ProductController {
   }
 
   @Get(':id')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @Public()
   @ApiOperation({ summary: 'Get product by ID' })
   @ApiResponse({ status: 200, description: 'Product retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Product not found' })
@@ -476,7 +477,7 @@ export class ProductController {
   }
 
   @Get('brands/list')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @Public()
   @ApiOperation({ summary: 'Get all brands' })
   @ApiResponse({ status: 200, description: 'Brands retrieved successfully' })
   async getBrands() {

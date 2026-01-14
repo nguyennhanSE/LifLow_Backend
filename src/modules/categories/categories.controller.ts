@@ -19,6 +19,7 @@ import { ResponseModel } from '../../libs/models/response/response.model';
 import { paginationResponse } from '../../utils/responseFormatter';
 import { ERoleName } from '../roles/enums/role.enum';
 import { Roles } from '../../libs/decorator/roles.decorator';
+import { Public } from '../../libs/decorator/public.decorator';
 
 @ApiTags('Categories')
 @ApiBearerAuth()
@@ -48,7 +49,7 @@ export class CategoriesController {
   }
 
   @Get('/list')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @Public()
   @ApiOperation({ summary: 'Get paginated list of categories with filters' })
   @ApiResponse({ status: 200, description: 'Categories retrieved successfully' })
   async findAll(@Query() filterDto: CategoryFilterDto) {
@@ -72,7 +73,7 @@ export class CategoriesController {
   }
 
   @Get(':productCategoryNumber')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @Public()
   @ApiOperation({ summary: 'Get category by productCategoryNumber' })
   @ApiResponse({ status: 200, description: 'Category retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Category not found' })

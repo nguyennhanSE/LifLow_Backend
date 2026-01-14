@@ -32,6 +32,7 @@ import {
 } from '../dto';
 import { ResponseModel } from '../../../libs/models/response/response.model';
 import { Roles } from '../../../libs/decorator/roles.decorator';
+import { Public } from '../../../libs/decorator/public.decorator';
 import { ERoleName } from '../../roles/enums/role.enum';
 
 /**
@@ -114,6 +115,7 @@ export class ProductInquiriesController {
    * Public endpoint
    */
   @Get()
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get all product inquiries',
@@ -145,6 +147,7 @@ export class ProductInquiriesController {
    * Dashboard stats for product inquiries by status
    */
   @Get('dashboard')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get product inquiries dashboard stats',
@@ -181,6 +184,7 @@ export class ProductInquiriesController {
    * Public endpoint
    */
   @Get(':id')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get product inquiry by ID',
@@ -218,6 +222,7 @@ export class ProductInquiriesController {
    * Public endpoint
    */
   @Get('product/:productId')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get all inquiries for a product',
@@ -258,6 +263,7 @@ export class ProductInquiriesController {
   }
 
   @Get('product/:productId/count')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get count of product inquiries',
@@ -288,6 +294,7 @@ export class ProductInquiriesController {
    * Public endpoint
    */
   @Get('product/:productId/stats')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get product inquiry statistics',
@@ -544,6 +551,7 @@ export class ProductInquiriesController {
    * Public endpoint
    */
   @Get(':inquiryId/answers')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get all answers for an inquiry',
@@ -577,6 +585,7 @@ export class ProductInquiriesController {
    * Public endpoint
    */
   @Get(':inquiryId/answers/:answerId')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get a single answer by ID',

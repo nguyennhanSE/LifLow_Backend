@@ -8,7 +8,8 @@ import * as path from 'path';
 import { parse } from 'csv-parse/sync';
 
 // Load environment variables
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const NODE_ENV = process.env.NODE_ENV || 'production';
+console.log('NODE_ENV', NODE_ENV);
 const envFileName = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 const envFilePath = path.resolve(__dirname, '..', envFileName);
 const result = dotenv.config({ path: envFilePath });
@@ -179,1021 +180,1049 @@ interface PointCsvRecord {
   available_points_balance?: string;
 }
 
-// async function main() {
-//   console.log('🌱 Starting seed...');
+// ========================================
+// FUNCTION 1: Seed Users (Clear all data + Import users from CSV)
+// ========================================
+async function seedUsers() {
+  console.log('🌱 Starting seed...');
 
-//   // ========================================
-//   // STEP 0: Clear all existing data
-//   // ========================================
-//   console.log('🗑️  Clearing all existing data...');
+  // ========================================
+  // STEP 0: Clear all existing data
+  // ========================================
+  console.log('🗑️  Clearing all existing data...');
   
-//   try {
-//     // Delete in order to respect foreign key constraints
-//     // Child tables first, parent tables last
-//     await prisma.refreshTokenUsed.deleteMany({});
-//     console.log('✅ Cleared refresh_token_used');
+  try {
+    // Delete in order to respect foreign key constraints
+    // Child tables first, parent tables last
+    await prisma.refreshTokenUsed.deleteMany({});
+    console.log('✅ Cleared refresh_token_used');
 
-//     await prisma.session.deleteMany({});
-//     console.log('✅ Cleared sessions');
+    await prisma.session.deleteMany({});
+    console.log('✅ Cleared sessions');
 
-//     await prisma.productInquiryAnswers.deleteMany({});
-//     console.log('✅ Cleared product_inquiry_answers');
+    await prisma.productInquiryAnswers.deleteMany({});
+    console.log('✅ Cleared product_inquiry_answers');
 
-//     await prisma.productInquiries.deleteMany({});
-//     console.log('✅ Cleared product_inquiries');
+    await prisma.productInquiries.deleteMany({});
+    console.log('✅ Cleared product_inquiries');
 
-//     await prisma.productReviews.deleteMany({});
-//     console.log('✅ Cleared product_reviews');
+    await prisma.productReviews.deleteMany({});
+    console.log('✅ Cleared product_reviews');
 
-//     await prisma.cartItem.deleteMany({});
-//     console.log('✅ Cleared cart_items');
+    await prisma.cartItem.deleteMany({});
+    console.log('✅ Cleared cart_items');
 
-//     await prisma.cart.deleteMany({});
-//     console.log('✅ Cleared carts');
+    await prisma.cart.deleteMany({});
+    console.log('✅ Cleared carts');
 
-//     await prisma.couponHistory.deleteMany({});
-//     console.log('✅ Cleared coupon_histories');
+    await prisma.couponHistory.deleteMany({});
+    console.log('✅ Cleared coupon_histories');
 
-//     await prisma.payment.deleteMany({});
-//     console.log('✅ Cleared payments');
+    await prisma.payment.deleteMany({});
+    console.log('✅ Cleared payments');
 
-//     await prisma.point.deleteMany({});
-//     console.log('✅ Cleared points');
+    await prisma.point.deleteMany({});
+    console.log('✅ Cleared points');
 
-//     await prisma.order.deleteMany({});
-//     console.log('✅ Cleared orders');
+    await prisma.order.deleteMany({});
+    console.log('✅ Cleared orders');
 
-//     await prisma.orderGroup.deleteMany({});
-//     console.log('✅ Cleared order_groups');
+    await prisma.orderGroup.deleteMany({});
+    console.log('✅ Cleared order_groups');
 
-//     await prisma.recipe.deleteMany({});
-//     console.log('✅ Cleared recipes');
+    await prisma.recipe.deleteMany({});
+    console.log('✅ Cleared recipes');
 
-//     await prisma.userShippingAddress.deleteMany({});
-//     console.log('✅ Cleared user_shipping_addresses');
+    await prisma.userShippingAddress.deleteMany({});
+    console.log('✅ Cleared user_shipping_addresses');
 
-//     await prisma.userMembership.deleteMany({});
-//     console.log('✅ Cleared user_memberships');
+    await prisma.userMembership.deleteMany({});
+    console.log('✅ Cleared user_memberships');
 
-//     await prisma.userRole.deleteMany({});
-//     console.log('✅ Cleared user_roles');
+    await prisma.userRole.deleteMany({});
+    console.log('✅ Cleared user_roles');
 
-//     await prisma.productDiscount.deleteMany({});
-//     console.log('✅ Cleared product_discounts');
+    await prisma.productDiscount.deleteMany({});
+    console.log('✅ Cleared product_discounts');
 
-//     await prisma.productSpecialOffer.deleteMany({});
-//     console.log('✅ Cleared product_special_offers');
+    await prisma.productSpecialOffer.deleteMany({});
+    console.log('✅ Cleared product_special_offers');
 
-//     await prisma.banner.deleteMany({});
-//     console.log('✅ Cleared banners');
+    await prisma.banner.deleteMany({});
+    console.log('✅ Cleared banners');
 
-//     await prisma.product.deleteMany({});
-//     console.log('✅ Cleared products');
+    await prisma.product.deleteMany({});
+    console.log('✅ Cleared products');
 
-//     await prisma.category.deleteMany({});
-//     console.log('✅ Cleared categories');
+    await prisma.category.deleteMany({});
+    console.log('✅ Cleared categories');
 
-//     await prisma.coupon.deleteMany({});
-//     console.log('✅ Cleared coupons');
+    await prisma.coupon.deleteMany({});
+    console.log('✅ Cleared coupons');
 
-//     await prisma.membership.deleteMany({});
-//     console.log('✅ Cleared memberships');
+    await prisma.membership.deleteMany({});
+    console.log('✅ Cleared memberships');
 
-//     await prisma.user.deleteMany({});
-//     console.log('✅ Cleared users');
+    await prisma.user.deleteMany({});
+    console.log('✅ Cleared users');
 
-//     await prisma.role.deleteMany({});
-//     console.log('✅ Cleared roles');
+    await prisma.role.deleteMany({});
+    console.log('✅ Cleared roles');
 
-//     console.log('✨ All data cleared successfully!');
-//   } catch (error) {
-//     console.error('❌ Error clearing data:', error);
-//     throw error;
-//   }
+    console.log('✨ All data cleared successfully!');
+  } catch (error) {
+    console.error('❌ Error clearing data:', error);
+    throw error;
+  }
 
-//   // ========================================
-//   // STEP 1: Import users from CSV (Batch Insert)
-//   // ========================================
-//   const csvPath = '/Users/nhannguyen/Documents/users.csv';
+  // ========================================
+  // STEP 1: Import users from CSV (Batch Insert)
+  // ========================================
+  const csvPath = '/Users/nhannguyen/Documents/users.csv';
   
-//   if (fs.existsSync(csvPath)) {
-//     console.log('📥 Importing users from CSV...');
-//     try {
-//       // Read CSV and remove BOM
-//       let csvContent = fs.readFileSync(csvPath, 'utf-8');
-//       if (csvContent.charCodeAt(0) === 0xFEFF) {
-//         csvContent = csvContent.slice(1);
-//       }
+  if (fs.existsSync(csvPath)) {
+    console.log('📥 Importing users from CSV...');
+    try {
+      // Read CSV and remove BOM
+      let csvContent = fs.readFileSync(csvPath, 'utf-8');
+      if (csvContent.charCodeAt(0) === 0xFEFF) {
+        csvContent = csvContent.slice(1);
+      }
       
-//       const records: UserCsvRecord[] = parse(csvContent, {
-//         columns: true,
-//         skip_empty_lines: true,
-//         trim: true,
-//       });
+      const records: UserCsvRecord[] = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
 
-//       console.log(`📊 Found ${records.length} users in CSV`);
+      console.log(`📊 Found ${records.length} users in CSV`);
 
-//       // Prepare data for batch insert
-//       const usersToInsert: any[] = [];
-//       let skippedCount = 0;
+      // Prepare data for batch insert
+      const usersToInsert: any[] = [];
+      let skippedCount = 0;
 
-//       for (const record of records) {
-//         const userId = record['아이디'];
+      for (const record of records) {
+        const userId = record['아이디'];
         
-//         // Skip records without id
-//         if (!userId || userId.trim() === '') {
-//           skippedCount++;
-//           continue;
-//         }
+        // Skip records without id
+        if (!userId || userId.trim() === '') {
+          skippedCount++;
+          continue;
+        }
 
-//         usersToInsert.push({
-//           id: userId,
-//           name: record['이름'] || null,
-//           membershipLevel: record['회원등급'] || null,
-//           age: record['나이'] ? parseInt(record['나이']) : null,
-//           email: record['이메일'] || null,
-//           phoneNumber: record['휴대폰번호'] || null,
-//           totalUsedPoints: record['총 사용 적립금'] ? parseInt(record['총 사용 적립금']) : 0,
-//           availablePoints: record['사용가능 적립금'] ? parseInt(record['사용가능 적립금']) : 0,
-//           registrationDate: record['회원 가입일'] || null,
-//           dormancyDate: record['휴면처리일'] || null,
-//           withdrawalDate: record['탈퇴일'] || null,
-//           withdrawalType: record['탈퇴구분'] || null,
-//           reasonForWithdrawal: record['탈퇴사유'] || null,
-//           totalPurchaseAmount: 0,
-//         });
-//       }
+        usersToInsert.push({
+          id: userId,
+          name: record['이름'] || null,
+          membershipLevel: record['회원등급'] || null,
+          age: record['나이'] ? parseInt(record['나이']) : null,
+          email: record['이메일'] || null,
+          phoneNumber: record['휴대폰번호'] || null,
+          totalUsedPoints: record['총 사용 적립금'] ? parseInt(record['총 사용 적립금']) : 0,
+          availablePoints: record['사용가능 적립금'] ? parseInt(record['사용가능 적립금']) : 0,
+          registrationDate: record['회원 가입일'] || null,
+          dormancyDate: record['휴면처리일'] || null,
+          withdrawalDate: record['탈퇴일'] || null,
+          withdrawalType: record['탈퇴구분'] || null,
+          reasonForWithdrawal: record['탈퇴사유'] || null,
+          totalPurchaseAmount: 0,
+        });
+      }
 
-//       console.log(`✅ Prepared ${usersToInsert.length} users (skipped ${skippedCount})`);
+      console.log(`✅ Prepared ${usersToInsert.length} users (skipped ${skippedCount})`);
       
-//       // Batch insert in chunks to avoid memory issues
-//       const BATCH_SIZE = 1000;
-//       let insertedCount = 0;
+      // Batch insert in chunks to avoid memory issues
+      const BATCH_SIZE = 1000;
+      let insertedCount = 0;
       
-//       for (let i = 0; i < usersToInsert.length; i += BATCH_SIZE) {
-//         const batch = usersToInsert.slice(i, i + BATCH_SIZE);
-//         await prisma.user.createMany({
-//           data: batch,
-//           skipDuplicates: true,
-//         });
-//         insertedCount += batch.length;
-//         console.log(`📝 Inserted ${insertedCount}/${usersToInsert.length} users...`);
-//       }
+      for (let i = 0; i < usersToInsert.length; i += BATCH_SIZE) {
+        const batch = usersToInsert.slice(i, i + BATCH_SIZE);
+        await prisma.user.createMany({
+          data: batch,
+          skipDuplicates: true,
+        });
+        insertedCount += batch.length;
+        console.log(`📝 Inserted ${insertedCount}/${usersToInsert.length} users...`);
+      }
       
-//       console.log(`✅ Successfully imported ${insertedCount} users from CSV`);
+      console.log(`✅ Successfully imported ${insertedCount} users from CSV`);
       
-//     } catch (error) {
-//       console.error('❌ Error importing CSV:', error);
-//       console.log('⚠️  Continuing with seed process...');
-//     }
-//   } else {
-//     console.log('⚠️  CSV file not found at', csvPath);
-//     console.log('⚠️  Skipping user import from CSV');
-//   }
+    } catch (error) {
+      console.error('❌ Error importing CSV:', error);
+      console.log('⚠️  Continuing with seed process...');
+    }
+  } else {
+    console.log('⚠️  CSV file not found at', csvPath);
+    console.log('⚠️  Skipping user import from CSV');
+  }
 
-//   // ========================================
-//   // STEP 2: Create roles
-//   // ========================================
-//   console.log('📝 Creating roles...');
+  // ========================================
+  // STEP 2: Create roles
+  // ========================================
+  console.log('📝 Creating roles...');
   
-//   const adminRole = await prisma.role.create({
-//     data: {
-//       name: 'ADMIN',
-//       description: 'Administrator role with full access',
-//     },
-//   });
-//   console.log(`✅ Admin role created: ${adminRole.id}`);
+  const adminRole = await prisma.role.create({
+    data: {
+      name: 'ADMIN',
+      description: 'Administrator role with full access',
+    },
+  });
+  console.log(`✅ Admin role created: ${adminRole.id}`);
 
-//   const userRole = await prisma.role.create({
-//     data: {
-//       name: 'USER',
-//       description: 'Regular user role',
-//     },
-//   });
-//   console.log(`✅ User role created: ${userRole.id}`);
+  const userRole = await prisma.role.create({
+    data: {
+      name: 'USER',
+      description: 'Regular user role',
+    },
+  });
+  console.log(`✅ User role created: ${userRole.id}`);
 
-//   // ========================================
-//   // STEP 3: Create liflowadmin user
-//   // ========================================
-//   console.log('👤 Creating liflowadmin user...');
+  // ========================================
+  // STEP 3: Create liflowadmin user
+  // ========================================
+  console.log('👤 Creating liflowadmin user...');
   
-//   const hashedPassword = await bcrypt.hash('123456', 10);
-//   const registrationDate = new Date().toISOString().split('T')[0];
+  const hashedPassword = await bcrypt.hash('123456', 10);
+  const registrationDate = new Date().toISOString().split('T')[0];
 
-//   // Check if liflowadmin already exists (from CSV)
-//   const existingAdmin = await prisma.user.findUnique({
-//     where: { id: 'liflowadmin' },
-//   });
+  // Check if liflowadmin already exists (from CSV)
+  const existingAdmin = await prisma.user.findUnique({
+    where: { id: 'liflowadmin' },
+  });
 
-//   let liflowAdmin;
-//   if (existingAdmin) {
-//     // Update existing user
-//     liflowAdmin = await prisma.user.update({
-//       where: { id: 'liflowadmin' },
-//       data: {
-//         password: hashedPassword,
-//         name: 'LiflowAdmin',
-//         email: 'thegarden4991@naver.com',
-//         dashboardAccess: true,
-//         memberAccess: true,
-//         productAccess: true,
-//         orderAccess: true,
-//         recipeAccess: true,
-//         bannerAccess: true,
-//       },
-//     });
-//     console.log(`✅ Liflowadmin user updated: ${liflowAdmin.id}`);
-//   } else {
-//     // Create new user
-//     liflowAdmin = await prisma.user.create({
-//       data: {
-//         id: 'liflowadmin',
-//         password: hashedPassword,
-//         name: 'LiflowAdmin',
-//         email: 'thegarden4991@naver.com',
-//         registrationDate: registrationDate,
-//         totalUsedPoints: 0,
-//         availablePoints: 0,
-//         totalPurchaseAmount: 0,
-//         dashboardAccess: true,
-//         memberAccess: true,
-//         productAccess: true,
-//         orderAccess: true,
-//         recipeAccess: true,
-//         bannerAccess: true,
-//       },
-//     });
-//     console.log(`✅ Liflowadmin user created: ${liflowAdmin.id}`);
-//   }
+  let liflowAdmin;
+  if (existingAdmin) {
+    // Update existing user
+    liflowAdmin = await prisma.user.update({
+      where: { id: 'liflowadmin' },
+      data: {
+        password: hashedPassword,
+        name: 'LiflowAdmin',
+        email: 'thegarden4991@naver.com',
+        dashboardAccess: true,
+        memberAccess: true,
+        productAccess: true,
+        orderAccess: true,
+        recipeAccess: true,
+        bannerAccess: true,
+      },
+    });
+    console.log(`✅ Liflowadmin user updated: ${liflowAdmin.id}`);
+  } else {
+    // Create new user
+    liflowAdmin = await prisma.user.create({
+      data: {
+        id: 'liflowadmin',
+        password: hashedPassword,
+        name: 'LiflowAdmin',
+        email: 'thegarden4991@naver.com',
+        registrationDate: registrationDate,
+        totalUsedPoints: 0,
+        availablePoints: 0,
+        totalPurchaseAmount: 0,
+        dashboardAccess: true,
+        memberAccess: true,
+        productAccess: true,
+        orderAccess: true,
+        recipeAccess: true,
+        bannerAccess: true,
+      },
+    });
+    console.log(`✅ Liflowadmin user created: ${liflowAdmin.id}`);
+  }
 
-//   // ========================================
-//   // STEP 4: Create userRole for all users
-//   // ========================================
-//   console.log('👥 Getting all users...');
-//   const allUsers = await prisma.user.findMany({
-//     select: { id: true },
-//   });
-//   console.log(`📊 Found ${allUsers.length} users`);
+  // ========================================
+  // STEP 4: Create userRole for all users
+  // ========================================
+  console.log('👥 Getting all users...');
+  const allUsers = await prisma.user.findMany({
+    select: { id: true },
+  });
+  console.log(`📊 Found ${allUsers.length} users`);
 
-//   console.log('🔗 Creating user roles...');
+  console.log('🔗 Creating user roles...');
   
-//   for (const user of allUsers) {
-//     const roleToAssign = user.id === 'liflowadmin' ? adminRole : userRole;
+  for (const user of allUsers) {
+    const roleToAssign = user.id === 'liflowadmin' ? adminRole : userRole;
     
-//     await prisma.userRole.create({
-//       data: {
-//         userId: user.id,
-//         roleId: roleToAssign.id,
-//       },
-//     });
-//     console.log(`✅ Assigned ${roleToAssign.name} role to user: ${user.id}`);
-//   }
+    await prisma.userRole.create({
+      data: {
+        userId: user.id,
+        roleId: roleToAssign.id,
+      },
+    });
+    console.log(`✅ Assigned ${roleToAssign.name} role to user: ${user.id}`);
+  }
 
-//   console.log('✨ Seed completed successfully!');
-// }
+  console.log('✨ Seed completed successfully!');
+}
 
 
 
-// async function main() {
-//   console.log('🌱 Starting seed...');
-//   await prisma.product.deleteMany({});
+
+// ========================================
+// FUNCTION 2: Seed Products (Import products from CSV)
+// ========================================
+async function seedProducts() {
+  console.log('🌱 Starting seed...');
+  await prisma.product.deleteMany({});
   
-//   // ========================================
-//   // STEP 1: Import products from CSV
-//   // ========================================
-//   const productsCsvPath = '/Users/nhannguyen/Documents/products_test_1.csv';
+  // ========================================
+  // STEP 1: Import products from CSV
+  // ========================================
+  const productsCsvPath = '/Users/nhannguyen/Documents/products_test_1.csv';
   
-//   if (fs.existsSync(productsCsvPath)) {
-//     console.log('📥 Importing products from CSV...');
-//     try {
-//       // Read CSV and remove BOM if present
-//       let csvContent = fs.readFileSync(productsCsvPath, 'utf-8');
-//       if (csvContent.charCodeAt(0) === 0xFEFF) {
-//         csvContent = csvContent.slice(1);
-//       }
+  if (fs.existsSync(productsCsvPath)) {
+    console.log('📥 Importing products from CSV...');
+    try {
+      // Read CSV and remove BOM if present
+      let csvContent = fs.readFileSync(productsCsvPath, 'utf-8');
+      if (csvContent.charCodeAt(0) === 0xFEFF) {
+        csvContent = csvContent.slice(1);
+      }
       
-//       const records: ProductCsvRecord[] = parse(csvContent, {
-//         columns: true,
-//         skip_empty_lines: true,
-//         trim: true,
-//       });
+      const records: ProductCsvRecord[] = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
 
-//       console.log(`📊 Found ${records.length} products in CSV`);
+      console.log(`📊 Found ${records.length} products in CSV`);
 
-//       // Prepare data for batch insert
-//       const productsToInsert: any[] = [];
-//       let skippedCount = 0;
+      // Prepare data for batch insert
+      const productsToInsert: any[] = [];
+      let skippedCount = 0;
 
-//       for (const record of records) {
-//         try {
-//           // Parse product_client_category as array of integers (e.g., "55|56|91" -> [55, 56, 91])
-//           const productClientCategory = record.product_client_category
-//             ? record.product_client_category.split('|').map((v: string) => parseInt(v.trim())).filter((v: number) => !isNaN(v))
-//             : [];
+      for (const record of records) {
+        try {
+          // Parse product_client_category as array of integers (e.g., "55|56|91" -> [55, 56, 91])
+          const productClientCategory = record.product_client_category
+            ? record.product_client_category.split('|').map((v: string) => parseInt(v.trim())).filter((v: number) => !isNaN(v))
+            : [];
 
-//           // Use first category as productCategoryNumber (required field)
-//           const productCategoryNumber = productClientCategory.length > 0 ? productClientCategory[0] : 1;
+          // Use first category as productCategoryNumber (required field)
+          const productCategoryNumber = productClientCategory.length > 0 ? productClientCategory[0] : 1;
 
-//           productsToInsert.push({
-//             productCode: record.product_code || null,
-//             ownProductCode: record.own_product_code || null,
-//             displayStatus: record.display_status || 'ACTIVE',
-//             saleStatus: record.sale_status || null,
-//             productCategoryNumber: productCategoryNumber,
-//             productClientCategory: productClientCategory,
-//             productCategoryNewProductArea: record.product_category_new_product_area || null,
-//             productCategoryRecommendedProductArea: record.product_category_recommended_product_area || null,
-//             productName: record.product_name || null,
-//             englishProductName: record.english_product_name || null,
-//             productNameForManagement: record.product_name_for_management || null,
-//             supplierProductName: record.supplier_product_name || null,
-//             modelName: record.model_name || null,
-//             productSummaryDescription: record.product_summary_description || null,
-//             productBriefDescription: record.product_brief_description || null,
-//             searchKeywordSetting: record.search_keyword_setting || null,
-//             taxClassification: record.tax_classification || null,
-//             consumerPrice: record.consumer_price ? parseInt(record.consumer_price) : null,
-//             supplyPrice: record.supply_price ? parseInt(record.supply_price) : null,
-//             productPrice: record.product_price ? parseInt(record.product_price) : null,
-//             salePrice: record.sale_price ? parseInt(record.sale_price) : null,
-//             useSalePriceAlternativeText: record.use_sale_price_alternative_text || null,
-//             salePriceAlternativeText: record.sale_price_alternative_text || null,
-//             orderQuantityLimitCriteria: record.order_quantity_limit_criteria || null,
-//             minOrderQuantity: record.min_order_quantity ? parseInt(record.min_order_quantity) : null,
-//             maxOrderQuantity: record.max_order_quantity ? parseInt(record.max_order_quantity) : null,
-//             rewardPoints: record.reward_points ? parseInt(record.reward_points) : null,
-//             rewardPointsClassification: record.reward_points_classification || null,
-//             commonEventInfo: record.common_event_info || null,
-//             adultVerification: record.adult_verification || null,
-//             optionUsage: record.option_usage || null,
-//             itemCompositionMethod: record.item_composition_method || null,
-//             optionDisplayMethod: record.option_display_method || null,
-//             optionSetName: record.option_set_name || null,
-//             optionInput: record.option_input || null,
-//             optionStyle: record.option_style || null,
-//             buttonImageSetting: record.button_image_setting || null,
-//             colorSetting: record.color_setting || null,
-//             requiredOrNot: record.required_or_not || null,
-//             outOfStockDisplayText: record.out_of_stock_display_text || null,
-//             additionalInputOption: record.additional_input_option || null,
-//             additionalInputOptionName: record.additional_input_option_name || null,
-//             additionalInputOptionRequiredOrNot: record.additional_input_option_required_or_not || null,
-//             inputCharacterCount: record.input_character_count || null,
-//             imageRegistrationDetail: record.image_registration_detail || null,
-//             imageRegistrationList: record.image_registration_list || null,
-//             imageRegistrationSmallList: record.image_registration_small_list || null,
-//             imageRegistrationThumbnail: record.image_registration_thumbnail || null,
-//             manufacturer: record.manufacturer || null,
-//             supplier: record.supplier || null,
-//             brand: record.brand || null,
-//             trend: record.trend || null,
-//             ownClassificationCode: record.own_classification_code || null,
-//             manufacturingDate: record.manufacturing_date || null,
-//             releaseDate: record.release_date || null,
-//             validityPeriodUsage: record.validity_period_usage || null,
-//             validityPeriod: record.validity_period || null,
-//             origin: record.origin ? parseInt(record.origin) : null,
-//             productVolume: record.product_volume || null,
-//             volumeWeight: record.volume_weight || null,
-//             productPaymentGuide: record.product_payment_guide || null,
-//             productDeliveryGuide: record.product_delivery_guide || null,
-//             exchangeReturnGuide: record.exchange_return_guide || null,
-//             serviceInquiryGuide: record.service_inquiry_guide || null,
-//             deliveryInfo: record.delivery_info || null,
-//             deliveryMethod: record.delivery_method || null,
-//             domesticOverseasDelivery: record.domestic_overseas_delivery || null,
-//             deliveryArea: record.delivery_area || null,
-//             deliveryFeePrepaymentSetting: record.delivery_fee_prepayment_setting || null,
-//             deliveryPeriod: record.delivery_period || null,
-//             deliveryFeeClassification: record.delivery_fee_classification || null,
-//             deliveryFeeInput: record.delivery_fee_input || null,
-//             productClassificationCustoms: record.product_classification_customs || null,
-//             productMaterial: record.product_material || null,
-//             englishProductMaterialCustoms: record.english_product_material_customs || null,
-//             fabricCustoms: record.fabric_customs || null,
-//             seoSearchEngineExposureSetting: record['검색엔진최적화(SEO) 검색엔진 노출 설정'] || null,
-//             seoTitle: record['검색엔진최적화(SEO) Title'] || null,
-//             seoAuthor: record['검색엔진최적화(SEO) Author'] || null,
-//             seoDescription: record['검색엔진최적화(SEO) Description'] || null,
-//             seoKeywords: record['검색엔진최적화(SEO) Keywords'] || null,
-//             seoProductImageAltText: record['검색엔진최적화(SEO) 상품 이미지 Alt 텍스트'] || null,
-//             individualPaymentMethodSetting: record.individual_payment_method_setting || null,
-//             productDeliveryTypeCode: record.product_delivery_type_code || null,
-//             storePickupSetting: record.store_pickup_setting || null,
-//             productTotalWeight: record.product_total_weight ? parseFloat(record.product_total_weight) : null,
-//             hsCode: record.hs_code ? BigInt(record.hs_code) : null,
-//             additionalItem01TodayDepartureDeliveryUsage: record.additional_item_01_today_departure_delivery_usage || null,
-//             additionalItem02TodayDepartureDeliveryTime: record.additional_item_02_today_departure_delivery_time || null,
-//             additionalItem03StorageMethod: record.additional_item_03_storage_method || null,
-//             additionalItem04Origin: record.additional_item_04_origin || null,
-//             additionalItem05Event: record.additional_item_05_event || null,
-//             additionalItem06ParcelDelivery: record.additional_item_06_parcel_delivery || null,
-//           });
-//         } catch (error) {
-//           skippedCount++;
-//           console.error(`⚠️  Error parsing product record:`, error instanceof Error ? error.message : String(error));
-//         }
-//       }
+          productsToInsert.push({
+            productCode: record.product_code || null,
+            ownProductCode: record.own_product_code || null,
+            displayStatus: record.display_status || 'ACTIVE',
+            saleStatus: record.sale_status || null,
+            productCategoryNumber: productCategoryNumber,
+            productClientCategory: productClientCategory,
+            productCategoryNewProductArea: record.product_category_new_product_area || null,
+            productCategoryRecommendedProductArea: record.product_category_recommended_product_area || null,
+            productName: record.product_name || null,
+            englishProductName: record.english_product_name || null,
+            productNameForManagement: record.product_name_for_management || null,
+            supplierProductName: record.supplier_product_name || null,
+            modelName: record.model_name || null,
+            productSummaryDescription: record.product_summary_description || null,
+            productBriefDescription: record.product_brief_description || null,
+            searchKeywordSetting: record.search_keyword_setting || null,
+            taxClassification: record.tax_classification || null,
+            consumerPrice: record.consumer_price ? parseInt(record.consumer_price) : null,
+            supplyPrice: record.supply_price ? parseInt(record.supply_price) : null,
+            productPrice: record.product_price ? parseInt(record.product_price) : null,
+            salePrice: record.sale_price ? parseInt(record.sale_price) : null,
+            useSalePriceAlternativeText: record.use_sale_price_alternative_text || null,
+            salePriceAlternativeText: record.sale_price_alternative_text || null,
+            orderQuantityLimitCriteria: record.order_quantity_limit_criteria || null,
+            minOrderQuantity: record.min_order_quantity ? parseInt(record.min_order_quantity) : null,
+            maxOrderQuantity: record.max_order_quantity ? parseInt(record.max_order_quantity) : null,
+            rewardPoints: record.reward_points ? parseInt(record.reward_points) : null,
+            rewardPointsClassification: record.reward_points_classification || null,
+            commonEventInfo: record.common_event_info || null,
+            adultVerification: record.adult_verification || null,
+            optionUsage: record.option_usage || null,
+            itemCompositionMethod: record.item_composition_method || null,
+            optionDisplayMethod: record.option_display_method || null,
+            optionSetName: record.option_set_name || null,
+            optionInput: record.option_input || null,
+            optionStyle: record.option_style || null,
+            buttonImageSetting: record.button_image_setting || null,
+            colorSetting: record.color_setting || null,
+            requiredOrNot: record.required_or_not || null,
+            outOfStockDisplayText: record.out_of_stock_display_text || null,
+            additionalInputOption: record.additional_input_option || null,
+            additionalInputOptionName: record.additional_input_option_name || null,
+            additionalInputOptionRequiredOrNot: record.additional_input_option_required_or_not || null,
+            inputCharacterCount: record.input_character_count || null,
+            imageRegistrationDetail: record.image_registration_detail || null,
+            imageRegistrationList: record.image_registration_list || null,
+            imageRegistrationSmallList: record.image_registration_small_list || null,
+            imageRegistrationThumbnail: record.image_registration_thumbnail || null,
+            manufacturer: record.manufacturer || null,
+            supplier: record.supplier || null,
+            brand: record.brand || null,
+            trend: record.trend || null,
+            ownClassificationCode: record.own_classification_code || null,
+            manufacturingDate: record.manufacturing_date || null,
+            releaseDate: record.release_date || null,
+            validityPeriodUsage: record.validity_period_usage || null,
+            validityPeriod: record.validity_period || null,
+            origin: record.origin ? parseInt(record.origin) : null,
+            productVolume: record.product_volume || null,
+            volumeWeight: record.volume_weight || null,
+            productPaymentGuide: record.product_payment_guide || null,
+            productDeliveryGuide: record.product_delivery_guide || null,
+            exchangeReturnGuide: record.exchange_return_guide || null,
+            serviceInquiryGuide: record.service_inquiry_guide || null,
+            deliveryInfo: record.delivery_info || null,
+            deliveryMethod: record.delivery_method || null,
+            domesticOverseasDelivery: record.domestic_overseas_delivery || null,
+            deliveryArea: record.delivery_area || null,
+            deliveryFeePrepaymentSetting: record.delivery_fee_prepayment_setting || null,
+            deliveryPeriod: record.delivery_period || null,
+            deliveryFeeClassification: record.delivery_fee_classification || null,
+            deliveryFeeInput: record.delivery_fee_input || null,
+            productClassificationCustoms: record.product_classification_customs || null,
+            productMaterial: record.product_material || null,
+            englishProductMaterialCustoms: record.english_product_material_customs || null,
+            fabricCustoms: record.fabric_customs || null,
+            seoSearchEngineExposureSetting: record['검색엔진최적화(SEO) 검색엔진 노출 설정'] || null,
+            seoTitle: record['검색엔진최적화(SEO) Title'] || null,
+            seoAuthor: record['검색엔진최적화(SEO) Author'] || null,
+            seoDescription: record['검색엔진최적화(SEO) Description'] || null,
+            seoKeywords: record['검색엔진최적화(SEO) Keywords'] || null,
+            seoProductImageAltText: record['검색엔진최적화(SEO) 상품 이미지 Alt 텍스트'] || null,
+            individualPaymentMethodSetting: record.individual_payment_method_setting || null,
+            productDeliveryTypeCode: record.product_delivery_type_code || null,
+            storePickupSetting: record.store_pickup_setting || null,
+            productTotalWeight: record.product_total_weight ? parseFloat(record.product_total_weight) : null,
+            hsCode: record.hs_code ? BigInt(record.hs_code) : null,
+            additionalItem01TodayDepartureDeliveryUsage: record.additional_item_01_today_departure_delivery_usage || null,
+            additionalItem02TodayDepartureDeliveryTime: record.additional_item_02_today_departure_delivery_time || null,
+            additionalItem03StorageMethod: record.additional_item_03_storage_method || null,
+            additionalItem04Origin: record.additional_item_04_origin || null,
+            additionalItem05Event: record.additional_item_05_event || null,
+            additionalItem06ParcelDelivery: record.additional_item_06_parcel_delivery || null,
+          });
+        } catch (error) {
+          skippedCount++;
+          console.error(`⚠️  Error parsing product record:`, error instanceof Error ? error.message : String(error));
+        }
+      }
 
-//       console.log(`✅ Prepared ${productsToInsert.length} products (skipped ${skippedCount})`);
+      console.log(`✅ Prepared ${productsToInsert.length} products (skipped ${skippedCount})`);
       
-//       // Batch insert in chunks
-//       const BATCH_SIZE = 500;
-//       let insertedCount = 0;
+      // Batch insert in chunks
+      const BATCH_SIZE = 500;
+      let insertedCount = 0;
       
-//       for (let i = 0; i < productsToInsert.length; i += BATCH_SIZE) {
-//         const batch = productsToInsert.slice(i, i + BATCH_SIZE);
-//         await prisma.product.createMany({
-//           data: batch,
-//           skipDuplicates: true,
-//         });
-//         insertedCount += batch.length;
-//         console.log(`📝 Inserted ${insertedCount}/${productsToInsert.length} products...`);
-//       }
+      for (let i = 0; i < productsToInsert.length; i += BATCH_SIZE) {
+        const batch = productsToInsert.slice(i, i + BATCH_SIZE);
+        await prisma.product.createMany({
+          data: batch,
+          skipDuplicates: true,
+        });
+        insertedCount += batch.length;
+        console.log(`📝 Inserted ${insertedCount}/${productsToInsert.length} products...`);
+      }
       
-//       console.log(`✅ Successfully imported ${insertedCount} products from CSV`);
+      console.log(`✅ Successfully imported ${insertedCount} products from CSV`);
       
-//     } catch (error) {
-//       console.error('❌ Error importing products CSV:', error);
-//     }
-//   } else {
-//     console.log('⚠️  Products CSV file not found at', productsCsvPath);
-//   }
+    } catch (error) {
+      console.error('❌ Error importing products CSV:', error);
+    }
+  } else {
+    console.log('⚠️  Products CSV file not found at', productsCsvPath);
+  }
 
-//   console.log('✨ Seed completed successfully!');
-// }
+  console.log('✨ Seed completed successfully!');
+}
 
-
-// async function main() {
-//   // ========================================
-//   // Import orders from CSV
-//   // ========================================
-//   const ordersCsvPath = '/Users/nhannguyen/Documents/orders_test_1.csv';
+// ========================================
+// FUNCTION 3: Seed Orders (Import orders from CSV)
+// ========================================
+async function seedOrders() {
+  // ========================================
+  // Import orders from CSV
+  // ========================================
+  await prisma.order.deleteMany();
+  await prisma.orderGroup.deleteMany();
+  const ordersCsvPath = '/Users/nhannguyen/Documents/orders_test_1.csv';
   
-//   if (fs.existsSync(ordersCsvPath)) {
-//     console.log('📥 Importing orders from CSV...');
-//     try {
-//       // Read CSV and remove BOM if present
-//       let csvContent = fs.readFileSync(ordersCsvPath, 'utf-8');
-//       if (csvContent.charCodeAt(0) === 0xFEFF) {
-//         csvContent = csvContent.slice(1);
-//       }
+  if (fs.existsSync(ordersCsvPath)) {
+    console.log('📥 Importing orders from CSV...');
+    try {
+      // Read CSV and remove BOM if present
+      let csvContent = fs.readFileSync(ordersCsvPath, 'utf-8');
+      if (csvContent.charCodeAt(0) === 0xFEFF) {
+        csvContent = csvContent.slice(1);
+      }
       
-//       const records: OrderCsvRecord[] = parse(csvContent, {
-//         columns: true,
-//         skip_empty_lines: true,
-//         trim: true,
-//       });
+      const records: OrderCsvRecord[] = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
 
-//       console.log(`📊 Found ${records.length} orders in CSV`);
+      console.log(`📊 Found ${records.length} orders in CSV`);
 
-//       // Get all existing product IDs to validate foreign keys
-//       const existingProducts = await prisma.product.findMany({
-//         select: { id: true }
-//       });
-//       const existingProductIds = new Set(existingProducts.map(p => p.id));
-//       console.log(`📦 Found ${existingProductIds.size} products in database`);
+      // Get all existing product IDs to validate foreign keys
+      const existingProducts = await prisma.product.findMany({
+        select: { id: true }
+      });
+      const existingProductIds = new Set(existingProducts.map(p => p.id));
+      console.log(`📦 Found ${existingProductIds.size} products in database`);
 
-//       // ========================================
-//       // Step 1: Create OrderGroups from unique order group numbers
-//       // ========================================
-//       console.log('📦 Creating order groups...');
+      // ========================================
+      // Step 1: Create OrderGroups from unique order group numbers
+      // ========================================
+      console.log('📦 Creating order groups...');
       
-//       // Group orders by orderGroupNumber to aggregate data
-//       const orderGroupsMap = new Map<string, {
-//         orders: OrderCsvRecord[];
-//         totalOrderAmount: number;
-//         totalPaymentAmount: number;
-//       }>();
+      // Group orders by orderGroupNumber to aggregate data
+      const orderGroupsMap = new Map<string, {
+        orders: OrderCsvRecord[];
+        totalOrderAmount: number;
+        totalPaymentAmount: number;
+      }>();
 
-//       for (const record of records) {
-//         const orderGroupNumber = record['품목별 주문번호'];
-//         if (orderGroupNumber) {
-//           if (!orderGroupsMap.has(orderGroupNumber)) {
-//             orderGroupsMap.set(orderGroupNumber, {
-//               orders: [],
-//               totalOrderAmount: 0,
-//               totalPaymentAmount: 0,
-//             });
-//           }
+      for (const record of records) {
+        const orderGroupNumber = record['품목별 주문번호'];
+        if (orderGroupNumber) {
+          if (!orderGroupsMap.has(orderGroupNumber)) {
+            orderGroupsMap.set(orderGroupNumber, {
+              orders: [],
+              totalOrderAmount: 0,
+              totalPaymentAmount: 0,
+            });
+          }
           
-//           const group = orderGroupsMap.get(orderGroupNumber)!;
-//           group.orders.push(record);
+          const group = orderGroupsMap.get(orderGroupNumber)!;
+          group.orders.push(record);
           
-//           // Aggregate amounts
-//           if (record.total_order_amount) {
-//             group.totalOrderAmount += parseInt(record.total_order_amount);
-//           }
-//           if (record.total_payment_amount) {
-//             group.totalPaymentAmount += parseInt(record.total_payment_amount);
-//           }
-//         }
-//       }
+          // Aggregate amounts
+          if (record.total_order_amount) {
+            group.totalOrderAmount += parseInt(record.total_order_amount);
+          }
+          if (record.total_payment_amount) {
+            group.totalPaymentAmount += parseInt(record.total_payment_amount);
+          }
+        }
+      }
 
-//       console.log(`📋 Found ${orderGroupsMap.size} unique order groups`);
+      console.log(`📋 Found ${orderGroupsMap.size} unique order groups`);
 
-//       // Create OrderGroup records
-//       const orderGroupsToCreate = Array.from(orderGroupsMap.entries()).map(([orderGroupNumber, data]) => ({
-//         orderGroupNumber: orderGroupNumber,
-//         orderGroupName: `Order Group ${orderGroupNumber}`,
-//         originalAmount: data.totalOrderAmount,
-//         discountAmount: 0,
-//         finalAmount: data.totalPaymentAmount,
-//         couponUsed: [],
-//         pointsUsed: 0,
-//         cartItemIds: [],
-//         deliveryFee: 0,
-//       }));
+      // Create OrderGroup records
+      const orderGroupsToCreate = Array.from(orderGroupsMap.entries()).map(([orderGroupNumber, data]) => ({
+        orderGroupNumber: orderGroupNumber,
+        orderGroupName: `Order Group ${orderGroupNumber}`,
+        originalAmount: data.totalOrderAmount,
+        discountAmount: 0,
+        finalAmount: data.totalPaymentAmount,
+        pointsUsed: 0,
+        cartItemIds: [],
+        deliveryFee: 0,
+      }));
 
-//       // Insert OrderGroups in batches
-//       const ORDER_GROUP_BATCH_SIZE = 100;
-//       let createdOrderGroups = 0;
+      // Insert OrderGroups in batches
+      const ORDER_GROUP_BATCH_SIZE = 100;
+      let createdOrderGroups = 0;
       
-//       for (let i = 0; i < orderGroupsToCreate.length; i += ORDER_GROUP_BATCH_SIZE) {
-//         const batch = orderGroupsToCreate.slice(i, i + ORDER_GROUP_BATCH_SIZE);
-//         await prisma.orderGroup.createMany({
-//           data: batch,
-//           skipDuplicates: true,
-//         });
-//         createdOrderGroups += batch.length;
-//         console.log(`📝 Created ${createdOrderGroups}/${orderGroupsToCreate.length} order groups...`);
-//       }
+      for (let i = 0; i < orderGroupsToCreate.length; i += ORDER_GROUP_BATCH_SIZE) {
+        const batch = orderGroupsToCreate.slice(i, i + ORDER_GROUP_BATCH_SIZE);
+        await prisma.orderGroup.createMany({
+          data: batch,
+          skipDuplicates: true,
+        });
+        createdOrderGroups += batch.length;
+        console.log(`📝 Created ${createdOrderGroups}/${orderGroupsToCreate.length} order groups...`);
+      }
 
-//       console.log(`✅ Successfully created ${createdOrderGroups} order groups`);
+      console.log(`✅ Successfully created ${createdOrderGroups} order groups`);
 
-//       // ========================================
-//       // Step 2: Create Orders
-//       // ========================================
-//       console.log('📦 Creating orders...');
+      // ========================================
+      // Step 2: Create Orders
+      // ========================================
+      console.log('📦 Creating orders...');
       
-//       const ordersToInsert: any[] = [];
-//       let skippedCount = 0;
-//       let invalidProductIdCount = 0;
+      const ordersToInsert: any[] = [];
+      let skippedCount = 0;
+      let invalidProductIdCount = 0;
 
-//       for (const record of records) {
-//         try {
-//           // Validate productId - set to null if not exists in DB
-//           let productId = record.product_id || null;
-//           if (productId && !existingProductIds.has(productId)) {
-//             productId = null;
-//             invalidProductIdCount++;
-//           }
+      for (const record of records) {
+        try {
+          // Validate productId - set to null if not exists in DB
+          let productId = record.product_id || null;
+          if (productId && !existingProductIds.has(productId)) {
+            productId = null;
+            invalidProductIdCount++;
+          }
 
-//           ordersToInsert.push({
-//             orderNumber: record.order_number || null,
-//             orderGroupNumber: record['품목별 주문번호'] || null,
-//             totalOrderAmount: record.total_order_amount ? parseInt(record.total_order_amount) : null,
-//             totalPaymentAmount: record.total_payment_amount ? parseInt(record.total_payment_amount) : null,
-//             productId: productId,
-//             productName: record.product_name || '',
-//             productNameWithOptions: record['주문상품명(옵션포함)'] || '',
-//             quantity: record.quantity ? parseInt(record.quantity) : null,
-//             recipient: record.recipient || '',
-//             recipientAddressFull: record.recipient_address_full || '',
-//             recipientPostalCode: record.recipient_postal_code ? parseInt(record.recipient_postal_code) : null,
-//             recipientMobilePhone: record.recipient_mobile_phone || '',
-//             recipientPhoneNumber: record.recipient_phone_number || '',
-//             deliveryMessage: record.delivery_message || '',
-//             salePrice: record.sale_price ? parseInt(record.sale_price) : null,
-//             paymentType: record.payment_type || '',
-//             paymentMethod: record.payment_method || '',
-//             orderDate: record.order_date || '',
-//             ordererName: record.orderer_name || '',
-//             ordererMobilePhone: record.orderer_mobile_phone || '',
-//             ordererId: record.orderer_id || null,
-//             desiredDeliveryDate: record.desired_delivery_date || '',
-//             membershipLevelAtOrderTime: record.membership_level_at_order_time || '',
-//           });
-//         } catch (error) {
-//           skippedCount++;
-//           console.error(`⚠️  Error parsing order record:`, error instanceof Error ? error.message : String(error));
-//         }
-//       }
+          ordersToInsert.push({
+            orderNumber: record.order_number || null,
+            orderGroupNumber: record['품목별 주문번호'] || null,
+            totalOrderAmount: record.total_order_amount ? parseInt(record.total_order_amount) : null,
+            totalPaymentAmount: record.total_payment_amount ? parseInt(record.total_payment_amount) : null,
+            productId: productId,
+            productName: record.product_name || '',
+            productNameWithOptions: record['주문상품명(옵션포함)'] || '',
+            quantity: record.quantity ? parseInt(record.quantity) : null,
+            recipient: record.recipient || '',
+            recipientAddressFull: record.recipient_address_full || '',
+            recipientPostalCode: record.recipient_postal_code ? parseInt(record.recipient_postal_code) : null,
+            recipientMobilePhone: record.recipient_mobile_phone || '',
+            recipientPhoneNumber: record.recipient_phone_number || '',
+            deliveryMessage: record.delivery_message || '',
+            salePrice: record.sale_price ? parseInt(record.sale_price) : null,
+            paymentType: record.payment_type || '',
+            paymentMethod: record.payment_method || '',
+            orderDate: record.order_date || '',
+            ordererName: record.orderer_name || '',
+            ordererMobilePhone: record.orderer_mobile_phone || '',
+            ordererId: record.orderer_id || null,
+            desiredDeliveryDate: record.desired_delivery_date || '',
+            membershipLevelAtOrderTime: record.membership_level_at_order_time || '',
+          });
+        } catch (error) {
+          skippedCount++;
+          console.error(`⚠️  Error parsing order record:`, error instanceof Error ? error.message : String(error));
+        }
+      }
 
-//       console.log(`✅ Prepared ${ordersToInsert.length} orders (skipped ${skippedCount}, ${invalidProductIdCount} orders with invalid productId set to null)`);
+      console.log(`✅ Prepared ${ordersToInsert.length} orders (skipped ${skippedCount}, ${invalidProductIdCount} orders with invalid productId set to null)`);
       
-//       // Batch insert orders in chunks
-//       const ORDER_BATCH_SIZE = 500;
-//       let insertedCount = 0;
+      // Batch insert orders in chunks
+      const ORDER_BATCH_SIZE = 500;
+      let insertedCount = 0;
       
-//       for (let i = 0; i < ordersToInsert.length; i += ORDER_BATCH_SIZE) {
-//         const batch = ordersToInsert.slice(i, i + ORDER_BATCH_SIZE);
-//         await prisma.order.createMany({
-//           data: batch,
-//           skipDuplicates: true,
-//         });
-//         insertedCount += batch.length;
-//         console.log(`📝 Inserted ${insertedCount}/${ordersToInsert.length} orders...`);
-//       }
+      for (let i = 0; i < ordersToInsert.length; i += ORDER_BATCH_SIZE) {
+        const batch = ordersToInsert.slice(i, i + ORDER_BATCH_SIZE);
+        await prisma.order.createMany({
+          data: batch,
+          skipDuplicates: true,
+        });
+        insertedCount += batch.length;
+        console.log(`📝 Inserted ${insertedCount}/${ordersToInsert.length} orders...`);
+      }
       
-//       console.log(`✅ Successfully imported ${insertedCount} orders from CSV`);
+      console.log(`✅ Successfully imported ${insertedCount} orders from CSV`);
       
-//     } catch (error) {
-//       console.error('❌ Error importing orders CSV:', error);
-//     }
-//   } else {
-//     console.log('⚠️  Orders CSV file not found at', ordersCsvPath);
-//   }
+    } catch (error) {
+      console.error('❌ Error importing orders CSV:', error);
+    }
+  } else {
+    console.log('⚠️  Orders CSV file not found at', ordersCsvPath);
+  }
 
-//   console.log('✨ Seed completed successfully!');
-// }
+  console.log('✨ Seed completed successfully!');
+}
 
-// async function main() {
-//   // ========================================
-//   // Import points from CSV
-//   // ========================================
-//   const pointsCsvPath = '/Users/nhannguyen/Documents/points_test_1.csv';
+// ========================================
+// FUNCTION 4: Seed Points (Import points from CSV)
+// ========================================
+async function seedPoints() {
+  // ========================================
+  // Import points from CSV
+  // ========================================
+  const pointsCsvPath = '/Users/nhannguyen/Documents/points_test_1.csv';
   
-//   if (fs.existsSync(pointsCsvPath)) {
-//     console.log('📥 Importing points from CSV...');
-//     try {
-//       // Read CSV and remove BOM if present
-//       let csvContent = fs.readFileSync(pointsCsvPath, 'utf-8');
-//       if (csvContent.charCodeAt(0) === 0xFEFF) {
-//         csvContent = csvContent.slice(1);
-//       }
+  if (fs.existsSync(pointsCsvPath)) {
+    console.log('📥 Importing points from CSV...');
+    try {
+      // Read CSV and remove BOM if present
+      let csvContent = fs.readFileSync(pointsCsvPath, 'utf-8');
+      if (csvContent.charCodeAt(0) === 0xFEFF) {
+        csvContent = csvContent.slice(1);
+      }
       
-//       const records: PointCsvRecord[] = parse(csvContent, {
-//         columns: true,
-//         skip_empty_lines: true,
-//         trim: true,
-//       });
+      const records: PointCsvRecord[] = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
 
-//       console.log(`📊 Found ${records.length} points in CSV`);
+      console.log(`📊 Found ${records.length} points in CSV`);
 
-//       // Get all existing user IDs to validate foreign keys
-//       const existingUsers = await prisma.user.findMany({
-//         select: { id: true }
-//       });
-//       const existingUserIds = new Set(existingUsers.map(u => u.id));
-//       console.log(`👥 Found ${existingUserIds.size} users in database`);
+      // Get all existing user IDs to validate foreign keys
+      const existingUsers = await prisma.user.findMany({
+        select: { id: true }
+      });
+      const existingUserIds = new Set(existingUsers.map(u => u.id));
+      console.log(`👥 Found ${existingUserIds.size} users in database`);
 
-//       // Get all existing order group numbers to validate foreign keys
-//       const existingOrderGroups = await prisma.orderGroup.findMany({
-//         select: { orderGroupNumber: true }
-//       });
-//       const existingOrderGroupNumbers = new Set(existingOrderGroups.map(og => og.orderGroupNumber));
-//       console.log(`📦 Found ${existingOrderGroupNumbers.size} order groups in database`);
+      // Get all existing order group numbers to validate foreign keys
+      const existingOrderGroups = await prisma.orderGroup.findMany({
+        select: { orderGroupNumber: true }
+      });
+      const existingOrderGroupNumbers = new Set<string>(
+        existingOrderGroups
+          .map(og => og.orderGroupNumber)
+          .filter((num): num is string => num !== null && num !== undefined)
+      );
+      console.log(`📦 Found ${existingOrderGroupNumbers.size} order groups in database`);
 
-//       // Prepare data for batch insert
-//       const pointsToInsert: any[] = [];
-//       let skippedCount = 0;
-//       let invalidUserIdCount = 0;
-//       let invalidOrderGroupCount = 0;
+      // Prepare data for batch insert
+      const pointsToInsert: any[] = [];
+      let skippedCount = 0;
+      let invalidUserIdCount = 0;
+      let invalidOrderGroupCount = 0;
 
-//       for (const record of records) {
-//         try {
-//           // Validate userId - set to null if not exists in DB
-//           let userId = record.user_id || null;
-//           if (userId && !existingUserIds.has(userId)) {
-//             userId = null;
-//             invalidUserIdCount++;
-//           }
+      for (const record of records) {
+        try {
+          // Validate userId - set to null if not exists in DB
+          let userId = record.user_id || null;
+          if (userId && !existingUserIds.has(userId)) {
+            userId = null;
+            invalidUserIdCount++;
+          }
 
-//           // Validate orderGroupNumber - set to null if not exists in DB
-//           let orderGroupNumber = record.order_number || null;
-//           if (orderGroupNumber && !existingOrderGroupNumbers.has(orderGroupNumber)) {
-//             orderGroupNumber = null;
-//             invalidOrderGroupCount++;
-//           }
+          // Validate orderGroupNumber - set to null if not exists in DB
+          let orderGroupNumber = record.order_number || null;
+          if (orderGroupNumber && !existingOrderGroupNumbers.has(orderGroupNumber)) {
+            orderGroupNumber = null;
+            invalidOrderGroupCount++;
+          }
 
-//           pointsToInsert.push({
-//             date: record.date || null,
-//             userId: userId,
-//             membershipLevel: record.membership_level || null,
-//             content: record.content || null,
-//             orderGroupNumber: orderGroupNumber,
-//             pointsType: record.points_type || null,
-//             availablePointsIncrease: record.available_points_increase ? parseInt(record.available_points_increase) : null,
-//             availablePointsDeduction: record.available_points_deduction ? parseInt(record.available_points_deduction) : null,
-//             availablePointsBalance: record.available_points_balance ? parseInt(record.available_points_balance) : null,
-//           });
-//         } catch (error) {
-//           skippedCount++;
-//           console.error(`⚠️  Error parsing point record:`, error instanceof Error ? error.message : String(error));
-//         }
-//       }
+          pointsToInsert.push({
+            date: record.date || null,
+            userId: userId,
+            membershipLevel: record.membership_level || null,
+            content: record.content || null,
+            orderGroupNumber: orderGroupNumber,
+            pointsType: record.points_type || null,
+            availablePointsIncrease: record.available_points_increase ? parseInt(record.available_points_increase) : null,
+            availablePointsDeduction: record.available_points_deduction ? parseInt(record.available_points_deduction) : null,
+            availablePointsBalance: record.available_points_balance ? parseInt(record.available_points_balance) : null,
+          });
+        } catch (error) {
+          skippedCount++;
+          console.error(`⚠️  Error parsing point record:`, error instanceof Error ? error.message : String(error));
+        }
+      }
 
-//       console.log(`✅ Prepared ${pointsToInsert.length} points (skipped ${skippedCount}, ${invalidUserIdCount} points with invalid userId set to null, ${invalidOrderGroupCount} points with invalid orderGroupNumber set to null)`);
+      console.log(`✅ Prepared ${pointsToInsert.length} points (skipped ${skippedCount}, ${invalidUserIdCount} points with invalid userId set to null, ${invalidOrderGroupCount} points with invalid orderGroupNumber set to null)`);
       
-//       // Batch insert in chunks
-//       const BATCH_SIZE = 500;
-//       let insertedCount = 0;
+      // Batch insert in chunks
+      const BATCH_SIZE = 500;
+      let insertedCount = 0;
       
-//       for (let i = 0; i < pointsToInsert.length; i += BATCH_SIZE) {
-//         const batch = pointsToInsert.slice(i, i + BATCH_SIZE);
-//         await prisma.point.createMany({
-//           data: batch,
-//           skipDuplicates: true,
-//         });
-//         insertedCount += batch.length;
-//         console.log(`📝 Inserted ${insertedCount}/${pointsToInsert.length} points...`);
-//       }
+      for (let i = 0; i < pointsToInsert.length; i += BATCH_SIZE) {
+        const batch = pointsToInsert.slice(i, i + BATCH_SIZE);
+        await prisma.point.createMany({
+          data: batch,
+          skipDuplicates: true,
+        });
+        insertedCount += batch.length;
+        console.log(`📝 Inserted ${insertedCount}/${pointsToInsert.length} points...`);
+      }
       
-//       console.log(`✅ Successfully imported ${insertedCount} points from CSV`);
+      console.log(`✅ Successfully imported ${insertedCount} points from CSV`);
       
-//     } catch (error) {
-//       console.error('❌ Error importing points CSV:', error);
-//     }
-//   } else {
-//     console.log('⚠️  Points CSV file not found at', pointsCsvPath);
-//   }
+    } catch (error) {
+      console.error('❌ Error importing points CSV:', error);
+    }
+  } else {
+    console.log('⚠️  Points CSV file not found at', pointsCsvPath);
+  }
 
-//   console.log('✨ Seed completed successfully!');
-// }
+  console.log('✨ Seed completed successfully!');
+}
 
+// ========================================
+// FUNCTION 5: Seed Categories and Update Product Categories
+// ========================================
+async function seedCategories() {
+  console.log('🌱 Starting seed...');
 
-// async function main() {
-//   console.log('🌱 Starting seed...');
-
-//   // Seed Categories
-//   console.log('📂 Seeding categories...');
+  // Seed Categories
+  console.log('📂 Seeding categories...');
   
-//   const categories = [
-//     { name: 'LIVESTOCK', description: '라이브스톡 (축산물)' },
-//     { name: 'SIDE_DISH', description: '사이드 요리 (반찬)' },
-//     { name: 'CONVENIENCE_FOOD', description: '편의점 음식 (간편식)' },
-//     { name: 'FISHERIES', description: '수산물' },
-//   ];
+  const categories = [
+    { name: 'LIVESTOCK', description: '라이브스톡 (축산물)' },
+    { name: 'SIDE_DISH', description: '사이드 요리 (반찬)' },
+    { name: 'CONVENIENCE_FOOD', description: '편의점 음식 (간편식)' },
+    { name: 'FISHERIES', description: '수산물' },
+  ];
 
-//   for (const category of categories) {
-//     await prisma.category.upsert({
-//       where: { name: category.name as any },
-//       update: {},
-//       create: {
-//         name: category.name as any,
-//         description: category.description,
-//       },
-//     });
-//   }
+  for (const category of categories) {
+    await prisma.category.upsert({
+      where: { name: category.name as any },
+      update: {},
+      create: {
+        name: category.name as any,
+        description: category.description,
+      },
+    });
+  }
 
-//   console.log('✅ Successfully seeded 4 categories');
+  console.log('✅ Successfully seeded 4 categories');
 
-//   // Get category numbers
-//   const livestockCategory = await prisma.category.findUnique({ where: { name: 'LIVESTOCK' } });
-//   const sideDishCategory = await prisma.category.findUnique({ where: { name: 'SIDE_DISH' } });
-//   const convenienceFoodCategory = await prisma.category.findUnique({ where: { name: 'CONVENIENCE_FOOD' } });
-//   const fisheriesCategory = await prisma.category.findUnique({ where: { name: 'FISHERIES' } });
+  // Get category numbers
+  const livestockCategory = await prisma.category.findUnique({ where: { name: 'LIVESTOCK' } });
+  const sideDishCategory = await prisma.category.findUnique({ where: { name: 'SIDE_DISH' } });
+  const convenienceFoodCategory = await prisma.category.findUnique({ where: { name: 'CONVENIENCE_FOOD' } });
+  const fisheriesCategory = await prisma.category.findUnique({ where: { name: 'FISHERIES' } });
 
-//   if (!livestockCategory || !sideDishCategory || !convenienceFoodCategory || !fisheriesCategory) {
-//     throw new Error('Categories not found');
-//   }
+  if (!livestockCategory || !sideDishCategory || !convenienceFoodCategory || !fisheriesCategory) {
+    throw new Error('Categories not found');
+  }
 
-//   console.log('📦 Updating product categories...');
+  console.log('📦 Updating product categories...');
   
-//   // Clear all existing product categories first
-//   console.log('🗑️  Clearing all existing product categories...');
-//   await prisma.product.updateMany({
-//     data: { productCategoryNumber: null }
-//   });
-//   console.log('✅ Cleared all product categories');
+  // Clear all existing product categories first
+  console.log('🗑️  Clearing all existing product categories...');
+  await prisma.product.updateMany({
+    data: { productCategoryNumber: null }
+  });
+  console.log('✅ Cleared all product categories');
   
-//   // Get all products to find their IDs by row number
-//   // Note: Assuming row number is based on creation order (createdAt)
-//   const allProducts = await prisma.product.findMany({
-//     select: { id: true, productCode: true, productName: true }
-//   });
+  // Get all products to find their IDs by row number
+  // Note: Assuming row number is based on creation order (createdAt)
+  const allProducts = await prisma.product.findMany({
+    select: { id: true, productCode: true, productName: true }
+  });
 
-//   console.log(`  Found ${allProducts.length} products in database`);
+  console.log(`  Found ${allProducts.length} products in database`);
 
-//   // Product category mapping by row index (1-based)
-//   const productCategoryMap: { [key: number]: number } = {
-//     // LIVESTOCK (축산)
-//     57: livestockCategory.productCategoryNumber,
-//     103: livestockCategory.productCategoryNumber,
-//     120: livestockCategory.productCategoryNumber,
-//     121: livestockCategory.productCategoryNumber,
-//     122: livestockCategory.productCategoryNumber,
-//     257: livestockCategory.productCategoryNumber,
-//     253: livestockCategory.productCategoryNumber,
-//     40: livestockCategory.productCategoryNumber,
-//     44: livestockCategory.productCategoryNumber,
-//     46: livestockCategory.productCategoryNumber,
-//     261: livestockCategory.productCategoryNumber,
-//     273: livestockCategory.productCategoryNumber,
-//     39: livestockCategory.productCategoryNumber,
-//     110: livestockCategory.productCategoryNumber,
-//     272: livestockCategory.productCategoryNumber,
-//     25: livestockCategory.productCategoryNumber,
-//     33: livestockCategory.productCategoryNumber,
-//     276: livestockCategory.productCategoryNumber,
-//     258: livestockCategory.productCategoryNumber,
-//     89: livestockCategory.productCategoryNumber,
-//     144: livestockCategory.productCategoryNumber,
-//     96: livestockCategory.productCategoryNumber,
-//     159: livestockCategory.productCategoryNumber,
-//     263: livestockCategory.productCategoryNumber,
-//     262: livestockCategory.productCategoryNumber,
-//     7: livestockCategory.productCategoryNumber,
-//     15: livestockCategory.productCategoryNumber,
+  // Product category mapping by row index (1-based)
+  const productCategoryMap: { [key: number]: number } = {
+    // LIVESTOCK (축산)
+    57: livestockCategory.productCategoryNumber,
+    103: livestockCategory.productCategoryNumber,
+    120: livestockCategory.productCategoryNumber,
+    121: livestockCategory.productCategoryNumber,
+    122: livestockCategory.productCategoryNumber,
+    257: livestockCategory.productCategoryNumber,
+    253: livestockCategory.productCategoryNumber,
+    40: livestockCategory.productCategoryNumber,
+    44: livestockCategory.productCategoryNumber,
+    46: livestockCategory.productCategoryNumber,
+    261: livestockCategory.productCategoryNumber,
+    273: livestockCategory.productCategoryNumber,
+    39: livestockCategory.productCategoryNumber,
+    110: livestockCategory.productCategoryNumber,
+    272: livestockCategory.productCategoryNumber,
+    25: livestockCategory.productCategoryNumber,
+    33: livestockCategory.productCategoryNumber,
+    276: livestockCategory.productCategoryNumber,
+    258: livestockCategory.productCategoryNumber,
+    89: livestockCategory.productCategoryNumber,
+    144: livestockCategory.productCategoryNumber,
+    96: livestockCategory.productCategoryNumber,
+    159: livestockCategory.productCategoryNumber,
+    263: livestockCategory.productCategoryNumber,
+    262: livestockCategory.productCategoryNumber,
+    7: livestockCategory.productCategoryNumber,
+    15: livestockCategory.productCategoryNumber,
     
-//     // CONVENIENCE_FOOD (간편식)
-//     259: convenienceFoodCategory.productCategoryNumber,
-//     279: convenienceFoodCategory.productCategoryNumber,
-//     47: convenienceFoodCategory.productCategoryNumber,
-//     256: convenienceFoodCategory.productCategoryNumber,
-//     278: convenienceFoodCategory.productCategoryNumber,
-//     277: convenienceFoodCategory.productCategoryNumber,
-//     271: convenienceFoodCategory.productCategoryNumber,
+    // CONVENIENCE_FOOD (간편식)
+    259: convenienceFoodCategory.productCategoryNumber,
+    279: convenienceFoodCategory.productCategoryNumber,
+    47: convenienceFoodCategory.productCategoryNumber,
+    256: convenienceFoodCategory.productCategoryNumber,
+    278: convenienceFoodCategory.productCategoryNumber,
+    277: convenienceFoodCategory.productCategoryNumber,
+    271: convenienceFoodCategory.productCategoryNumber,
     
-//     // FISHERIES (수산)
-//     269: fisheriesCategory.productCategoryNumber,
-//     116: fisheriesCategory.productCategoryNumber,
-//     134: fisheriesCategory.productCategoryNumber,
-//     250: fisheriesCategory.productCategoryNumber,
+    // FISHERIES (수산)
+    269: fisheriesCategory.productCategoryNumber,
+    116: fisheriesCategory.productCategoryNumber,
+    134: fisheriesCategory.productCategoryNumber,
+    250: fisheriesCategory.productCategoryNumber,
     
-//     // SIDE_DISH (반찬)
-//     268: sideDishCategory.productCategoryNumber,
-//     267: sideDishCategory.productCategoryNumber,
-//     34: sideDishCategory.productCategoryNumber,
-//   };
+    // SIDE_DISH (반찬)
+    268: sideDishCategory.productCategoryNumber,
+    267: sideDishCategory.productCategoryNumber,
+    34: sideDishCategory.productCategoryNumber,
+  };
 
-//   let updatedCount = 0;
+  let updatedCount = 0;
   
-//   for (const [rowIndex, categoryNumber] of Object.entries(productCategoryMap)) {
-//     const productIndex = parseInt(rowIndex) - 1; // Convert to 0-based index
+  for (const [rowIndex, categoryNumber] of Object.entries(productCategoryMap)) {
+    const productIndex = parseInt(rowIndex) - 1; // Convert to 0-based index
     
-//     if (productIndex >= 0 && productIndex < allProducts.length) {
-//       const product = allProducts[productIndex];
+    if (productIndex >= 0 && productIndex < allProducts.length) {
+      const product = allProducts[productIndex];
       
-//       await prisma.product.update({
-//         where: { id: product.id },
-//         data: { productCategoryNumber: categoryNumber },
-//       });
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { productCategoryNumber: categoryNumber },
+      });
       
-//       updatedCount++;
-//       console.log(`  ✓ Updated product ${rowIndex}: ${product.productName || product.productCode}`);
-//     } else {
-//       console.log(`  ⚠️  Product at row ${rowIndex} not found`);
-//     }
-//   }
+      updatedCount++;
+      console.log(`  ✓ Updated product ${rowIndex}: ${product.productName || product.productCode}`);
+    } else {
+      console.log(`  ⚠️  Product at row ${rowIndex} not found`);
+    }
+  }
 
-//   console.log(`✅ Successfully updated ${updatedCount} products with categories`);
-//   console.log('✨ Seed completed successfully!');
-// }
+  console.log(`✅ Successfully updated ${updatedCount} products with categories`);
+  console.log('✨ Seed completed successfully!');
+}
 
-// async function main(){
-//   console.log('🌱 Starting seed...');
+// ========================================
+// FUNCTION 6: Seed Memberships
+// ========================================
+async function seedMemberships(){
+  console.log('🌱 Starting seed...');
   
-//   // Seed Memberships
-//   console.log('🎖️  Seeding memberships...');
+  // Seed Memberships
+  console.log('🎖️  Seeding memberships...');
   
-//   const memberships = [
-//     { name: 'LV1. 씨앗', description: null, minPrice: 0 },
-//     { name: 'LV2. 새싹', description: null, minPrice: 150000 },
-//     { name: 'LV3. 열매', description: null, minPrice: 300000 },
-//     { name: 'LV4. 나무', description: null, minPrice: 500000 },
-//     { name: 'LV5. 정원', description: null, minPrice: 1000000 },
-//   ];
+  const memberships = [
+    { name: 'LV1. 씨앗', description: null, minPrice: 0 },
+    { name: 'LV2. 새싹', description: null, minPrice: 150000 },
+    { name: 'LV3. 열매', description: null, minPrice: 300000 },
+    { name: 'LV4. 나무', description: null, minPrice: 500000 },
+    { name: 'LV5. 정원', description: null, minPrice: 1000000 },
+  ];
 
-//   for (const membership of memberships) {
-//     await prisma.membership.upsert({
-//       where: { name: membership.name },
-//       update: {
-//         minPrice: membership.minPrice,
-//       },
-//       create: {
-//         name: membership.name,
-//         description: membership.description,
-//         minPrice: membership.minPrice,
-//       },
-//     });
-//     console.log(`  ✓ Created/Updated membership: ${membership.name} (₩${membership.minPrice.toLocaleString()})`);
-//   }
+  for (const membership of memberships) {
+    await prisma.membership.upsert({
+      where: { name: membership.name },
+      update: {
+        minPrice: membership.minPrice,
+      },
+      create: {
+        name: membership.name,
+        description: membership.description,
+        minPrice: membership.minPrice,
+      },
+    });
+    console.log(`  ✓ Created/Updated membership: ${membership.name} (₩${membership.minPrice.toLocaleString()})`);
+  }
 
-//   console.log('✅ Successfully seeded 5 memberships');
-//   console.log('✨ Seed completed successfully!');
-// }
+  console.log('✅ Successfully seeded 5 memberships');
+  console.log('✨ Seed completed successfully!');
+}
 
-// async function main() {
-//   console.log('🌱 Starting seed...');
+// ========================================
+// FUNCTION 7: Seed Memberships and User Memberships
+// ========================================
+async function seedUserMemberships() {
+  console.log('🌱 Starting seed...');
   
-//   // Seed Memberships
-//   console.log('🎖️  Seeding memberships...');
+  // Seed Memberships
+  console.log('🎖️  Seeding memberships...');
   
-//   const memberships = [
-//     { name: 'LV1. 씨앗', description: null, minPrice: 0 },
-//     { name: 'LV2. 새싹', description: null, minPrice: 150000 },
-//     { name: 'LV3. 열매', description: null, minPrice: 300000 },
-//     { name: 'LV4. 나무', description: null, minPrice: 500000 },
-//     { name: 'LV5. 정원', description: null, minPrice: 1000000 },
-//   ];
+  const memberships = [
+    { name: 'LV1. 씨앗', description: null, minPrice: 0 },
+    { name: 'LV2. 새싹', description: null, minPrice: 150000 },
+    { name: 'LV3. 열매', description: null, minPrice: 300000 },
+    { name: 'LV4. 나무', description: null, minPrice: 500000 },
+    { name: 'LV5. 정원', description: null, minPrice: 1000000 },
+  ];
 
-//   for (const membership of memberships) {
-//     await prisma.membership.upsert({
-//       where: { name: membership.name },
-//       update: {
-//         minPrice: membership.minPrice,
-//         description: membership.description,
-//       },
-//       create: {
-//         name: membership.name,
-//         description: membership.description,
-//         minPrice: membership.minPrice,
-//       },
-//     });
-//     console.log(`  ✓ Created/Updated membership: ${membership.name} (₩${membership.minPrice.toLocaleString()})`);
-//   }
+  for (const membership of memberships) {
+    await prisma.membership.upsert({
+      where: { name: membership.name },
+      update: {
+        minPrice: membership.minPrice,
+        description: membership.description,
+      },
+      create: {
+        name: membership.name,
+        description: membership.description,
+        minPrice: membership.minPrice,
+      },
+    });
+    console.log(`  ✓ Created/Updated membership: ${membership.name} (₩${membership.minPrice.toLocaleString()})`);
+  }
 
-//   console.log('✅ Successfully seeded memberships');
+  console.log('✅ Successfully seeded memberships');
 
-//   // Seed User Memberships
-//   console.log('🔗 Seeding user memberships...');
+  // Seed User Memberships
+  console.log('🔗 Seeding user memberships...');
   
-//   // Get all users with membershipLevel
-//   const usersWithMembership = await prisma.user.findMany({
-//     where: {
-//       membershipLevel: {
-//         not: null,
-//       },
-//     },
-//     select: {
-//       id: true,
-//       membershipLevel: true,
-//     },
-//   });
+  // Get all users with membershipLevel
+  const usersWithMembership = await prisma.user.findMany({
+    where: {
+      membershipLevel: {
+        not: null,
+      },
+    },
+    select: {
+      id: true,
+      membershipLevel: true,
+    },
+  });
 
-//   console.log(`📊 Found ${usersWithMembership.length} users with membership level`);
+  console.log(`📊 Found ${usersWithMembership.length} users with membership level`);
 
-//   // Get all memberships to create a map
-//   const allMemberships = await prisma.membership.findMany({
-//     select: {
-//       id: true,
-//       name: true,
-//       description: true,
-//       basePeriod: true,
-//     },
-//   });
+  // Get all memberships to create a map
+  const allMemberships = await prisma.membership.findMany({
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      basePeriod: true,
+    },
+  });
 
-//   const membershipMap = new Map(allMemberships.map(m => [m.name, m]));
-//   console.log(`📊 Found ${allMemberships.length} memberships in database`);
+  const membershipMap = new Map(allMemberships.map(m => [m.name, m]));
+  console.log(`📊 Found ${allMemberships.length} memberships in database`);
 
-//   let createdCount = 0;
-//   let skippedCount = 0;
+  let createdCount = 0;
+  let skippedCount = 0;
 
-//   for (const user of usersWithMembership) {
-//     if (!user.membershipLevel) {
-//       skippedCount++;
-//       continue;
-//     }
+  for (const user of usersWithMembership) {
+    if (!user.membershipLevel) {
+      skippedCount++;
+      continue;
+    }
 
-//     // Find membership by name matching user's membershipLevel
-//     const membership = membershipMap.get(user.membershipLevel);
+    // Find membership by name matching user's membershipLevel
+    const membership = membershipMap.get(user.membershipLevel);
     
-//     if (!membership) {
-//       console.log(`⚠️  Membership not found for level: ${user.membershipLevel} (user: ${user.id})`);
-//       skippedCount++;
-//       continue;
-//     }
+    if (!membership) {
+      console.log(`⚠️  Membership not found for level: ${user.membershipLevel} (user: ${user.id})`);
+      skippedCount++;
+      continue;
+    }
 
-//     // Ensure membership name is not null
-//     if (!membership.name) {
-//       console.log(`⚠️  Membership name is null for membership ID: ${membership.id} (user: ${user.id})`);
-//       skippedCount++;
-//       continue;
-//     }
+    // Ensure membership name is not null
+    if (!membership.name) {
+      console.log(`⚠️  Membership name is null for membership ID: ${membership.id} (user: ${user.id})`);
+      skippedCount++;
+      continue;
+    }
 
-//     // Check if user_membership already exists
-//     const existingUserMembership = await prisma.userMembership.findUnique({
-//       where: { userId: user.id },
-//     });
+    // Check if user_membership already exists
+    const existingUserMembership = await prisma.userMembership.findUnique({
+      where: { userId: user.id },
+    });
 
-//     if (existingUserMembership) {
-//       console.log(`  ⏭️  User membership already exists for user: ${user.id}`);
-//       skippedCount++;
-//       continue;
-//     }
+    if (existingUserMembership) {
+      console.log(`  ⏭️  User membership already exists for user: ${user.id}`);
+      skippedCount++;
+      continue;
+    }
 
-//     // Calculate dates based on basePeriod or default to 1 year
-//     const startDate = new Date();
-//     const endDate = new Date();
-//     endDate.setFullYear(endDate.getFullYear() + (membership.basePeriod ? Math.floor(membership.basePeriod / 365) : 1));
+    // Calculate dates based on basePeriod or default to 1 year
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setFullYear(endDate.getFullYear() + (membership.basePeriod ? Math.floor(membership.basePeriod / 365) : 1));
 
-//     try {
-//       await prisma.userMembership.create({
-//         data: {
-//           userId: user.id,
-//           membershipId: membership.id,
-//           membershipName: membership.name,
-//           membershipDescription: membership.description || '',
-//           status: 'normal',
-//           startDate: startDate,
-//           endDate: endDate,
-//         },
-//       });
-//       createdCount++;
-//       console.log(`  ✓ Created user membership for user: ${user.id} -> ${membership.name}`);
-//     } catch (error) {
-//       console.error(`  ❌ Error creating user membership for user ${user.id}:`, error);
-//       skippedCount++;
-//     }
-//   }
+    try {
+      await prisma.userMembership.create({
+        data: {
+          userId: user.id,
+          membershipId: membership.id,
+          membershipName: membership.name,
+          membershipDescription: membership.description || '',
+          status: 'normal',
+          startDate: startDate,
+          endDate: endDate,
+        },
+      });
+      createdCount++;
+      console.log(`  ✓ Created user membership for user: ${user.id} -> ${membership.name}`);
+    } catch (error) {
+      console.error(`  ❌ Error creating user membership for user ${user.id}:`, error);
+      skippedCount++;
+    }
+  }
 
-//   console.log(`✅ Successfully created ${createdCount} user memberships (skipped ${skippedCount})`);
-//   console.log('✨ Seed completed successfully!');
-// }
+  console.log(`✅ Successfully created ${createdCount} user memberships (skipped ${skippedCount})`);
+  console.log('✨ Seed completed successfully!');
+}
 
-async function main() {
+// ========================================
+// FUNCTION 8: Seed Banners (All 5 types with proper distribution)
+// ========================================
+async function seedBanners() {
   // drop all banners
   await prisma.banner.deleteMany();
   console.log('🌱 Starting banner seed...');
@@ -1219,8 +1248,8 @@ async function main() {
       mainText: 'Discover our premium selection of fresh products',
       ctaButtonText: 'Shop Now',
       ctaButtonUrl: '/products',
-      imageUrl: 'https://via.placeholder.com/1200x800/FF6B6B/FFFFFF?text=Main+Product+Banner',
-      mobileImageUrl: 'https://via.placeholder.com/800x800/FF6B6B/FFFFFF?text=Main+Product+Mobile',
+      imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=800&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=800&fit=crop',
       displayOrder: 1,
       startDate: new Date(),
       endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
@@ -1237,8 +1266,8 @@ async function main() {
       mainText: 'High-quality meat products delivered fresh',
       ctaButtonText: 'Browse Livestock',
       ctaButtonUrl: '/category/livestock',
-      imageUrl: 'https://via.placeholder.com/1200x800/4ECDC4/FFFFFF?text=Livestock+Category',
-      mobileImageUrl: 'https://via.placeholder.com/800x800/4ECDC4/FFFFFF?text=Livestock+Mobile',
+      imageUrl: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=1200&h=800&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=800&h=800&fit=crop',
       displayOrder: 2,
       startDate: new Date(),
       endDate: null,
@@ -1253,8 +1282,8 @@ async function main() {
       mainText: 'Delicious meals ready in minutes',
       ctaButtonText: 'View Convenience Food',
       ctaButtonUrl: '/category/convenience-food',
-      imageUrl: 'https://via.placeholder.com/1200x800/FFE66D/333333?text=Convenience+Food',
-      mobileImageUrl: 'https://via.placeholder.com/800x800/FFE66D/333333?text=Convenience+Mobile',
+      imageUrl: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=1200&h=800&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=800&h=800&fit=crop',
       displayOrder: 3,
       startDate: new Date(),
       endDate: null,
@@ -1269,8 +1298,8 @@ async function main() {
       mainText: 'Premium seafood from trusted suppliers',
       ctaButtonText: 'Explore Seafood',
       ctaButtonUrl: '/category/fisheries',
-      imageUrl: 'https://via.placeholder.com/1200x800/95E1D3/333333?text=Fisheries+Category',
-      mobileImageUrl: 'https://via.placeholder.com/800x800/95E1D3/333333?text=Fisheries+Mobile',
+      imageUrl: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=1200&h=800&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=800&fit=crop',
       displayOrder: 4,
       startDate: new Date(),
       endDate: null,
@@ -1285,8 +1314,8 @@ async function main() {
       mainText: 'Traditional Korean side dishes',
       ctaButtonText: 'View Side Dishes',
       ctaButtonUrl: '/category/side-dish',
-      imageUrl: 'https://via.placeholder.com/1200x800/F38181/FFFFFF?text=Side+Dish+Category',
-      mobileImageUrl: 'https://via.placeholder.com/800x800/F38181/FFFFFF?text=Side+Dish+Mobile',
+      imageUrl: 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?w=1200&h=800&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?w=800&h=800&fit=crop',
       displayOrder: 5,
       startDate: new Date(),
       endDate: null,
@@ -1301,14 +1330,14 @@ async function main() {
       mainText: 'Browse our complete collection',
       ctaButtonText: 'See All',
       ctaButtonUrl: '/categories',
-      imageUrl: 'https://via.placeholder.com/1200x800/AA96DA/FFFFFF?text=All+Categories',
-      mobileImageUrl: 'https://via.placeholder.com/800x800/AA96DA/FFFFFF?text=All+Categories+Mobile',
+      imageUrl: 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?w=1200&h=800&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?w=800&h=800&fit=crop',
       displayOrder: 6,
       startDate: new Date(),
       endDate: null,
     },
     
-    // 3. FOOTER Banner (1 banner)
+    // 3. FOOTER Banners (3 banners)
     {
       type: 'FOOTER',
       status: 'ACTIVE',
@@ -1319,9 +1348,41 @@ async function main() {
       mainText: 'Get exclusive deals and updates',
       ctaButtonText: 'Subscribe Now',
       ctaButtonUrl: '/newsletter',
-      imageUrl: 'https://via.placeholder.com/1200x400/5F27CD/FFFFFF?text=Footer+Banner',
-      mobileImageUrl: 'https://via.placeholder.com/800x400/5F27CD/FFFFFF?text=Footer+Mobile',
+      imageUrl: 'https://images.unsplash.com/photo-1557821552-17105176677c?w=1200&h=400&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1557821552-17105176677c?w=800&h=400&fit=crop',
       displayOrder: 7,
+      startDate: new Date(),
+      endDate: null,
+    },
+    {
+      type: 'FOOTER',
+      status: 'ACTIVE',
+      productId: null,
+      category: null,
+      title: 'Download Our App',
+      badgeText: 'Get Mobile App',
+      mainText: 'Shop easier with our mobile application',
+      ctaButtonText: 'Download Now',
+      ctaButtonUrl: '/app-download',
+      imageUrl: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=1200&h=400&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=800&h=400&fit=crop',
+      displayOrder: 8,
+      startDate: new Date(),
+      endDate: null,
+    },
+    {
+      type: 'FOOTER',
+      status: 'ACTIVE',
+      productId: null,
+      category: null,
+      title: 'Customer Support',
+      badgeText: '24/7 Support',
+      mainText: 'We are here to help you anytime',
+      ctaButtonText: 'Contact Us',
+      ctaButtonUrl: '/contact',
+      imageUrl: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=1200&h=400&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=800&h=400&fit=crop',
+      displayOrder: 9,
       startDate: new Date(),
       endDate: null,
     },
@@ -1337,8 +1398,8 @@ async function main() {
       mainText: 'Your trusted source for fresh, quality products',
       ctaButtonText: 'Start Shopping',
       ctaButtonUrl: '/shop',
-      imageUrl: 'https://via.placeholder.com/1920x800/341F97/FFFFFF?text=Hero+Banner',
-      mobileImageUrl: 'https://via.placeholder.com/800x1000/341F97/FFFFFF?text=Hero+Mobile',
+      imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=1920&h=800&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&h=1000&fit=crop',
       displayOrder: 0, // Hero usually comes first
       startDate: new Date(),
       endDate: null,
@@ -1355,8 +1416,8 @@ async function main() {
       mainText: 'Limited time offers on selected products',
       ctaButtonText: 'View Deals',
       ctaButtonUrl: '/special-deals',
-      imageUrl: 'https://via.placeholder.com/1200x800/EE5A6F/FFFFFF?text=Special+Price',
-      mobileImageUrl: 'https://via.placeholder.com/800x800/EE5A6F/FFFFFF?text=Special+Price+Mobile',
+      imageUrl: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&h=800&fit=crop',
+      mobileImageUrl: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=800&h=800&fit=crop',
       displayOrder: 1,
       startDate: new Date(),
       endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
@@ -1379,6 +1440,27 @@ async function main() {
   
   console.log(`✅ Successfully created ${createdCount}/${banners.length} banners`);
   console.log('✨ Banner seed completed successfully!');
+}
+
+// ========================================
+// MAIN FUNCTION - Run seed functions sequentially
+// ========================================
+async function main() {
+  console.log('🚀 Starting complete database seeding process...\n');
+  // return Promise.resolve().then(() => {
+  //   console.log('Promise resolved');
+  // })
+  
+  // await seedUsers();           // Import users and clear all data
+  // await seedProducts();        // Import products from CSV
+  // await seedOrders();          // Import orders from CSV
+  // await seedPoints();          // Import points from CSV
+  // await seedCategories();      // Seed categories and update products
+  // await seedMemberships();     // Seed memberships only
+  // await seedUserMemberships(); // Seed memberships and user memberships
+  await seedBanners();         // Seed all 5 types of banners
+  
+  console.log('\n✨ All seed functions completed successfully!');
 }
 
 main()

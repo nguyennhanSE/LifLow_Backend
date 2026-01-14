@@ -56,7 +56,10 @@ export class CartItemService {
       }
 
       // Check product availability
-      if (product.displayStatus !== 'ACTIVE') {
+      this.logger.debug(`Product displayStatus: "${product.displayStatus}" (type: ${typeof product.displayStatus})`);
+      const trimmedDisplayStatus = product.displayStatus?.trim();
+      if (trimmedDisplayStatus !== 'Y') {
+        this.logger.warn(`Product ${createDto.productId} has displayStatus: "${product.displayStatus}", trimmed: "${trimmedDisplayStatus}"`);
         throw new BadRequestException('Product is not available for purchase');
       }
 
