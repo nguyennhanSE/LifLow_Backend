@@ -34,6 +34,7 @@ import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { tokenType } from 'src/common/enums';
+import { Public } from '../../libs/decorator/public.decorator';
 
 /**
  * Interface for authenticated request with user info
@@ -171,6 +172,7 @@ export class ProductReviewsController {
    * Public endpoint
    */
   @Get()
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get all product reviews',
@@ -240,6 +242,7 @@ export class ProductReviewsController {
    * Public endpoint
    */
   @Get('product/:productId')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get all reviews for a product',
@@ -284,6 +287,7 @@ export class ProductReviewsController {
    * Public endpoint
    */
   @Get('product/:productId/stats')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get product review statistics',

@@ -84,7 +84,7 @@ export class RecipeService {
         // Upload thumbnail if provided
         if (thumbnail) {
           try {
-            const thumbnailUrl = await this.awsService.uploadFile('recipes', recipe.id, thumbnail);
+            const thumbnailUrl = await this.awsService.uploadFile(userId+'/recipes', recipe.id, thumbnail);
             const updatedRecipe = await tx.recipe.update({
               where: { id: recipe.id },
               data: { thumbnailUrl },

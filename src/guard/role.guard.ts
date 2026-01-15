@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from 'libs/decorator';
+import { ROLES_KEY, IS_PUBLIC } from 'libs/decorator';
 import { AppLogger } from 'libs/logger';
 import { Request } from 'express';
 import { TokenPayload } from 'libs/constants/interface';
@@ -20,6 +20,19 @@ export class RolesGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
+    // Check if the route is marked as public
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      this.logger.debug(
+        `[${this.context}] Route is public, skipping role check`,
+      );
+      return true;
+    }
+
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),

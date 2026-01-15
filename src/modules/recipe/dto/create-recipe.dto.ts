@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsArray,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ERecipeCategory } from '../enums/recipe.enum';
 
 export class CreateRecipeDto {
@@ -37,10 +38,34 @@ export class CreateRecipeDto {
   content?: string;
 
   @ApiPropertyOptional({
-    description: 'Recipe ingredients',
+    description: 'Recipe ingredients (can be a string or array of strings)',
     example: ['Pasta', 'Tomato', 'Garlic', 'Cheese'],
   })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) {
+      return value;
+    }
+    // If already an array, return as is
+    if (Array.isArray(value)) {
+      return value;
+    }
+    // If it's a string, try to parse as JSON first
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      } catch {
+        // Not valid JSON, treat as single string value
+      }
+      // Convert single string to array
+      return [value];
+    }
+    // For numbers or other types, convert to string and wrap in array
+    return [String(value)];
+  })
   @IsArray({ message: 'Ingredients must be an array' })
   @IsString({ each: true, message: 'Each ingredient must be a string' })
   ingredients?: string[];
