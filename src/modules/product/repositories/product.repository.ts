@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { DuplicateError } from '../../../utils/customErrors';
 import { toProductEntity, toProductEntityWithRelations } from '../mapper/product.mapper';
 import { CreateProductDto, CreateProductSpecialOfferDto, UpdateProductDto } from '../dto/product.dto';
+import { isValidS3Url } from '../../../utils/s3-helper';
 
 export interface ProductFilters {
   search?: string;
@@ -49,7 +50,18 @@ export class ProductRepository {
       },
     });
 
-    return products.map(product => toProductEntityWithRelations(product));
+    // Filter products that have at least one valid S3 image URL
+    const filteredProducts = products.filter(product => {
+      const hasValidImage = 
+        (product.imageRegistrationDetail && isValidS3Url(product.imageRegistrationDetail)) ||
+        (product.imageRegistrationList && isValidS3Url(product.imageRegistrationList)) ||
+        (product.imageRegistrationSmallList && isValidS3Url(product.imageRegistrationSmallList)) ||
+        (product.imageRegistrationThumbnail && isValidS3Url(product.imageRegistrationThumbnail));
+      
+      return hasValidImage;
+    });
+
+    return filteredProducts.map(product => toProductEntityWithRelations(product));
   }
 
   /**

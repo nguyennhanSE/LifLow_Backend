@@ -3,6 +3,7 @@ import { IAwsService } from './aws.interface';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { config } from '../../config';
 import { AppLogger } from 'src/libs/logger/logger.service';
+import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 
 @Injectable()
 export class AwsService implements IAwsService {
@@ -68,6 +69,81 @@ export class AwsService implements IAwsService {
 
     getPublicUrl(key: string): string {
         return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+    }
+
+    async listObjects(prefix: string): Promise<string[]> {
+        const command = new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: prefix,
+        });
+        
+        const response = await this.s3.send(command);
+        const keys = (response.Contents || [])
+            .map(obj => obj.Key)
+            .filter((key): key is string => !!key);
+        
+        return keys;
+    }
+    
+    async getRandomImageFromFolder(folderPath: string): Promise<string | null> {
+        try {
+            // Đảm bảo folder path kết thúc bằng / nếu chưa có
+            const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+            
+            // List tất cả objects trong folder
+            const keys = await this.listObjects(prefix);
+            
+            // Lọc ra các file ảnh (jpg, jpeg, png, webp, gif)
+            const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+            const imageKeys = keys.filter(key => {
+                const lowerKey = key.toLowerCase();
+                return imageExtensions.some(ext => lowerKey.endsWith(ext));
+            });
+            
+            if (imageKeys.length === 0) {
+                this.logger.warn(`No images found in folder: ${folderPath}`);
+                return null;
+            }
+            
+            // Chọn random một ảnh
+            const randomIndex = Math.floor(Math.random() * imageKeys.length);
+            const randomKey = imageKeys[randomIndex];
+            
+            // Trả về public URL
+            return this.getPublicUrl(randomKey);
+        } catch (error) {
+            this.logger.error(`Failed to get random image from folder: ${folderPath}`, error);
+            throw error;
+        }
+    }
+    
+    async getImageByIndex(folderPath: string, index: number): Promise<string | null> {
+        try {
+            const prefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`;
+            const keys = await this.listObjects(prefix);
+            
+            const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+            const imageKeys = keys
+                .filter(key => {
+                    const lowerKey = key.toLowerCase();
+                    return imageExtensions.some(ext => lowerKey.endsWith(ext));
+                })
+                .sort(); // Sắp xếp để đảm bảo thứ tự nhất quán
+            
+            if (imageKeys.length === 0) {
+                this.logger.warn(`No images found in folder: ${folderPath}`);
+                return null;
+            }
+            
+            // Lấy ảnh theo index (0-based)
+            const actualIndex = index >= 0 ? index % imageKeys.length : (imageKeys.length + index) % imageKeys.length;
+            const selectedKey = imageKeys[actualIndex];
+            
+            return this.getPublicUrl(selectedKey);
+        } catch (error) {
+            this.logger.error(`Failed to get image by index from folder: ${folderPath}`, error);
+            throw error;
+        }
     }
 }
 

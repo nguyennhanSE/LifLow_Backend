@@ -6,6 +6,8 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parse } from 'csv-parse/sync';
+import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { defaultProvider } from '@aws-sdk/credential-provider-node';
 
 // Load environment variables
 const NODE_ENV = process.env.NODE_ENV || 'production';
@@ -460,6 +462,205 @@ async function seedUsers() {
 
 
 // ========================================
+// Helper: Initialize S3 Client
+// ========================================
+function getS3Client(): S3Client {
+  const region = process.env.AWS_REGION || 'ap-northeast-2';
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+
+  const credentials = (accessKeyId && secretAccessKey)
+    ? { accessKeyId, secretAccessKey }
+    : defaultProvider();
+
+  return new S3Client({ region, credentials });
+}
+
+// Flag to track if permission error has been logged (to avoid spam)
+let s3PermissionErrorLogged = false;
+// Flags for debug logging (to avoid spam)
+let s3DebugPrefixLogged = false;
+let s3SampleKeysLogged = false;
+
+// ========================================
+// Helper: Get random image from S3 folder
+// ========================================
+async function getRandomImageFromFolder(s3Client: S3Client, bucket: string, folderPath: string): Promise<string | null> {
+  try {
+    // Map folder name if it exists in mapping (for cases where S3 folder name differs)
+    const actualFolderPath = folderNameMapping[folderPath] || folderPath;
+    const prefix = actualFolderPath.endsWith('/') ? actualFolderPath : `${actualFolderPath}/`;
+    
+    // Debug: log prefix để kiểm tra
+    if (!s3DebugPrefixLogged) {
+      console.log(`🔍 Debug: Searching with prefix: "${prefix}"`);
+      s3DebugPrefixLogged = true;
+    }
+    
+    const command = new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+    });
+    
+    const response = await s3Client.send(command);
+    const keys = (response.Contents || [])
+      .map(obj => obj.Key)
+      .filter((key): key is string => !!key);
+    
+    // Debug: log keys đầu tiên để xem format thực tế
+    if (keys.length > 0 && !s3SampleKeysLogged) {
+      console.log(`🔍 Debug: Sample keys from S3 (first 3):`, keys.slice(0, 3));
+      s3SampleKeysLogged = true;
+    }
+    
+    // Lọc ra các file ảnh (không phân biệt hoa thường)
+    // Hỗ trợ cả .JPG, .jpg, .JPEG, .jpeg, etc.
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+    const imageKeys = keys.filter(key => {
+      // Convert key về lowercase để so sánh không phân biệt hoa thường
+      const lowerKey = key.toLowerCase();
+      // Check xem key có kết thúc bằng một trong các extension không
+      return imageExtensions.some(ext => lowerKey.endsWith(ext));
+    });
+    
+    if (imageKeys.length === 0) {
+      // Debug: log một vài keys đầu tiên để xem format
+      if (keys.length > 0) {
+        console.warn(`⚠️  No images found in folder: ${folderPath}`);
+        console.warn(`   Found ${keys.length} objects, first few keys:`, keys.slice(0, 3));
+      } else {
+        // Thử lại với prefix không có trailing slash
+        if (prefix.endsWith('/')) {
+          const altPrefix = prefix.slice(0, -1);
+          const altCommand = new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: altPrefix,
+          });
+          const altResponse = await s3Client.send(altCommand);
+          const altKeys = (altResponse.Contents || [])
+            .map(obj => obj.Key)
+            .filter((key): key is string => !!key);
+          
+          if (altKeys.length > 0) {
+            console.warn(`⚠️  No images found in folder: ${folderPath} (tried with trailing slash, found ${altKeys.length} objects without slash)`);
+            console.warn(`   Sample keys:`, altKeys.slice(0, 3));
+          } else {
+            console.warn(`⚠️  No images found in folder: ${folderPath} (no objects in folder, tried both with and without trailing slash)`);
+          }
+        } else {
+          console.warn(`⚠️  No images found in folder: ${folderPath} (no objects in folder)`);
+        }
+      }
+      return null;
+    }
+    
+    // Chọn random một ảnh
+    const randomIndex = Math.floor(Math.random() * imageKeys.length);
+    const randomKey = imageKeys[randomIndex];
+    
+    // Trả về public URL
+    const region = process.env.AWS_REGION || 'ap-northeast-2';
+    return `https://${bucket}.s3.${region}.amazonaws.com/${randomKey}`;
+  } catch (error: any) {
+    // Handle permission errors gracefully
+    if (error?.Code === 'AccessDenied' || error?.name === 'AccessDenied') {
+      // Only log once to avoid spam
+      if (!s3PermissionErrorLogged) {
+        console.warn(`⚠️  S3 ListBucket permission denied. Skipping image updates. Add s3:ListBucket permission to IAM user or skip image updates.`);
+        s3PermissionErrorLogged = true;
+      }
+      return null;
+    }
+    // For other errors, log a brief message without full stack trace
+    console.warn(`⚠️  Failed to get random image from folder: ${folderPath} - ${error?.message || error?.Code || 'Unknown error'}`);
+    return null;
+  }
+}
+
+// ========================================
+// Mapping: Folder name in code -> Actual folder name in S3
+// ========================================
+const folderNameMapping: { [key: string]: string } = {
+  'seed/24. 곱창류 5종': 'seed/24. 곰탕류 5종', // Tên trong S3 khác với mapping
+};
+
+// ========================================
+// Mapping: Product number -> Folder name
+// ========================================
+function getFolderForProduct(productNumber: number): string | null {
+  const mapping: { [key: number]: string } = {
+    // 1. 언양불고기
+    56: 'seed/1. 언양불고기',
+    102: 'seed/1. 언양불고기',
+    119: 'seed/1. 언양불고기',
+    120: 'seed/1. 언양불고기',
+    121: 'seed/1. 언양불고기',
+    256: 'seed/1. 언양불고기',
+    // 2. 한우샤브샤브
+    252: 'seed/2. 한우샤브샤브',
+    // 3. LA갈비
+    39: 'seed/3. LA갈비',
+    43: 'seed/3. LA갈비',
+    45: 'seed/3. LA갈비',
+    260: 'seed/3. LA갈비',
+    // 4. 제주흑돼지 불고기
+    272: 'seed/4. 제주흑돼지 불고기',
+    // 5. 돼지막창류
+    38: 'seed/5. 돼지막창류',
+    // 6. 한우떡갈비
+    109: 'seed/6. 한우떡갈비',
+    271: 'seed/6. 한우떡갈비',
+    // 7. 연평도 게장
+    268: 'seed/7. 연평도 게장',
+    // 8. 새우장
+    267: 'seed/8. 새우장',
+    // 9. 꼬막장
+    266: 'seed/9. 꼬막장',
+    // 10. 한우불고기 전골, 실속형
+    258: 'seed/10. 한우불고기 전골, 실속형',
+    278: 'seed/10. 한우불고기 전골, 실속형',
+    // 11. 한돈 돼지갈비, 실속형
+    24: 'seed/11. 한돈 돼지갈비, 실속형',
+    // 12. 한우곱창류
+    32: 'seed/12. 한우곱창류',
+    275: 'seed/12. 한우곱창류',
+    // 13. 양념게장
+    33: 'seed/13. 양념게장',
+    // 14. 갈비탕
+    46: 'seed/14. 갈비탕',
+    255: 'seed/14. 갈비탕',
+    277: 'seed/14. 갈비탕',
+    // 15. 육개장
+    276: 'seed/15. 육개장',
+    // 16. 너티버티
+    172: 'seed/16. 너티버티',
+    // 18. 냉면
+    270: 'seed/18. 냉면',
+    // 19. 1등급 암소한우 등심
+    88: 'seed/19. 1등급 암소한우 등심',
+    143: 'seed/19. 1등급 암소한우 등심',
+    // 20. 왕구이
+    95: 'seed/20. 왕구이',
+    // 21. 수산
+    115: 'seed/21. 수산',
+    133: 'seed/21. 수산',
+    249: 'seed/21. 수산',
+    // 22. 무항생제 한돈
+    158: 'seed/22. 무항생제 한돈',
+    262: 'seed/22. 무항생제 한돈',
+    // 24. 곰탕류 5종 (tên trong S3)
+    257: 'seed/24. 곰탕류 5종',
+    // 27. 생고기
+    261: 'seed/27. 생고기',
+    // 31. 수제 안창 토시 양념
+    6: 'seed/31. 수제 안창 토시 양념',
+    14: 'seed/31. 수제 안창 토시 양념',
+  };
+  
+  return mapping[productNumber] || null;
+}
+
+// ========================================
 // FUNCTION 2: Seed Products (Import products from CSV)
 // ========================================
 async function seedProducts() {
@@ -605,21 +806,211 @@ async function seedProducts() {
 
       console.log(`✅ Prepared ${productsToInsert.length} products (skipped ${skippedCount})`);
       
-      // Batch insert in chunks
-      const BATCH_SIZE = 500;
-      let insertedCount = 0;
+      // ========================================
+      // STEP 2: Insert all products first (without updating images)
+      // ========================================
+      console.log('📝 Inserting all products...');
       
-      for (let i = 0; i < productsToInsert.length; i += BATCH_SIZE) {
-        const batch = productsToInsert.slice(i, i + BATCH_SIZE);
-        await prisma.product.createMany({
-          data: batch,
-          skipDuplicates: true,
-        });
-        insertedCount += batch.length;
-        console.log(`📝 Inserted ${insertedCount}/${productsToInsert.length} products...`);
+      // Insert products one by one to maintain index mapping
+      let insertedCount = 0;
+      const insertedProductIds: string[] = [];
+      
+      for (let i = 0; i < productsToInsert.length; i++) {
+        const productData = productsToInsert[i];
+        
+        try {
+          // Insert product
+          const product = await prisma.product.create({
+            data: productData,
+          });
+          
+          insertedProductIds.push(product.id);
+          insertedCount++;
+          
+          if (insertedCount % 50 === 0) {
+            console.log(`📝 Inserted ${insertedCount}/${productsToInsert.length} products...`);
+          }
+        } catch (error) {
+          console.error(`⚠️  Error inserting product ${i}:`, error instanceof Error ? error.message : String(error));
+        }
       }
       
       console.log(`✅ Successfully imported ${insertedCount} products from CSV`);
+      
+      // ========================================
+      // STEP 3: Update images for products based on getFolderForProduct mapping
+      // ========================================
+      console.log('🖼️  Updating product images from S3...');
+      
+      // Initialize S3 client
+      const s3Client = getS3Client();
+      const bucket = process.env.AWS_S3_BUCKET || '';
+      
+      // Check S3 permissions early by testing with a dummy folder
+      let canAccessS3 = false;
+      if (bucket) {
+        try {
+          // Test S3 access with a non-existent folder to check permissions
+          const testCommand = new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: 'seed/_permission_test_',
+            MaxKeys: 1,
+          });
+          await s3Client.send(testCommand);
+          canAccessS3 = true;
+          
+          // List all folders in S3 to help debug mapping issues
+          try {
+            const listFoldersCommand = new ListObjectsV2Command({
+              Bucket: bucket,
+              Prefix: 'seed/',
+              Delimiter: '/',
+            });
+            const foldersResponse = await s3Client.send(listFoldersCommand);
+            const folders = (foldersResponse.CommonPrefixes || [])
+              .map(prefix => prefix.Prefix)
+              .filter((prefix): prefix is string => !!prefix)
+              .map(prefix => prefix.replace('seed/', '').replace('/', ''));
+            
+            if (folders.length > 0) {
+              console.log(`📁 Found ${folders.length} folders in S3:`);
+              folders.slice(0, 20).forEach(folder => console.log(`   - ${folder}`));
+              if (folders.length > 20) {
+                console.log(`   ... and ${folders.length - 20} more folders`);
+              }
+              
+              // Get unique folder paths from mapping
+              const mappingFolders = new Set<string>();
+              for (let num = 0; num < 300; num++) {
+                const folder = getFolderForProduct(num);
+                if (folder) {
+                  const folderName = folder.replace('seed/', '');
+                  mappingFolders.add(folderName);
+                }
+              }
+              
+              // Create reverse mapping from S3 folder names to mapping folder names
+              // This helps handle encoding issues
+              const s3ToMappingMap: { [key: string]: string } = {};
+              for (const s3Folder of folders) {
+                // Try to find matching folder in mapping (normalize for comparison)
+                const normalizedS3 = s3Folder.trim().normalize('NFC');
+                let found = false;
+                for (const mappingFolder of mappingFolders) {
+                  const normalizedMapping = mappingFolder.trim().normalize('NFC');
+                  if (normalizedS3 === normalizedMapping) {
+                    s3ToMappingMap[`seed/${mappingFolder}`] = `seed/${s3Folder}`;
+                    found = true;
+                    break;
+                  }
+                }
+                // If not found, try fuzzy matching (remove spaces, compare)
+                if (!found) {
+                  const s3NoSpaces = normalizedS3.replace(/\s+/g, '');
+                  for (const mappingFolder of mappingFolders) {
+                    const mappingNoSpaces = mappingFolder.trim().normalize('NFC').replace(/\s+/g, '');
+                    if (s3NoSpaces === mappingNoSpaces) {
+                      s3ToMappingMap[`seed/${mappingFolder}`] = `seed/${s3Folder}`;
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              // Add reverse mappings to folderNameMapping
+              Object.assign(folderNameMapping, s3ToMappingMap);
+              
+              // Log mappings created
+              if (Object.keys(s3ToMappingMap).length > 0) {
+                console.log(`🔗 Created ${Object.keys(s3ToMappingMap).length} folder name mappings`);
+              }
+              
+              // Find folders in mapping but not in S3 (after reverse mapping)
+              const missingFolders = Array.from(mappingFolders).filter(f => {
+                const normalizedF = f.normalize('NFC');
+                return !folders.some(s3f => s3f.normalize('NFC') === normalizedF);
+              });
+              if (missingFolders.length > 0) {
+                console.warn(`⚠️  ${missingFolders.length} folders in mapping but not found in S3:`);
+                missingFolders.slice(0, 10).forEach(folder => console.warn(`   - ${folder}`));
+                if (missingFolders.length > 10) {
+                  console.warn(`   ... and ${missingFolders.length - 10} more`);
+                }
+              }
+            }
+          } catch (listError) {
+            // Ignore errors when listing folders, not critical
+          }
+        } catch (error: any) {
+          if (error?.Code === 'AccessDenied' || error?.name === 'AccessDenied') {
+            console.warn('⚠️  S3 ListBucket permission denied. Skipping all image updates.');
+            console.warn('   To enable image updates, add s3:ListBucket permission to your IAM user.');
+            canAccessS3 = false;
+          } else {
+            // Other errors might be okay (e.g., bucket doesn't exist, network issues)
+            // We'll try anyway and handle errors per-folder
+            canAccessS3 = true;
+          }
+        }
+      } else {
+        console.warn('⚠️  AWS_S3_BUCKET not configured, skipping image updates');
+      }
+      
+      // Update images for each product based on productNumber (index)
+      let updatedImageCount = 0;
+      
+      if (bucket && canAccessS3) {
+        for (let i = 0; i < insertedProductIds.length; i++) {
+          const productId = insertedProductIds[i];
+          const productNumber = i; // productNumber is 0-based index
+          
+          try {
+            const folderPath = getFolderForProduct(productNumber);
+            if (folderPath) {
+              try {
+                // Get random images for all 4 image fields
+                const [thumbnail, list, smallList, detail] = await Promise.all([
+                  getRandomImageFromFolder(s3Client, bucket, folderPath),
+                  getRandomImageFromFolder(s3Client, bucket, folderPath),
+                  getRandomImageFromFolder(s3Client, bucket, folderPath),
+                  getRandomImageFromFolder(s3Client, bucket, folderPath),
+                ]);
+                
+                // Only update fields that have valid images
+                const updateData: {
+                  imageRegistrationThumbnail?: string;
+                  imageRegistrationList?: string;
+                  imageRegistrationSmallList?: string;
+                  imageRegistrationDetail?: string;
+                } = {};
+                if (thumbnail) updateData.imageRegistrationThumbnail = thumbnail;
+                if (list) updateData.imageRegistrationList = list;
+                if (smallList) updateData.imageRegistrationSmallList = smallList;
+                if (detail) updateData.imageRegistrationDetail = detail;
+                
+                // Update product with images if we got at least one
+                if (Object.keys(updateData).length > 0) {
+                  await prisma.product.update({
+                    where: { id: productId },
+                    data: updateData,
+                  });
+                  
+                  updatedImageCount++;
+                  if (updatedImageCount % 50 === 0) {
+                    console.log(`🖼️  Updated images for ${updatedImageCount} products...`);
+                  }
+                }
+              } catch (error) {
+                // Error already handled in getRandomImageFromFolder
+              }
+            }
+          } catch (error) {
+            console.error(`⚠️  Error updating images for product ${productNumber}:`, error instanceof Error ? error.message : String(error));
+          }
+        }
+        
+        console.log(`✅ Updated images for ${updatedImageCount} products from S3`);
+      }
       
     } catch (error) {
       console.error('❌ Error importing products CSV:', error);
@@ -846,11 +1237,10 @@ async function seedPoints() {
       const existingOrderGroups = await prisma.orderGroup.findMany({
         select: { orderGroupNumber: true }
       });
-      const existingOrderGroupNumbers = new Set<string>(
-        existingOrderGroups
-          .map(og => og.orderGroupNumber)
-          .filter((num): num is string => num !== null && num !== undefined)
-      );
+      const orderGroupNumberArray: string[] = existingOrderGroups
+        .map(og => og.orderGroupNumber)
+        .filter((num): num is string => typeof num === 'string');
+      const existingOrderGroupNumbers = new Set<string>(orderGroupNumberArray);
       console.log(`📦 Found ${existingOrderGroupNumbers.size} order groups in database`);
 
       // Prepare data for batch insert
@@ -979,53 +1369,53 @@ async function seedCategories() {
   // Product category mapping by row index (1-based)
   const productCategoryMap: { [key: number]: number } = {
     // LIVESTOCK (축산)
-    57: livestockCategory.productCategoryNumber,
-    103: livestockCategory.productCategoryNumber,
+    56: livestockCategory.productCategoryNumber,
+    102: livestockCategory.productCategoryNumber,
+    119: livestockCategory.productCategoryNumber,
     120: livestockCategory.productCategoryNumber,
     121: livestockCategory.productCategoryNumber,
-    122: livestockCategory.productCategoryNumber,
-    257: livestockCategory.productCategoryNumber,
-    253: livestockCategory.productCategoryNumber,
-    40: livestockCategory.productCategoryNumber,
-    44: livestockCategory.productCategoryNumber,
-    46: livestockCategory.productCategoryNumber,
-    261: livestockCategory.productCategoryNumber,
-    273: livestockCategory.productCategoryNumber,
+    256: livestockCategory.productCategoryNumber,
+    252: livestockCategory.productCategoryNumber,
     39: livestockCategory.productCategoryNumber,
-    110: livestockCategory.productCategoryNumber,
+    43: livestockCategory.productCategoryNumber,
+    45: livestockCategory.productCategoryNumber,
+    260: livestockCategory.productCategoryNumber,
     272: livestockCategory.productCategoryNumber,
-    25: livestockCategory.productCategoryNumber,
-    33: livestockCategory.productCategoryNumber,
-    276: livestockCategory.productCategoryNumber,
-    258: livestockCategory.productCategoryNumber,
-    89: livestockCategory.productCategoryNumber,
-    144: livestockCategory.productCategoryNumber,
-    96: livestockCategory.productCategoryNumber,
-    159: livestockCategory.productCategoryNumber,
-    263: livestockCategory.productCategoryNumber,
+    38: livestockCategory.productCategoryNumber,
+    109: livestockCategory.productCategoryNumber,
+    271: livestockCategory.productCategoryNumber,
+    24: livestockCategory.productCategoryNumber,
+    32: livestockCategory.productCategoryNumber,
+    275: livestockCategory.productCategoryNumber,
+    257: livestockCategory.productCategoryNumber,
+    88: livestockCategory.productCategoryNumber,
+    143: livestockCategory.productCategoryNumber,
+    95: livestockCategory.productCategoryNumber,
+    158: livestockCategory.productCategoryNumber,
     262: livestockCategory.productCategoryNumber,
-    7: livestockCategory.productCategoryNumber,
-    15: livestockCategory.productCategoryNumber,
+    261: livestockCategory.productCategoryNumber,
+    6: livestockCategory.productCategoryNumber,
+    14: livestockCategory.productCategoryNumber,
     
     // CONVENIENCE_FOOD (간편식)
-    259: convenienceFoodCategory.productCategoryNumber,
-    279: convenienceFoodCategory.productCategoryNumber,
-    47: convenienceFoodCategory.productCategoryNumber,
-    256: convenienceFoodCategory.productCategoryNumber,
+    258: convenienceFoodCategory.productCategoryNumber,
     278: convenienceFoodCategory.productCategoryNumber,
+    46: convenienceFoodCategory.productCategoryNumber,
+    255: convenienceFoodCategory.productCategoryNumber,
     277: convenienceFoodCategory.productCategoryNumber,
-    271: convenienceFoodCategory.productCategoryNumber,
+    276: convenienceFoodCategory.productCategoryNumber,
+    270: convenienceFoodCategory.productCategoryNumber,
     
     // FISHERIES (수산)
-    269: fisheriesCategory.productCategoryNumber,
-    116: fisheriesCategory.productCategoryNumber,
-    134: fisheriesCategory.productCategoryNumber,
-    250: fisheriesCategory.productCategoryNumber,
+    268: fisheriesCategory.productCategoryNumber,
+    115: fisheriesCategory.productCategoryNumber,
+    133: fisheriesCategory.productCategoryNumber,
+    249: fisheriesCategory.productCategoryNumber,
     
     // SIDE_DISH (반찬)
-    268: sideDishCategory.productCategoryNumber,
     267: sideDishCategory.productCategoryNumber,
-    34: sideDishCategory.productCategoryNumber,
+    266: sideDishCategory.productCategoryNumber,
+    33: sideDishCategory.productCategoryNumber,
   };
 
   let updatedCount = 0;
@@ -1230,18 +1620,20 @@ async function seedBanners() {
   // Seed Banners
   console.log('🎨 Seeding banners...');
   
-  // Get some products for MAIN_PRODUCTS banner
-  const products = await prisma.product.findMany({
-    take: 1,
+  // Check if the specified product exists
+  const product = await prisma.product.findFirst({
+    where: { displayStatus: 'Y' },
     select: { id: true },
   });
+
+  const mainProductId = product ? product.id : null;
   
   const banners = [
     // 1. MAIN_PRODUCTS Banner (1 banner)
     {
       type: 'MAIN_PRODUCTS',
       status: 'ACTIVE',
-      productId: products.length > 0 ? products[0].id : null,
+      productId: mainProductId,
       category: null,
       title: 'Main Product Featured Banner',
       badgeText: 'Special Offer',
@@ -1443,6 +1835,127 @@ async function seedBanners() {
 }
 
 // ========================================
+// FUNCTION 9: Seed Test User
+// ========================================
+async function seedTestUser() {
+  console.log('🌱 Starting test user seed...');
+  
+  const email = 'user@example.com';
+  const password = '123456';
+  const userId = 'testuser';
+  
+  // Hash password
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const registrationDate = new Date().toISOString().split('T')[0];
+  
+  // Check if user already exists
+  const existingUser = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+  
+  let testUser;
+  if (existingUser) {
+    // Update existing user
+    testUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+        name: 'Test User',
+        email: email,
+        membershipLevel: 'LV1. 씨앗',
+        totalUsedPoints: 0,
+        availablePoints: 0,
+        totalPurchaseAmount: 0,
+      },
+    });
+    console.log(`✅ Test user updated: ${testUser.id}`);
+  } else {
+    // Create new user
+    testUser = await prisma.user.create({
+      data: {
+        id: userId,
+        password: hashedPassword,
+        name: 'Test User',
+        email: email,
+        registrationDate: registrationDate,
+        membershipLevel: 'LV1. 씨앗',
+        totalUsedPoints: 0,
+        availablePoints: 0,
+        totalPurchaseAmount: 0,
+      },
+    });
+    console.log(`✅ Test user created: ${testUser.id}`);
+  }
+  
+  // Get USER role
+  const userRole = await prisma.role.findFirst({
+    where: { name: 'USER' },
+  });
+  
+  if (!userRole) {
+    throw new Error('USER role not found. Please run seedUsers() first.');
+  }
+  
+  // Check if userRole already exists
+  const existingUserRole = await prisma.userRole.findFirst({
+    where: {
+      userId: testUser.id,
+      roleId: userRole.id,
+    },
+  });
+  
+  if (!existingUserRole) {
+    await prisma.userRole.create({
+      data: {
+        userId: testUser.id,
+        roleId: userRole.id,
+      },
+    });
+    console.log(`✅ Assigned USER role to test user: ${testUser.id}`);
+  } else {
+    console.log(`⏭️  User role already exists for test user: ${testUser.id}`);
+  }
+  
+  // Get LV1. 씨앗 membership
+  const membership = await prisma.membership.findFirst({
+    where: { name: 'LV1. 씨앗' },
+  });
+  
+  if (!membership) {
+    throw new Error('LV1. 씨앗 membership not found. Please run seedMemberships() first.');
+  }
+  
+  // Check if userMembership already exists
+  const existingUserMembership = await prisma.userMembership.findUnique({
+    where: { userId: testUser.id },
+  });
+  
+  if (!existingUserMembership) {
+    // Calculate dates based on basePeriod or default to 1 year
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setFullYear(endDate.getFullYear() + (membership.basePeriod ? Math.floor(membership.basePeriod / 365) : 1));
+    
+    await prisma.userMembership.create({
+      data: {
+        userId: testUser.id,
+        membershipId: membership.id,
+        membershipName: membership.name || '',
+        membershipDescription: membership.description || '',
+        status: 'normal',
+        startDate: startDate,
+        endDate: endDate,
+      },
+    });
+    console.log(`✅ Created user membership for test user: ${testUser.id} -> ${membership.name}`);
+  } else {
+    console.log(`⏭️  User membership already exists for test user: ${testUser.id}`);
+  }
+  
+  console.log('✨ Test user seed completed successfully!');
+}
+
+// ========================================
 // MAIN FUNCTION - Run seed functions sequentially
 // ========================================
 async function main() {
@@ -1452,13 +1965,16 @@ async function main() {
   // })
   
   // await seedUsers();           // Import users and clear all data
-  // await seedProducts();        // Import products from CSV
+  await seedProducts();        // Import products from CSV
   // await seedOrders();          // Import orders from CSV
   // await seedPoints();          // Import points from CSV
   // await seedCategories();      // Seed categories and update products
   // await seedMemberships();     // Seed memberships only
   // await seedUserMemberships(); // Seed memberships and user memberships
-  await seedBanners();         // Seed all 5 types of banners
+  // await seedBanners();         // Seed all 5 types of banners      
+
+  
+
   
   console.log('\n✨ All seed functions completed successfully!');
 }
