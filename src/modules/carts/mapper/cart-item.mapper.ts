@@ -29,7 +29,7 @@ export class CartItemMapper {
     const entity = new CartItemEntity();
     entity.productId = dto.productId;
     entity.quantity = dto.quantity;
-    entity.salePrice = dto.salePrice;
+    // salePrice is retrieved from the product in the service layer, not from the DTO
     return entity;
   }
 
@@ -62,20 +62,7 @@ export class CartItemMapper {
       productCode: cartItem.product.productCode ?? null,
       salePrice: cartItem.product.salePrice ?? null,
       imageRegistrationThumbnail: cartItem.product.imageRegistrationThumbnail ?? null,
-    } as any; // Using any to match ProductEntity structure
-    entity.product = {
-      id: cartItem.product.id,
-      productName: cartItem.product.productName ?? null,
-      productCode: cartItem.product.productCode ?? null,
-      salePrice: cartItem.product.salePrice ?? null,
-      imageRegistrationThumbnail: cartItem.product.imageRegistrationThumbnail ?? null,
-    } as any; // Using any to match ProductEntity structure
-    entity.product = {
-      id: cartItem.product.id,
-      productName: cartItem.product.productName ?? null,
-      productCode: cartItem.product.productCode ?? null,
-      salePrice: cartItem.product.salePrice ?? null,
-      imageRegistrationThumbnail: cartItem.product.imageRegistrationThumbnail ?? null,
+      deliveryFeeInput: cartItem.product.deliveryFeeInput ?? null,
     } as any; // Using any to match ProductEntity structure
     return entity;
   }
@@ -102,6 +89,7 @@ export class CartItemMapper {
         productCode: entity.product.productCode ?? null,
         salePrice: entity.product.salePrice ?? null,
         imageRegistrationThumbnail: entity.product.imageRegistrationThumbnail ?? null,
+        deliveryFeeInput: (entity.product as any).deliveryFeeInput ?? null,
       } as CartItemProductInfoDto;
     } else {
       dto.product = null;
@@ -127,9 +115,13 @@ export class CartItemMapper {
   static toEntityPartial(dto: UpdateCartItemDto): Partial<CartItemEntity> {
     const partial: Partial<CartItemEntity> = {};
     
-    partial.productId = dto.productId;
-    partial.quantity = dto.quantity;
-    partial.salePrice = dto.salePrice;
+    if (dto.productId !== undefined) {
+      partial.productId = dto.productId;
+    }
+    if (dto.quantity !== undefined) {
+      partial.quantity = dto.quantity;
+    }
+    // salePrice is retrieved from the product in the service layer, not from the DTO
     
     return partial;
   }

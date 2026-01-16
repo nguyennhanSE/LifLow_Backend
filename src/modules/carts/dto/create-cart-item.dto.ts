@@ -24,16 +24,5 @@ export class CreateCartItemDto {
   @IsNotEmpty({ message: 'Quantity is required' })
   @Min(1, { message: 'Quantity must be at least 1' })
   quantity!: number;
-
-  @ApiProperty({
-    description: 'Sale price of the product at the time of adding to cart (in KRW)',
-    example: 29000,
-    minimum: 0,
-  })
-  @Type(() => Number)
-  @IsNumber({}, { message: 'Sale price must be a number' })
-  @IsNotEmpty({ message: 'Sale price is required' })
-  @Min(0, { message: 'Sale price must be 0 or greater' })
-  salePrice!: number;
 }
 

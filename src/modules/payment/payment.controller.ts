@@ -84,9 +84,9 @@ export class PaymentController {
       const payment = await this.paymentService.initiatePayment(
         userId, 
         initiatePaymentDto.cartItems, 
+        initiatePaymentDto.userShippingAddressId,
         initiatePaymentDto.points,
-        initiatePaymentDto.deliveryFee,
-        initiatePaymentDto.userShippingAddressId
+        initiatePaymentDto.deliveryFee
       );
       responseModel.setData(payment);
       return responseModel;

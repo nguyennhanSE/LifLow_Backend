@@ -45,9 +45,9 @@ export class PaymentService {
   async initiatePayment(
     userId: string,
     cartItems: Array<{ cartItemId: string; couponIds?: string[] }>,
+    userShippingAddressId: string,
     points?: number,
     deliveryFee?: number,
-    userShippingAddressId?: string,
   ): Promise<InitiatePaymentResponseDto> {
     this.logger.log(`Initiating payment for user: ${userId}`, {
       cartItems,
@@ -55,6 +55,9 @@ export class PaymentService {
       deliveryFee,
       userShippingAddressId,
     });
+    if (!userShippingAddressId) {
+      throw new BadRequestException('User shipping address ID is required');
+    }
 
     try {
       // 1. Validate user exists
@@ -332,9 +335,9 @@ export class PaymentService {
           deliveryAddress: string;
           address: string;
           addressFull: string;
-          postalCode: number;
-          mobilePhone: string;
-          phoneNumber: string;
+          postalCode: number | null;
+          mobilePhone: string | null;
+          phoneNumber: string | null;
           setAsDefault: boolean;
         } | null = null;
         
@@ -356,7 +359,7 @@ export class PaymentService {
           shippingAddress = address;
         } else {
           // Get default shipping address by userId
-          shippingAddress = await tx.userShippingAddress.findUnique({
+          shippingAddress = await tx.userShippingAddress.findFirst({
             where: { userId: dto.userId },
           });
         }

@@ -35,6 +35,9 @@ export class CartItemProductInfoDto {
 
   @ApiPropertyOptional({ description: 'Product image URL', example: 'https://example.com/image.jpg' })
   imageRegistrationThumbnail?: string | null;
+
+  @ApiPropertyOptional({ description: 'Product delivery fee input', example: '3000' })
+  deliveryFeeInput?: string | null;
 }
 
 /**

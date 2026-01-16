@@ -827,11 +827,15 @@ export class UserRepository {
   /**
    * Get user shipping address (only one address per user due to unique constraint)
    */
-  async getUserShippingAddresses(userId: string): Promise<any> {
+  async getUserShippingAddresses(userId: string): Promise<any[]> {
     try {
-      return await this.prisma.userShippingAddress.findUnique({
+      return await this.prisma.userShippingAddress.findMany({
         where: { userId },
-      }) || [];
+        orderBy: [
+          { setAsDefault: 'desc' },
+          { createdAt: 'desc' },
+        ],
+      });
     } catch (error) {
       console.error('Prisma error in getUserShippingAddresses:', error);
       throw error;
@@ -844,7 +848,7 @@ export class UserRepository {
   async createUserShippingAddress(userId: string, addressData: {
     deliveryAddress: string;
     recipientName: string;
-    mobilePhone: string;
+    mobilePhone?: string;
     phoneNumber?: string;
     postalCode: number;
     address: string;
@@ -854,22 +858,24 @@ export class UserRepository {
     try {
       // Prepare data for database
       const { phoneNumber, setAsDefault, ...restData } = addressData;
+      const isDefault = setAsDefault ?? false;
+      
       const dbData = {
         ...restData,
         phoneNumber: phoneNumber || '', // Default to empty string if not provided
-        setAsDefault: setAsDefault ?? false, // Default to false if not provided
+        setAsDefault: isDefault,
       };
       
-      // Check if user already has a shipping address (since userId is unique)
-      const existingAddress = await this.prisma.userShippingAddress.findUnique({
-        where: { userId },
-      });
-
-      if (existingAddress) {
-        // Update existing address instead of creating new one
-        return await this.prisma.userShippingAddress.update({
-          where: { userId },
-          data: dbData,
+      // If setting as default, update all existing addresses to setAsDefault = false
+      if (isDefault) {
+        await this.prisma.userShippingAddress.updateMany({
+          where: { 
+            userId,
+            setAsDefault: true,
+          },
+          data: {
+            setAsDefault: false,
+          },
         });
       }
 

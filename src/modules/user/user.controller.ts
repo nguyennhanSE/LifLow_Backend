@@ -557,8 +557,8 @@ export class UserController {
 
   @Get('/me/shipping-address')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
-  @ApiOperation({ summary: 'Get user shipping address' })
-  @ApiResponse({ status: 200, description: 'User shipping address retrieved successfully (returns null if no address found)' })
+  @ApiOperation({ summary: 'Get user shipping addresses' })
+  @ApiResponse({ status: 200, description: 'User shipping addresses retrieved successfully (returns empty array if no addresses found)' })
   async getUserShippingAddresses(@Req() req: Request & { user?: TokenPayload }) {
     const responseModel = new ResponseModel();
     try {
@@ -568,8 +568,8 @@ export class UserController {
         throw new ForbiddenException('User not authenticated');
       }
 
-      const address = await this.userService.getUserShippingAddresses(requestingUserId);
-      responseModel.setData(address); // Will be null if no address exists
+      const addresses = await this.userService.getUserShippingAddresses(requestingUserId);
+      responseModel.setData(addresses); // Will be empty array if no addresses exist
     } catch (error) {
       console.error('Error in getUserShippingAddresses:', error);
       throw error;

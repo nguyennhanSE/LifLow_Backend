@@ -253,5 +253,5 @@ export class InitiatePaymentRequestDto {
   @ApiPropertyOptional({ description: '수령인 주소 ID (선택 사항)' })
   @IsOptional()
   @IsString()
-  userShippingAddressId?: string;
+  userShippingAddressId: string;
 }

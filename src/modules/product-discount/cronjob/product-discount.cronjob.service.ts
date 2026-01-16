@@ -11,10 +11,11 @@ export class ProductDiscountCronjobService {
   /**
    * Scheduled cron job that runs every hour to check and update product discount status
    */
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async handleScheduledProductDiscountStatusUpdate() {
     this.logger.log('Starting scheduled product discount status update...');
     await this.updateAllProductDiscountStatuses();
+    await this.recalculateProductSalePrices();
     this.logger.log('Completed scheduled product discount status update');
   }
 
@@ -162,6 +163,109 @@ export class ProductDiscountCronjobService {
   }
 
   /**
+   * Recalculate sale prices for all products with active discounts
+   * This method:
+   * 1. Finds all active product discounts (status = true)
+   * 2. Calculates new salePrice based on productPrice and discountRate
+   * 3. Updates the product's salePrice
+   */
+  async recalculateProductSalePrices(): Promise<{
+    totalProcessed: number;
+    totalUpdated: number;
+    errors: number;
+  }> {
+    this.logger.log('Starting product sale price recalculation based on active discounts');
+
+    const startTime = Date.now();
+    let totalProcessed = 0;
+    let totalUpdated = 0;
+    let errors = 0;
+
+    try {
+      // Get all active product discounts with their product information
+      const activeDiscounts = await this.prisma.productDiscount.findMany({
+        where: {
+          status: true,
+        },
+        select: {
+          id: true,
+          productId: true,
+          discountRate: true,
+          product: {
+            select: {
+              id: true,
+              productPrice: true,
+              salePrice: true,
+            },
+          },
+        },
+      });
+
+      this.logger.log(`Processing ${activeDiscounts.length} active product discounts`);
+
+      // Process each active discount
+      for (const discount of activeDiscounts) {
+        try {
+          // Skip if product doesn't exist or productPrice is not set
+          if (!discount.product || discount.product.productPrice === null || discount.product.productPrice === undefined) {
+            this.logger.warn(
+              `Skipping product ${discount.productId}: product not found or productPrice not set`
+            );
+            totalProcessed++;
+            continue;
+          }
+
+          // Calculate new sale price: productPrice * (1 - discountRate / 100)
+          const productPrice = discount.product.productPrice;
+          const discountRate = discount.discountRate;
+          const newSalePrice = Math.floor(productPrice * (1 - discountRate / 100));
+
+          // Only update if salePrice has changed
+          if (discount.product.salePrice !== newSalePrice) {
+            await this.prisma.product.update({
+              where: { id: discount.productId },
+              data: { salePrice: newSalePrice },
+            });
+
+            totalUpdated++;
+            this.logger.debug(
+              `Updated sale price for product ${discount.productId}: ` +
+                `${discount.product.salePrice} -> ${newSalePrice} ` +
+                `(productPrice: ${productPrice}, discountRate: ${discountRate}%)`
+            );
+          }
+
+          totalProcessed++;
+        } catch (error) {
+          this.logger.error(
+            `Error recalculating sale price for product ${discount.productId}: ${error.message}`,
+            error.stack
+          );
+          errors++;
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `Product sale price recalculation completed in ${duration}ms. ` +
+          `Processed: ${totalProcessed}, Updated: ${totalUpdated}, Errors: ${errors}`
+      );
+
+      return {
+        totalProcessed,
+        totalUpdated,
+        errors,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Failed to recalculate product sale prices',
+        error.stack
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Determine if a discount should be active based on date range
    * Returns true if:
    * - Both dates are set and current date is within range
@@ -193,6 +297,90 @@ export class ProductDiscountCronjobService {
 
     // If we get here, discount should be active
     return true;
+  }
+
+  /**
+   * Recalculate sale price for a specific product by productId
+   * This method:
+   * 1. Finds the product discount for the given productId
+   * 2. If discount is active, calculates new salePrice based on productPrice and discountRate
+   * 3. If discount is not active or doesn't exist, sets salePrice to productPrice
+   * 4. Updates the product's salePrice
+   */
+  async recalculateProductSalePricesById(productId: string): Promise<{
+    salePrice: number;
+  }> {
+    this.logger.log(`Starting product sale price recalculation for product ${productId}`);
+
+    try {
+      // Get product with its current price information
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        select: {
+          id: true,
+          productPrice: true,
+          salePrice: true,
+        },
+      });
+
+      if (!product) {
+        this.logger.warn(`Product ${productId} not found`);
+        throw new Error(`Product ${productId} not found`);
+      }
+
+      if (product.productPrice === null || product.productPrice === undefined) {
+        this.logger.warn(`Product ${productId} does not have productPrice set`);
+        throw new Error(`Product ${productId} does not have productPrice set`);
+      }
+
+      // Get product discount for this product
+      const discount = await this.prisma.productDiscount.findUnique({
+        where: { productId },
+        select: {
+          id: true,
+          status: true,
+          discountRate: true,
+        },
+      });
+
+      let newSalePrice: number;
+
+      // If discount exists and is active, calculate discounted price
+      if (discount && discount.status === true) {
+        // Calculate new sale price: productPrice * (1 - discountRate / 100)
+        newSalePrice = Math.floor(product.productPrice * (1 - discount.discountRate / 100));
+        this.logger.debug(
+          `Calculating discounted price for product ${productId}: ` +
+            `${product.productPrice} * (1 - ${discount.discountRate}%) = ${newSalePrice}`
+        );
+      } else {
+        // If no discount or discount is not active, set salePrice to productPrice
+        newSalePrice = product.productPrice;
+        this.logger.debug(
+          `No active discount for product ${productId}, setting salePrice to productPrice: ${newSalePrice}`
+        );
+      }
+
+      // Update the product's salePrice
+      await this.prisma.product.update({
+        where: { id: productId },
+        data: { salePrice: newSalePrice },
+      });
+
+      this.logger.log(
+        `Updated sale price for product ${productId}: ${product.salePrice} -> ${newSalePrice}`
+      );
+
+      return {
+        salePrice: newSalePrice,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to recalculate sale price for product ${productId}: ${error.message}`,
+        error.stack
+      );
+      throw error;
+    }
   }
 }
 

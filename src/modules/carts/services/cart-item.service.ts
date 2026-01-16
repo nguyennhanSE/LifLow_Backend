@@ -9,6 +9,7 @@ import { PrismaService } from '../../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { CreateCartItemDto } from '../dto/create-cart-item.dto';
 import { UpdateCartItemDto } from '../dto/update-cart-item.dto';
+import { BulkUpdateCartItemsDto } from '../dto/bulk-update-cart-item.dto';
 import { CartItemResponseDto } from '../dto/cart-response.dto';
 import { CartItemMapper } from '../mapper/cart-item.mapper';
 import { CartItemEntity } from '../entities/cart-item.entity';
@@ -63,6 +64,12 @@ export class CartItemService {
         throw new BadRequestException('Product is not available for purchase');
       }
 
+      // Get salePrice from product
+      if (!product.salePrice) {
+        throw new BadRequestException('Product does not have a sale price');
+      }
+      const salePrice = product.salePrice;
+
       // Use transaction to add item and update cart total
       const cartItem = await this.prisma.$transaction(async (tx) => {
         // Check if item already exists in cart
@@ -86,7 +93,7 @@ export class CartItemService {
             where: { id: existingItem.id },
             data: {
               quantity: existingItem.quantity + createDto.quantity,
-              salePrice: createDto.salePrice, // Update to latest price
+              salePrice: salePrice, // Update to latest price from product
             },
             include: {
               product: true,
@@ -104,7 +111,7 @@ export class CartItemService {
               cartId,
               productId: createDto.productId,
               quantity: createDto.quantity,
-              salePrice: createDto.salePrice,
+              salePrice: salePrice, // Get from product
               status: ECartItemStatus.ACTIVE,
             },
             include: {
@@ -333,6 +340,108 @@ export class CartItemService {
         `Failed to update quantity for cart item ${id}: ${error.message}`,
       );
       this.handleError(error, `Failed to update quantity for cart item ${id}`);
+    }
+  }
+
+  /**
+   * Bulk update cart items
+   * @param bulkUpdateDto - Bulk update data containing array of items to update
+   * @returns Array of updated cart items
+   */
+  async bulkUpdateItems(
+    bulkUpdateDto: BulkUpdateCartItemsDto,
+  ): Promise<CartItemResponseDto[]> {
+    try {
+      this.logger.log(`Bulk updating ${bulkUpdateDto.items.length} cart items`);
+
+      if (bulkUpdateDto.items.length === 0) {
+        throw new BadRequestException('Items array cannot be empty');
+      }
+
+      // Get all cart items first to validate they exist and check their status
+      const cartItemIds = bulkUpdateDto.items.map((item) => item.id);
+      const existingItems = await this.prisma.cartItem.findMany({
+        where: {
+          id: { in: cartItemIds },
+        },
+        include: {
+          cart: true,
+          product: true,
+        },
+      });
+
+      // Check if all items exist
+      if (existingItems.length !== cartItemIds.length) {
+        const foundIds = new Set(existingItems.map((item) => item.id));
+        const missingIds = cartItemIds.filter((id) => !foundIds.has(id));
+        throw new NotFoundException(
+          `Cart items not found: ${missingIds.join(', ')}`,
+        );
+      }
+
+      // Validate all carts are not checked out
+      const checkedOutCarts = existingItems.filter(
+        (item) => item.cart?.checkedOutAt !== null,
+      );
+      if (checkedOutCarts.length > 0) {
+        throw new BadRequestException(
+          'Cannot update items in checked out cart',
+        );
+      }
+
+      // Validate all cart items are not checked out
+      const checkedOutItems = existingItems.filter(
+        (item) => item.status === ECartItemStatus.CHECKED_OUT,
+      );
+      if (checkedOutItems.length > 0) {
+        throw new BadRequestException('Cannot update checked out cart items');
+      }
+
+      // Validate quantities if provided
+      for (const item of bulkUpdateDto.items) {
+        if (item.data.quantity !== undefined && item.data.quantity < 1) {
+          throw new BadRequestException(
+            `Quantity must be at least 1 for cart item ${item.id}`,
+          );
+        }
+      }
+
+      // Get unique cart IDs to recalculate totals
+      const uniqueCartIds = [...new Set(existingItems.map((item) => item.cartId))];
+
+      // Use transaction to update all items and recalculate cart totals
+      const updatedItems = await this.prisma.$transaction(async (tx) => {
+        const updated: any[] = [];
+
+        // Update each item
+        for (const itemUpdate of bulkUpdateDto.items) {
+          const item = await tx.cartItem.update({
+            where: { id: itemUpdate.id },
+            data: CartItemMapper.toEntityPartial(itemUpdate.data) as any,
+            include: {
+              product: true,
+            },
+          });
+          updated.push(item);
+        }
+
+        // Recalculate totals for all affected carts
+        for (const cartId of uniqueCartIds) {
+          await this.recalculateCartTotal(tx, cartId);
+        }
+
+        return updated;
+      });
+
+      this.logger.log(
+        `Successfully bulk updated ${updatedItems.length} cart items`,
+      );
+      return CartItemMapper.prismaToDtoListWithProduct(updatedItems);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to bulk update cart items: ${error.message}`,
+      );
+      this.handleError(error, 'Failed to bulk update cart items');
     }
   }
 

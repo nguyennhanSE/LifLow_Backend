@@ -1,3 +1,4 @@
+import { ProductDiscountCronjobService } from './cronjob/product-discount.cronjob.service';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ProductDiscountRepository } from './repositories/product-discount.repository';
 import { ProductDiscountEntity } from './entities/product-discount.entity';
@@ -7,7 +8,7 @@ import { DuplicateError } from '../../utils/customErrors';
 
 @Injectable()
 export class ProductDiscountService {
-  constructor(private readonly productDiscountRepository: ProductDiscountRepository) {}
+  constructor(private readonly productDiscountRepository: ProductDiscountRepository, private readonly productDiscountCronjobService: ProductDiscountCronjobService) {}
 
   /**
    * Create a new product discount
@@ -25,6 +26,7 @@ export class ProductDiscountService {
         throw new BadRequestException('Discount start date must be before end date');
       }
     }
+    await this.productDiscountCronjobService.recalculateProductSalePricesById(createProductDiscountDto.productId);
 
     return await this.productDiscountRepository.create(createProductDiscountDto);
   }

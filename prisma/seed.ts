@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, CouponType } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
@@ -10,7 +10,7 @@ import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 
 // Load environment variables
-const NODE_ENV = process.env.NODE_ENV || 'production';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 console.log('NODE_ENV', NODE_ENV);
 const envFileName = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 const envFilePath = path.resolve(__dirname, '..', envFileName);
@@ -1361,7 +1361,7 @@ async function seedCategories() {
   // Get all products to find their IDs by row number
   // Note: Assuming row number is based on creation order (createdAt)
   const allProducts = await prisma.product.findMany({
-    select: { id: true, productCode: true, productName: true }
+    select: { id: true, productCode: true, productName: true, productCategoryNumber: true }
   });
 
   console.log(`  Found ${allProducts.length} products in database`);
@@ -1835,7 +1835,396 @@ async function seedBanners() {
 }
 
 // ========================================
-// FUNCTION 9: Seed Test User
+// FUNCTION 9: Seed Recipes
+// ========================================
+async function seedRecipes() {
+  console.log('🌱 Starting recipe seed...');
+  
+  // Check if liflowadmin user exists
+  const liflowAdmin = await prisma.user.findUnique({
+    where: { id: 'liflowadmin' },
+  });
+
+  if (!liflowAdmin) {
+    console.warn('⚠️  liflowadmin user not found. Please run seedUsers() first.');
+    return;
+  }
+
+  const authorId = 'liflowadmin';
+  const authorName = liflowAdmin.name || 'LiflowAdmin';
+
+  // Clear existing recipes
+  // await prisma.recipe.deleteMany({});
+  // console.log('🗑️  Cleared existing recipes');
+
+  const recipes = [
+    {
+      title: '언양불고기 만들기',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=800&h=600&fit=crop',
+      content: `언양불고기는 경상남도 언양 지역의 대표적인 전통 요리입니다. 부드러운 고기와 달콤한 양념이 어우러진 이 요리는 가족 모임이나 손님 접대에 완벽한 메뉴입니다.
+
+**재료 준비**
+- 한우 불고기용 고기 500g
+- 양파 1개
+- 대파 2대
+- 당근 1개
+- 팽이버섯 1팩
+
+**양념 재료**
+- 간장 3큰술
+- 설탕 2큰술
+- 다진 마늘 1큰술
+- 생강즙 1작은술
+- 참기름 1큰술
+- 후추 약간
+
+**만드는 방법**
+1. 고기는 얇게 썰어 준비합니다.
+2. 양념 재료를 모두 섞어 고기에 버무려 30분 이상 재웁니다.
+3. 팬에 기름을 두르고 고기를 볶습니다.
+4. 야채를 넣고 함께 볶아 완성합니다.
+
+**팁**
+- 고기를 미리 재워두면 더욱 부드럽고 맛있습니다.
+- 불을 너무 세게 하지 않아야 고기가 질기지 않습니다.`,
+      ingredients: ['한우 불고기용 고기', '양파', '대파', '당근', '팽이버섯', '간장', '설탕', '마늘', '생강', '참기름'],
+      dateOfWriting: new Date('2024-01-15'),
+    },
+    {
+      title: '한우샤브샤브 레시피',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop',
+      content: `한우샤브샤브는 고급스러운 한우를 부드럽게 데쳐 먹는 요리입니다. 신선한 고기의 원래 맛을 즐길 수 있는 건강한 요리입니다.
+
+**재료**
+- 한우 샤브샤브용 고기 300g
+- 배추, 상추 등 쌈채소
+- 당면 100g
+- 표고버섯 5개
+- 팽이버섯 1팩
+
+**양념장**
+- 간장 2큰술
+- 식초 1큰술
+- 설탕 1작은술
+- 다진 파 1큰술
+- 깨소금 약간
+
+**만드는 방법**
+1. 물을 끓여 육수를 만듭니다.
+2. 고기를 얇게 썰어 준비합니다.
+3. 끓는 물에 고기를 살짝 데칩니다.
+4. 쌈채소와 함께 양념장에 찍어 먹습니다.
+
+**추천**
+- 고기는 너무 오래 데치지 않아야 부드러운 식감을 유지할 수 있습니다.`,
+      ingredients: ['한우 샤브샤브용 고기', '배추', '상추', '당면', '표고버섯', '팽이버섯', '간장', '식초'],
+      dateOfWriting: new Date('2024-01-20'),
+    },
+    {
+      title: 'LA갈비 구이 완벽 가이드',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&h=600&fit=crop',
+      content: `LA갈비는 한국의 대표적인 고기 요리 중 하나입니다. 달콤하고 짭조름한 양념이 고기와 완벽하게 어우러지는 이 요리는 모든 연령대가 좋아하는 메뉴입니다.
+
+**재료**
+- LA갈비 1kg
+- 양파 1개
+- 대파 2대
+- 마늘 5쪽
+
+**양념**
+- 간장 5큰술
+- 설탕 3큰술
+- 다진 마늘 2큰술
+- 생강즙 1큰술
+- 배즙 2큰술
+- 참기름 1큰술
+- 깨소금 1큰술
+
+**만드는 방법**
+1. 갈비는 찬물에 담가 핏물을 제거합니다.
+2. 양념 재료를 모두 섞어 갈비에 버무립니다.
+3. 최소 2시간 이상 재웁니다.
+4. 그릴이나 팬에 구워 완성합니다.
+
+**비법**
+- 배즙을 넣으면 고기가 더욱 부드러워집니다.
+- 중불에서 천천히 구워야 속까지 잘 익습니다.`,
+      ingredients: ['LA갈비', '양파', '대파', '마늘', '간장', '설탕', '생강', '배', '참기름', '깨소금'],
+      dateOfWriting: new Date('2024-02-01'),
+    },
+    {
+      title: '제주흑돼지 불고기 특별 레시피',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=800&h=600&fit=crop',
+      content: `제주흑돼지는 제주도의 특별한 재료로, 고소하고 깊은 맛이 특징입니다. 이 특별한 재료로 만드는 불고기는 그 맛이 일품입니다.
+
+**재료**
+- 제주흑돼지 불고기용 고기 500g
+- 양파 1개
+- 표고버섯 5개
+- 당근 1개
+
+**양념**
+- 간장 4큰술
+- 설탕 2큰술
+- 다진 마늘 1큰술
+- 생강즙 1작은술
+- 맛술 2큰술
+- 참기름 1큰술
+
+**만드는 방법**
+1. 고기는 적당한 크기로 썰어 준비합니다.
+2. 양념을 만들어 고기에 버무립니다.
+3. 1시간 이상 재웁니다.
+4. 팬에 볶아 완성합니다.
+
+**특징**
+- 제주흑돼지는 일반 돼지고기보다 고소하고 깊은 맛이 있습니다.
+- 적당한 지방 함량으로 부드러운 식감을 제공합니다.`,
+      ingredients: ['제주흑돼지 불고기용 고기', '양파', '표고버섯', '당근', '간장', '설탕', '마늘', '생강', '맛술', '참기름'],
+      dateOfWriting: new Date('2024-02-10'),
+    },
+    {
+      title: '갈비탕 끓이는 법',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=800&h=600&fit=crop',
+      content: `갈비탕은 한국의 대표적인 국물 요리입니다. 부드러운 갈비와 깔끔한 국물이 일품인 이 요리는 건강에도 좋아 많은 사람들이 즐겨 먹습니다.
+
+**재료**
+- 소갈비 1kg
+- 무 300g
+- 대파 2대
+- 마늘 5쪽
+- 생강 1쪽
+
+**양념**
+- 간장 3큰술
+- 다진 마늘 1큰술
+- 후추 약간
+
+**만드는 방법**
+1. 갈비는 찬물에 담가 핏물을 제거합니다.
+2. 냄비에 갈비와 물을 넣고 끓입니다.
+3. 첫 물은 버리고 깨끗한 물로 다시 끓입니다.
+4. 무를 넣고 푹 끓입니다.
+5. 양념을 넣고 간을 맞춥니다.
+6. 대파를 넣고 마무리합니다.
+
+**팁**
+- 첫 물을 버리면 깔끔한 국물이 됩니다.
+- 오래 끓일수록 부드러운 갈비를 즐길 수 있습니다.`,
+      ingredients: ['소갈비', '무', '대파', '마늘', '생강', '간장', '후추'],
+      dateOfWriting: new Date('2024-02-15'),
+    },
+    {
+      title: '연평도 게장 담그기',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop',
+      content: `연평도 게장은 신선한 꽃게로 만드는 전통 발효식품입니다. 깊은 맛과 풍부한 영양이 특징인 이 요리는 밥도둑으로 유명합니다.
+
+**재료**
+- 꽃게 5마리
+- 고춧가루 1컵
+- 간장 1/2컵
+- 다진 마늘 3큰술
+- 생강즙 2큰술
+- 설탕 2큰술
+- 맛술 2큰술
+
+**만드는 방법**
+1. 꽃게는 깨끗이 씻어 준비합니다.
+2. 게의 등딱지를 벗기고 내장을 제거합니다.
+3. 양념 재료를 모두 섞어 게장 양념을 만듭니다.
+4. 게를 양념에 버무려 밀폐 용기에 담습니다.
+5. 냉장고에서 3-5일 숙성시킵니다.
+
+**주의사항**
+- 신선한 게를 사용해야 안전합니다.
+- 냉장 보관이 필수입니다.
+- 숙성 기간 동안 주기적으로 뒤집어 줍니다.`,
+      ingredients: ['꽃게', '고춧가루', '간장', '마늘', '생강', '설탕', '맛술'],
+      dateOfWriting: new Date('2024-02-20'),
+    },
+    {
+      title: '육개장 끓이기',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=800&h=600&fit=crop',
+      content: `육개장은 매콤하고 시원한 국물 요리로, 특히 여름철에 인기 있는 메뉴입니다. 고기와 야채가 풍부하게 들어가 영양도 좋습니다.
+
+**재료**
+- 소고기 200g
+- 고사리 100g
+- 콩나물 200g
+- 대파 2대
+- 마늘 3쪽
+- 고춧가루 2큰술
+
+**양념**
+- 간장 2큰술
+- 다진 마늘 1큰술
+- 참기름 1큰술
+- 후추 약간
+
+**만드는 방법**
+1. 소고기는 채 썰어 준비합니다.
+2. 고사리는 미리 불려 준비합니다.
+3. 냄비에 기름을 두르고 고기를 볶습니다.
+4. 고춧가루를 넣고 볶아 색을 냅니다.
+5. 물을 넣고 끓입니다.
+6. 고사리와 콩나물을 넣고 끓입니다.
+7. 양념을 넣고 간을 맞춥니다.
+8. 대파를 넣고 마무리합니다.
+
+**추천**
+- 고춧가루를 먼저 볶으면 더 진한 색과 맛이 납니다.`,
+      ingredients: ['소고기', '고사리', '콩나물', '대파', '마늘', '고춧가루', '간장', '참기름'],
+      dateOfWriting: new Date('2024-03-01'),
+    },
+    {
+      title: '냉면 만드는 법',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?w=800&h=600&fit=crop',
+      content: `냉면은 여름철 대표적인 음식입니다. 시원하고 깔끔한 맛이 특징인 이 요리는 더위를 식혀주는 완벽한 메뉴입니다.
+
+**재료**
+- 냉면 사리 4인분
+- 소고기 200g
+- 오이 1개
+- 배 1/2개
+- 계란 2개
+- 무 100g
+
+**육수**
+- 소고기 500g
+- 무 200g
+- 양파 1개
+- 대파 1대
+- 마늘 5쪽
+- 생강 1쪽
+
+**양념**
+- 설탕 2큰술
+- 식초 3큰술
+- 간장 1큰술
+- 소금 약간
+
+**만드는 방법**
+1. 육수 재료를 넣고 끓여 육수를 만듭니다.
+2. 육수를 식혀 냉장고에 넣어 차갑게 만듭니다.
+3. 냉면 사리를 삶아 찬물에 헹굽니다.
+4. 오이, 배, 무를 채 썹니다.
+5. 계란은 삶아 반으로 자릅니다.
+6. 그릇에 면을 담고 육수를 부어줍니다.
+7. 고명을 올리고 양념을 넣어 완성합니다.
+
+**비법**
+- 육수는 미리 만들어 차갑게 보관하면 더욱 맛있습니다.`,
+      ingredients: ['냉면 사리', '소고기', '오이', '배', '계란', '무', '양파', '대파', '마늘', '생강', '설탕', '식초', '간장'],
+      dateOfWriting: new Date('2024-03-10'),
+    },
+    {
+      title: '한우떡갈비 구이',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&h=600&fit=crop',
+      content: `한우떡갈비는 고급 한우로 만드는 떡갈비입니다. 부드럽고 고소한 맛이 일품인 이 요리는 특별한 날에 완벽한 메뉴입니다.
+
+**재료**
+- 한우 갈비살 500g
+- 양파 1/2개
+- 대파 1대
+- 마늘 3쪽
+- 생강 1쪽
+
+**양념**
+- 간장 3큰술
+- 설탕 2큰술
+- 다진 마늘 1큰술
+- 생강즙 1작은술
+- 참기름 1큰술
+- 깨소금 1큰술
+- 후추 약간
+
+**만드는 방법**
+1. 한우 갈비살은 다져서 준비합니다.
+2. 양파, 대파, 마늘, 생강을 다져 넣습니다.
+3. 양념을 넣고 잘 버무립니다.
+4. 떡갈비 모양으로 만들어 준비합니다.
+5. 그릴이나 팬에 구워 완성합니다.
+
+**추천**
+- 손으로 직접 버무리면 더욱 쫄깃한 식감을 얻을 수 있습니다.
+- 중불에서 천천히 구워야 속까지 잘 익습니다.`,
+      ingredients: ['한우 갈비살', '양파', '대파', '마늘', '생강', '간장', '설탕', '참기름', '깨소금'],
+      dateOfWriting: new Date('2024-03-15'),
+    },
+    {
+      title: '양념게장 레시피',
+      category: 'RECIPE',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=600&fit=crop',
+      content: `양념게장은 꽃게를 양념에 재워 만드는 발효식품입니다. 매콤하고 짭조름한 맛이 특징인 이 요리는 밥과 함께 먹으면 일품입니다.
+
+**재료**
+- 꽃게 5마리
+- 고춧가루 1컵
+- 간장 1/2컵
+- 다진 마늘 4큰술
+- 생강즙 2큰술
+- 설탕 3큰술
+- 맛술 2큰술
+- 참기름 1큰술
+
+**만드는 방법**
+1. 꽃게는 깨끗이 씻어 준비합니다.
+2. 게의 등딱지를 벗기고 내장을 제거합니다.
+3. 게를 적당한 크기로 자릅니다.
+4. 양념 재료를 모두 섞어 양념장을 만듭니다.
+5. 게를 양념에 버무려 밀폐 용기에 담습니다.
+6. 냉장고에서 2-3일 숙성시킵니다.
+
+**팁**
+- 신선한 게를 사용하는 것이 가장 중요합니다.
+- 숙성 기간 동안 주기적으로 뒤집어 주면 고르게 양념이 배어듭니다.
+- 냉장 보관하여 신선도를 유지합니다.`,
+      ingredients: ['꽃게', '고춧가루', '간장', '마늘', '생강', '설탕', '맛술', '참기름'],
+      dateOfWriting: new Date('2024-03-20'),
+    },
+  ];
+
+  let createdCount = 0;
+
+  for (const recipe of recipes) {
+    try {
+      await prisma.recipe.create({
+        data: {
+          title: recipe.title,
+          authorId: authorId,
+          authorName: authorName,
+          category: recipe.category as any,
+          dateOfWriting: recipe.dateOfWriting,
+          views: 0,
+          status: 'active',
+          thumbnailUrl: recipe.thumbnailUrl,
+          content: recipe.content,
+          ingredients: recipe.ingredients,
+          isActive: true,
+        },
+      });
+      createdCount++;
+      console.log(`  ✓ Created recipe: ${recipe.title}`);
+    } catch (error) {
+      console.error(`  ❌ Error creating recipe ${recipe.title}:`, error);
+    }
+  }
+
+  console.log(`✅ Successfully created ${createdCount}/${recipes.length} recipes`);
+  console.log('✨ Recipe seed completed successfully!');
+}
+
+// ========================================
+// FUNCTION 10: Seed Test User
 // ========================================
 async function seedTestUser() {
   console.log('🌱 Starting test user seed...');
@@ -1955,9 +2344,167 @@ async function seedTestUser() {
   console.log('✨ Test user seed completed successfully!');
 }
 
+async function seedCoupons() {
+  console.log('🌱 Starting coupon seed...');
+  
+  const now = new Date();
+  const oneMonthLater = new Date(now);
+  oneMonthLater.setMonth(now.getMonth() + 1);
+  const threeMonthsLater = new Date(now);
+  threeMonthsLater.setMonth(now.getMonth() + 3);
+  
+  const coupons = [
+    // PERCENT type coupons
+    {
+      name: '10% 할인 쿠폰',
+      code: 'PERCENT10',
+      type: CouponType.PERCENT,
+      discountRate: 10,
+      discountAmount: null,
+      minPurchaseAmount: 30000,
+      maxDiscountAmount: 10000,
+      imageUrl: null,
+      startDate: now,
+      endDate: oneMonthLater,
+      isActive: true,
+      isAutoIssue: false,
+      autoIssueDayOfMonth: null,
+      targetGrades: ['LV1. 씨앗', 'LV2. 새싹', 'LV3. 열매', 'LV4. 나무', 'LV5. 정원'],
+    },
+    {
+      name: '15% 할인 쿠폰',
+      code: 'PERCENT15',
+      type: CouponType.PERCENT,
+      discountRate: 15,
+      discountAmount: null,
+      minPurchaseAmount: 50000,
+      maxDiscountAmount: 20000,
+      imageUrl: null,
+      startDate: now,
+      endDate: threeMonthsLater,
+      isActive: true,
+      isAutoIssue: false,
+      autoIssueDayOfMonth: null,
+      targetGrades: ['LV2. 새싹', 'LV3. 열매', 'LV4. 나무', 'LV5. 정원'],
+    },
+    {
+      name: '20% 할인 쿠폰',
+      code: 'PERCENT20',
+      type: CouponType.PERCENT,
+      discountRate: 20,
+      discountAmount: null,
+      minPurchaseAmount: 100000,
+      maxDiscountAmount: 50000,
+      imageUrl: null,
+      startDate: now,
+      endDate: threeMonthsLater,
+      isActive: true,
+      isAutoIssue: false,
+      autoIssueDayOfMonth: null,
+      targetGrades: ['LV3. 열매', 'LV4. 나무', 'LV5. 정원'],
+    },
+    // AMOUNT type coupons
+    {
+      name: '5,000원 할인 쿠폰',
+      code: 'AMOUNT5000',
+      type: CouponType.AMOUNT,
+      discountRate: null,
+      discountAmount: 5000,
+      minPurchaseAmount: 30000,
+      maxDiscountAmount: null,
+      imageUrl: null,
+      startDate: now,
+      endDate: oneMonthLater,
+      isActive: true,
+      isAutoIssue: false,
+      autoIssueDayOfMonth: null,
+      targetGrades: [],
+    },
+    {
+      name: '10,000원 할인 쿠폰',
+      code: 'AMOUNT10000',
+      type: CouponType.AMOUNT,
+      discountRate: null,
+      discountAmount: 10000,
+      minPurchaseAmount: 50000,
+      maxDiscountAmount: null,
+      imageUrl: null,
+      startDate: now,
+      endDate: threeMonthsLater,
+      isActive: true,
+      isAutoIssue: false,
+      autoIssueDayOfMonth: null,
+      targetGrades: ['LV2. 새싹', 'LV3. 열매', 'LV4. 나무', 'LV5. 정원'],
+    },
+    {
+      name: '20,000원 할인 쿠폰',
+      code: 'AMOUNT20000',
+      type: CouponType.AMOUNT,
+      discountRate: null,
+      discountAmount: 20000,
+      minPurchaseAmount: 100000,
+      maxDiscountAmount: null,
+      imageUrl: null,
+      startDate: now,
+      endDate: threeMonthsLater,
+      isActive: true,
+      isAutoIssue: false,
+      autoIssueDayOfMonth: null,
+      targetGrades: ['LV3. 열매', 'LV4. 나무', 'LV5. 정원'],
+    },
+    {
+      name: '30,000원 할인 쿠폰',
+      code: 'AMOUNT30000',
+      type: CouponType.AMOUNT,
+      discountRate: null,
+      discountAmount: 30000,
+      minPurchaseAmount: 150000,
+      maxDiscountAmount: null,
+      imageUrl: null,
+      startDate: now,
+      endDate: threeMonthsLater,
+      isActive: true,
+      isAutoIssue: false,
+      autoIssueDayOfMonth: null,
+      targetGrades: ['LV4. 나무', 'LV5. 정원'],
+    },
+  ];
+  
+  try {
+    for (const coupon of coupons) {
+      await prisma.coupon.upsert({
+        where: { code: coupon.code },
+        update: coupon,
+        create: coupon,
+      });
+      console.log(`✅ Created/Updated coupon: ${coupon.name} (${coupon.code})`);
+    }
+    
+    console.log(`✅ Successfully seeded ${coupons.length} coupons`);
+  } catch (error) {
+    console.error('❌ Error seeding coupons:', error);
+    throw error;
+  }
+}
+
+
 // ========================================
 // MAIN FUNCTION - Run seed functions sequentially
 // ========================================
+
+async function updateAdmin () {
+  const admin = await prisma.user.findUnique({
+    where: {
+      id: 'liflowadmin',
+    },
+  });
+  if (admin) {
+    await prisma.user.update({
+      where: { id: 'liflowadmin' },
+      data: { membershipLevel: 'LV1. 씨앗' },
+    });
+  }
+}
 async function main() {
   console.log('🚀 Starting complete database seeding process...\n');
   // return Promise.resolve().then(() => {
@@ -1965,15 +2512,16 @@ async function main() {
   // })
   
   // await seedUsers();           // Import users and clear all data
-  await seedProducts();        // Import products from CSV
+  // await seedProducts();        // Import products from CSV
   // await seedOrders();          // Import orders from CSV
   // await seedPoints();          // Import points from CSV
   // await seedCategories();      // Seed categories and update products
   // await seedMemberships();     // Seed memberships only
   // await seedUserMemberships(); // Seed memberships and user memberships
   // await seedBanners();         // Seed all 5 types of banners      
-
-  
+  // await seedRecipes();          // Seed recipes from CSV
+  // await seedCoupons();          // Seed coupons from CSV
+  await updateAdmin();          // Update admin membership level
 
   
   console.log('\n✨ All seed functions completed successfully!');

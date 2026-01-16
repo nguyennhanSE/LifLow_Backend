@@ -21,6 +21,7 @@ import {
 import { CartItemService } from '../services/cart-item.service';
 import { CreateCartItemDto } from '../dto/create-cart-item.dto';
 import { UpdateCartItemDto } from '../dto/update-cart-item.dto';
+import { BulkUpdateCartItemsDto } from '../dto/bulk-update-cart-item.dto';
 import { CartItemResponseDto } from '../dto/cart-response.dto';
 import { ResponseModel } from '../../../libs/models/response/response.model';
 
@@ -109,6 +110,66 @@ export class CartItemController {
   }
 
   /**
+   * Bulk update cart items
+   * PATCH /cart-items/bulk-update
+   */
+  @Patch('bulk-update')
+  @ApiOperation({
+    summary: 'Bulk update cart items',
+    description: 'Update multiple cart items in a single request. All updates are performed atomically in a transaction. Cannot update items in checked out carts.',
+  })
+  @ApiBody({ type: BulkUpdateCartItemsDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Cart items updated successfully',
+    type: [CartItemResponseDto],
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error or business rule violation' })
+  @ApiResponse({ status: 404, description: 'One or more cart items not found' })
+  async bulkUpdate(@Body() bulkUpdateDto: BulkUpdateCartItemsDto) {
+    const responseModel = new ResponseModel();
+    const cartItems = await this.cartItemService.bulkUpdateItems(bulkUpdateDto);
+    responseModel.setData(cartItems);
+    return responseModel;
+  }
+
+  /**
+   * Update cart item quantity
+   * PATCH /cart-items/:id/quantity
+   */
+  @Patch(':id/quantity')
+  @ApiOperation({
+    summary: 'Update cart item quantity',
+    description: 'Update the quantity of a cart item. Quantity must be at least 1.',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Cart item ID (UUID)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        quantity: { type: 'number', example: 3, minimum: 1 },
+      },
+      required: ['quantity'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cart item quantity updated successfully',
+    type: CartItemResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error or business rule violation' })
+  @ApiResponse({ status: 404, description: 'Cart item not found' })
+  async updateQuantity(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('quantity') quantity: number,
+  ) {
+    const responseModel = new ResponseModel();
+    const cartItem = await this.cartItemService.updateItemQuantity(id, quantity);
+    responseModel.setData(cartItem);
+    return responseModel;
+  }
+
+  /**
    * Update cart item
    * PATCH /cart-items/:id
    */
@@ -157,42 +218,6 @@ export class CartItemController {
     const responseModel = new ResponseModel();
     await this.cartItemService.removeItem(id);
     responseModel.setData({ message: 'Cart item removed successfully' });
-    return responseModel;
-  }
-
-  /**
-   * Update cart item quantity
-   * PATCH /cart-items/:id/quantity
-   */
-  @Patch(':id/quantity')
-  @ApiOperation({
-    summary: 'Update cart item quantity',
-    description: 'Update the quantity of a cart item. Quantity must be at least 1.',
-  })
-  @ApiParam({ name: 'id', type: String, description: 'Cart item ID (UUID)' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        quantity: { type: 'number', example: 3, minimum: 1 },
-      },
-      required: ['quantity'],
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Cart item quantity updated successfully',
-    type: CartItemResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Bad request - validation error or business rule violation' })
-  @ApiResponse({ status: 404, description: 'Cart item not found' })
-  async updateQuantity(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body('quantity') quantity: number,
-  ) {
-    const responseModel = new ResponseModel();
-    const cartItem = await this.cartItemService.updateItemQuantity(id, quantity);
-    responseModel.setData(cartItem);
     return responseModel;
   }
 }

@@ -235,9 +235,9 @@ export class UserService {
   }
 
   /**
-   * Get user shipping address (only one address per user)
+   * Get user shipping addresses (array of addresses)
    */
-  async getUserShippingAddresses(userId: string): Promise<any> {
+  async getUserShippingAddresses(userId: string): Promise<any[]> {
     try {
       return await this.userRepository.getUserShippingAddresses(userId);
     } catch (error) {
@@ -252,7 +252,7 @@ export class UserService {
   async createUserShippingAddress(userId: string, addressData: {
     deliveryAddress: string;
     recipientName: string;
-    mobilePhone: string;
+    mobilePhone?: string;
     phoneNumber?: string;
     postalCode: number;
     address: string;

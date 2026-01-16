@@ -545,15 +545,15 @@ export class CreateShippingAddressDto {
     @MaxLength(100)
     recipientName!: string;
 
-    @ApiProperty({ 
+    @ApiPropertyOptional({ 
         description: 'Contact information (mobile phone)', 
         example: '010-1234-5678',
         pattern: '^01[0-9]-?[0-9]{3,4}-?[0-9]{4}$'
     })
+    @IsOptional()
     @IsString() 
-    @IsNotEmpty() 
     @trim()
-    mobilePhone!: string;
+    mobilePhone?: string;
 
     @ApiProperty({ 
         description: 'Phone number (optional landline)', 
@@ -571,7 +571,7 @@ export class CreateShippingAddressDto {
         maximum: 99999
     })
     @IsNumber()
-    @Min(10000)
+    // @Min(10000)
     @Max(99999)
     postalCode!: number;
 
