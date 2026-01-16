@@ -52,6 +52,7 @@ model User {
   orders Order[]
   recipes Recipe[]
   couponHistories CouponHistory[]
+  recipeComments RecipeComments[]
   carts Cart[]
   payments Payment[]
   productReviews ProductReviews[]
@@ -469,6 +470,7 @@ model Product {
   cartItems CartItem[]
   productReviews ProductReviews[]
   productInquiries ProductInquiries[]
+  recipes Recipe[]
   @@map("products")
 }
 
@@ -575,12 +577,13 @@ model Recipe {
   id             String   @id @default(uuid())
   title          String   @db.VarChar(255)
   authorId       String?
+  productId      String?
   authorName     String   @db.VarChar(100) // denormalized for fast listing
   category       RecipeCategory   @map("category") // denormalized category name
   dateOfWriting  DateTime @map("date_of_writing")
   views          Int      @default(0)
-  status         String   @default("active") // e.g., active | inactive
-  thumbnailUrl   String?  @map("thumbnail_url")
+  status         String   @default("pending") // e.g., pending | approved | rejected
+  thumbnailUrl   String[]  @map("thumbnail_url")
   content        String
   ingredients    String[] @map("ingredients")
 
@@ -591,11 +594,25 @@ model Recipe {
 
   // Relations
   author         User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  // productRecipes ProductRecipe[]
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  recipeComments RecipeComments[]
   @@index([status])
   @@index([authorId])
   @@index([dateOfWriting])
   @@map("recipes")
+}
+
+model RecipeComments {
+  id String @id @default(uuid())
+  recipeId String @map("recipe_id")
+  authorId String @map("author_id")
+  content String @map("content")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  // Relations
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  @@map("recipe_comments")
 }
 
 // model RecipeCategory {

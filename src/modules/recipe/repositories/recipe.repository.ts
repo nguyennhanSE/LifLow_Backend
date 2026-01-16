@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { Prisma, Recipe, User } from '@prisma/client';
+import { Prisma, Recipe, User, Product } from '@prisma/client';
 import { RecipeListQueryDto } from '../dto/recipe-list-query.dto';
 import { ERecipeCategory } from '../enums/recipe.enum';
 
-export type RecipeWithAuthor = Recipe & { author?: User | null };
+export type RecipeWithAuthor = Recipe & { author?: User | null; product?: Product | null };
 
 export interface RecipeCountResult {
   total: number;
@@ -144,7 +144,7 @@ export class RecipeRepository {
     try {
       return await this.prisma.recipe.findUnique({
         where: { id },
-        include: includeAuthor ? { author: true } : undefined,
+        include: includeAuthor ? { author: true, product: true } : undefined,
       });
     } catch (error: any) {
       this.handlePrismaError(error, id);
@@ -354,14 +354,14 @@ export class RecipeRepository {
   }
   async deactivate(id: string): Promise<void> {
     try {
-      await this.prisma.recipe.update({ where: { id }, data: { status: 'inactive', updatedAt: new Date(), isActive: false } });
+      await this.prisma.recipe.update({ where: { id }, data: { updatedAt: new Date(), isActive: false } });
     } catch (error: any) {
       this.handlePrismaError(error, id);
     }
   }
   async activate(id: string): Promise<void> {
     try {
-      await this.prisma.recipe.update({ where: { id }, data: { status: 'active', updatedAt: new Date(), isActive: true } });
+      await this.prisma.recipe.update({ where: { id }, data: { updatedAt: new Date(), isActive: true } });
     } catch (error: any) {
       this.handlePrismaError(error, id);
     }

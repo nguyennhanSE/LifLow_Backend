@@ -31,13 +31,13 @@ export class RecipeService {
    * Create a new recipe
    * - Automatically sets authorId and authorName from authenticated user
    * - Sets dateOfWriting to current timestamp
-   * - Initializes views to 0 and status to 'active'
+   * - Initializes views to 0 and status to 'pending'
    */
   async create(
     userId: string,
     userName: string,
     createRecipeDto: CreateRecipeDto,
-    thumbnail?: Express.Multer.File,
+    thumbnails?: Express.Multer.File[],
   ): Promise<RecipeEntityWithAuthor> {
     try {
       // Validate user exists
@@ -54,48 +54,83 @@ export class RecipeService {
         throw new BadRequestException('Category is required');
       }
 
+      // Validate productId if provided
+      if (createRecipeDto.productId) {
+        // if (!this.isValidUUID(createRecipeDto.productId)) {
+        //   throw new BadRequestException('Invalid product ID format');
+        // }
+        const productExists = await this.prisma.product.findUnique({
+          where: { id: createRecipeDto.productId },
+        });
+        if (!productExists) {
+          throw new NotFoundException(`Product with id ${createRecipeDto.productId} not found`);
+        }
+      }
+
       // Extract validated fields
       const title = createRecipeDto.title;
       const category = createRecipeDto.category;
 
       // Use transaction to create recipe and upload thumbnail atomically
       const result = await this.prisma.$transaction(async (tx) => {
+        // Prepare recipe data
+        const recipeData: any = {
+          title,
+          category,
+          thumbnailUrl: [],
+          content: createRecipeDto.content || '',
+          ingredients: createRecipeDto.ingredients || [],
+          authorName: userName,
+          dateOfWriting: new Date(),
+          views: 0,
+          status: 'pending',
+          author: {
+            connect: { id: userId },
+          },
+        };
+
+        // Link product if productId is provided
+        if (createRecipeDto.productId) {
+          recipeData.product = {
+            connect: { id: createRecipeDto.productId },
+          };
+        }
+
         // Create recipe with auto-populated fields
         const recipe = await tx.recipe.create({
-          data: {
-            title,
-            category,
-            thumbnailUrl: null,
-            content: createRecipeDto.content || '',
-            ingredients: createRecipeDto.ingredients || [],
-            authorName: userName,
-            dateOfWriting: new Date(),
-            views: 0,
-            status: 'active',
-            author: {
-              connect: { id: userId },
-            },
-          },
+          data: recipeData,
           include: {
             author: true,
+            product: true,
           },
         });
 
-        // Upload thumbnail if provided
-        if (thumbnail) {
+        // Upload thumbnails if provided
+        if (thumbnails && thumbnails.length > 0) {
+          if (!userId || !recipe.id) {
+            throw new BadRequestException('User ID and Recipe ID are required for uploading thumbnails');
+          }
           try {
-            const thumbnailUrl = await this.awsService.uploadFile(userId+'/recipes', recipe.id, thumbnail);
+            const thumbnailUrls: string[] = [];
+            const prefix: string = `${userId}/recipes`;
+            const recipeId: string = recipe.id;
+            for (const thumbnail of thumbnails) {
+              if (!thumbnail) continue;
+              const url = await this.awsService.uploadFile(prefix, recipeId, thumbnail);
+              thumbnailUrls.push(url!);
+            }
             const updatedRecipe = await tx.recipe.update({
               where: { id: recipe.id },
-              data: { thumbnailUrl },
+              data: { thumbnailUrl: thumbnailUrls },
               include: {
                 author: true,
+                product: true,
               },
             });
             return updatedRecipe;
           } catch (error) {
             throw new BadRequestException(
-              `Failed to upload thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              `Failed to upload thumbnails: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
           }
         }
@@ -163,7 +198,7 @@ export class RecipeService {
     id: string,
     userId: string,
     updateRecipeDto: UpdateRecipeDto,
-    thumbnail?: Express.Multer.File,
+    thumbnails?: Express.Multer.File[],
   ): Promise<RecipeEntityWithAuthor> {
     try {
       // Validate UUID format
@@ -210,13 +245,29 @@ export class RecipeService {
           },
         });
 
-        // Upload thumbnail if provided
-        if (thumbnail) {
+        // Upload thumbnails if provided
+        if (thumbnails && thumbnails.length > 0) {
+          if (!userId || !id) {
+            throw new BadRequestException('User ID and Recipe ID are required for uploading thumbnails');
+          }
           try {
-            const thumbnailUrl = await this.awsService.uploadFile('recipes', id, thumbnail);
+            const thumbnailUrls: string[] = [];
+            const prefix: string = `${userId}/recipes`;
+            const recipeId: string = id;
+            for (const thumbnail of thumbnails) {
+              if (!thumbnail) continue;
+              const url = await this.awsService.uploadFile(prefix, recipeId, thumbnail);
+              thumbnailUrls.push(url!);
+            }
+            // Merge with existing thumbnails if any, or replace if updateRecipeDto.thumbnailUrl is provided
+            const existingThumbnails = updatedRecipe.thumbnailUrl || [];
+            const finalThumbnailUrls = updateRecipeDto.thumbnailUrl 
+              ? updateRecipeDto.thumbnailUrl 
+              : [...existingThumbnails, ...thumbnailUrls];
+            
             const finalRecipe = await tx.recipe.update({
               where: { id },
-              data: { thumbnailUrl },
+              data: { thumbnailUrl: finalThumbnailUrls },
               include: {
                 author: true,
               },
@@ -224,7 +275,7 @@ export class RecipeService {
             return finalRecipe;
           } catch (error) {
             throw new BadRequestException(
-              `Failed to upload thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              `Failed to upload thumbnails: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
           }
         }
@@ -290,7 +341,7 @@ export class RecipeService {
       const result = await this.recipeRepository.findAll({
         ...query,
         category,
-        status: query?.status || 'active',
+        status: query?.status || 'approved',
         page: query?.page || 1,
         limit: query?.limit || 20,
         sortBy: query?.sortBy || 'createdAt',
@@ -356,7 +407,7 @@ export class RecipeService {
    */
   async getPopularRecipes(
     limit = 10,
-    status = 'active',
+    status = 'approved',
   ): Promise<RecipeEntityWithAuthor[]> {
     try {
       const recipes = await this.recipeRepository.getPopularRecipes(
@@ -374,7 +425,7 @@ export class RecipeService {
    */
   async getRecentRecipes(
     limit = 10,
-    status = 'active',
+    status = 'approved',
   ): Promise<RecipeEntityWithAuthor[]> {
     try {
       const recipes = await this.recipeRepository.getRecentRecipes(
@@ -389,12 +440,13 @@ export class RecipeService {
   /**
    * Get dashboard data
    */
-  async getDashboardData(): Promise<{fullRecipeCount: number, activeRecipeCount: number, hiddenRecipeCount: number}> {
+  async getDashboardData(): Promise<{fullRecipeCount: number, activeRecipeCount: number, pendingRecipeCount: number, rejectedRecipeCount: number}> {
     try {
       const fullRecipeCount = await this.recipeRepository.countByFilters({});
-      const activeRecipeCount = await this.recipeRepository.countByFilters({status: 'active'});
-      const hiddenRecipeCount = await this.recipeRepository.countByFilters({status: 'hidden'});
-      return {fullRecipeCount, activeRecipeCount, hiddenRecipeCount};
+      const activeRecipeCount = await this.recipeRepository.countByFilters({status: 'approved'});
+      const pendingRecipeCount = await this.recipeRepository.countByFilters({status: 'pending'});
+      const rejectedRecipeCount = await this.recipeRepository.countByFilters({status: 'rejected'});
+      return {fullRecipeCount, activeRecipeCount, pendingRecipeCount, rejectedRecipeCount};
     } catch (error: any) {
       this.handleError(error, 'Failed to fetch dashboard data');
     }
@@ -475,6 +527,66 @@ export class RecipeService {
       return { message: `Recipe ${id} activated successfully` };
     } catch (error: any) {
       this.handleError(error, 'Failed to activate recipe');
+    }
+  }
+
+  /**
+   * Approve a recipe
+   * - Updates status to 'approved'
+   * - Only ADMIN or GENERAL_MANAGER can approve
+   * - Validates recipe exists
+   */
+  async approve(id: string): Promise<RecipeEntityWithAuthor> {
+    try {
+      // Validate UUID format
+      if (!this.isValidUUID(id)) {
+        throw new BadRequestException('Invalid recipe ID format');
+      }
+
+      // Check if recipe exists
+      const existingRecipe = await this.recipeRepository.findById(id, false);
+      if (!existingRecipe) {
+        throw new NotFoundException(`Recipe with id ${id} not found`);
+      }
+
+      // Update status to approved (active)
+      const updatedRecipe = await this.recipeRepository.update(id, {
+        status: 'approved',
+      });
+
+      return toRecipeEntityWithAuthor(updatedRecipe);
+    } catch (error: any) {
+      this.handleError(error, `Failed to approve recipe ${id}`);
+    }
+  }
+
+  /**
+   * Reject a recipe
+   * - Updates status to 'rejected'
+   * - Only ADMIN or GENERAL_MANAGER can reject
+   * - Validates recipe exists
+   */
+  async reject(id: string): Promise<RecipeEntityWithAuthor> {
+    try {
+      // Validate UUID format
+      if (!this.isValidUUID(id)) {
+        throw new BadRequestException('Invalid recipe ID format');
+      }
+
+      // Check if recipe exists
+      const existingRecipe = await this.recipeRepository.findById(id, false);
+      if (!existingRecipe) {
+        throw new NotFoundException(`Recipe with id ${id} not found`);
+      }
+
+      // Update status to rejected
+      const updatedRecipe = await this.recipeRepository.update(id, {
+        status: 'rejected',
+      });
+
+      return toRecipeEntityWithAuthor(updatedRecipe);
+    } catch (error: any) {
+      this.handleError(error, `Failed to reject recipe ${id}`);
     }
   }
 }

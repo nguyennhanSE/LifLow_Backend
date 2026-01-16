@@ -46,12 +46,12 @@ export class RecipeListQueryDto {
 
   @ApiPropertyOptional({
     description: 'Filter by recipe status',
-    example: 'active',
-    enum: ['active', 'inactive'],
+    example: 'approved',
+    enum: ['approved', 'pending', 'rejected'],
   })
   @IsOptional()
   @IsString({ message: 'Status must be a string' })
-  @IsIn(['active', 'inactive'], { message: 'Status must be either "active" or "inactive"' })
+  @IsIn(['approved', 'pending', 'rejected'], { message: 'Status must be either "approved", "pending" or "rejected"' })
   status?: string;
 
   @ApiPropertyOptional({

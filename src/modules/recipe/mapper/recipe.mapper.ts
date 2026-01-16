@@ -1,13 +1,14 @@
-import { Recipe, User } from '@prisma/client';
+import { Recipe, User, Product } from '@prisma/client';
 import { RecipeEntity, RecipeEntityWithAuthor } from '../entities/recipe.entity';
 import { toUserEntity } from 'src/modules/user/mapper/user.mapper';
+import { toProductEntity } from 'src/modules/product/mapper/product.mapper';
 import { ERecipeCategory } from '../enums/recipe.enum';
 
 /**
- * Type for Recipe with author relation
+ * Type for Recipe with author and product relations
  */
 // export type RecipeWithAuthor = Recipe;
-export type RecipeWithAuthor = Recipe & { author?: User | null }; 
+export type RecipeWithAuthor = Recipe & { author?: User | null; product?: Product | null }; 
 
 /**
  * Maps Prisma Recipe to RecipeEntity
@@ -23,7 +24,9 @@ export function toRecipeEntity(recipe: Recipe): RecipeEntity {
     dateOfWriting: recipe.dateOfWriting,
     views: recipe.views,
     status: recipe.status,  
-    thumbnailUrl: recipe.thumbnailUrl || null,
+    thumbnailUrl: Array.isArray(recipe.thumbnailUrl) 
+      ? (recipe.thumbnailUrl.length > 0 ? recipe.thumbnailUrl[0] : null)
+      : (recipe.thumbnailUrl || null),
     content: recipe.content,
     ingredients: recipe.ingredients,
     createdAt: recipe.createdAt,
@@ -36,6 +39,7 @@ export function toRecipeEntityWithAuthor(recipe: RecipeWithAuthor): RecipeEntity
   return {
     ...toRecipeEntity(recipe),
     author: recipe.author ? toUserEntity(recipe.author) : null,
+    product: recipe.product ? toProductEntity(recipe.product) : null,
   };
 }
 
@@ -134,7 +138,9 @@ export function mapToSummary(recipe: RecipeWithAuthor): RecipeSummaryDto {
     authorName: recipe.authorName,
     category: recipe.category,
     views: recipe.views,
-    thumbnailUrl: recipe.thumbnailUrl,
+    thumbnailUrl: Array.isArray(recipe.thumbnailUrl)
+      ? (recipe.thumbnailUrl.length > 0 ? recipe.thumbnailUrl[0] : null)
+      : (recipe.thumbnailUrl || null),
     createdAt: recipe.createdAt,
   };
 }

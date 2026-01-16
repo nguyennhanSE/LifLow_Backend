@@ -31,6 +31,7 @@ import { ProductReviewsModule } from './modules/product-reviews/product-reviews.
 import { ProductInquiriesModule } from './modules/product-inquiries/product-inquiries.module';
 import { PolicyModule } from './modules/policy/policy.module';
 import { AnnouncementsModule } from './modules/announcements/announcements.module';
+import { RecipeCommentModule } from './modules/recipe/recipe-comment/recipe-comment.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { AnnouncementsModule } from './modules/announcements/announcements.modul
     ProductReviewsModule,
     ProductInquiriesModule,
     RecipeModule,
+    RecipeCommentModule,
     GuardModule,
     LoggerModule,
     RolesModule,

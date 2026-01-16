@@ -68,7 +68,7 @@ export class RecipeController {
   @UseInterceptors(
     RecipeUserInterceptor,
     FileFieldsInterceptor([
-      { name: 'thumbnail', maxCount: 1 },
+      { name: 'thumbnail', maxCount: 10 },
     ])
   )
   @ApiBearerAuth()
@@ -78,7 +78,7 @@ export class RecipeController {
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    description: 'Create recipe with optional thumbnail image',
+    description: 'Creates a new recipe. Requires authentication. Author information is automatically set from the authenticated user. Supports uploading multiple thumbnail images (up to 10).',
     schema: {
       type: 'object',
       properties: {
@@ -106,9 +106,12 @@ export class RecipeController {
           example: ['Pasta', 'Tomato', 'Garlic', 'Cheese'],
         },
         thumbnail: {
-          type: 'string',
-          format: 'binary',
-          description: 'Recipe thumbnail image (max 5MB, jpg/jpeg/png/webp)',
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Recipe thumbnail images (max 10 images, each max 5MB, jpg/jpeg/png/webp)',
         },
       },
       required: ['title', 'category'],
@@ -136,14 +139,15 @@ export class RecipeController {
     @Request() req: AuthenticatedRequest,
   ) {
     const responseModel = new ResponseModel();
+    createRecipeDto.authorId = req.user.id;
 
     try {
-      const thumbnail = files?.thumbnail?.[0];
+      const thumbnails = files?.thumbnail || [];
       const recipe = await this.recipeService.create(
         req.user.id,
         req.user.name,
         createRecipeDto,
-        thumbnail,
+        thumbnails,
       );
       const result = successResponse(recipe, 'Recipe created successfully');
       responseModel.setData(result);
@@ -518,7 +522,7 @@ export class RecipeController {
   @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
   @UseInterceptors(
     FileFieldsInterceptor([
-      { name: 'thumbnail', maxCount: 1 },
+      { name: 'thumbnail', maxCount: 10 },
     ])
   )
   @ApiBearerAuth()
@@ -534,7 +538,7 @@ export class RecipeController {
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    description: 'Update recipe with optional thumbnail image',
+    description: 'Updates an existing recipe. Only the recipe owner can update it. Supports partial updates. Supports uploading multiple thumbnail images (up to 10).',
     schema: {
       type: 'object',
       properties: {
@@ -562,9 +566,12 @@ export class RecipeController {
           example: ['Pasta', 'Tomato', 'Garlic', 'Cheese'],
         },
         thumbnail: {
-          type: 'string',
-          format: 'binary',
-          description: 'Recipe thumbnail image (max 5MB, jpg/jpeg/png/webp)',
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Recipe thumbnail images (max 10 images, each max 5MB, jpg/jpeg/png/webp)',
         },
       },
     },
@@ -600,12 +607,12 @@ export class RecipeController {
     const responseModel = new ResponseModel();
 
     try {
-      const thumbnail = files?.thumbnail?.[0];
+      const thumbnails = files?.thumbnail || [];
       const recipe = await this.recipeService.update(
         id,
         req.user.id,
         updateRecipeDto,
-        thumbnail,
+        thumbnails,
       );
       const result = successResponse(recipe, 'Recipe updated successfully');
       responseModel.setData(result);
@@ -751,6 +758,96 @@ export class RecipeController {
     try {
       const result = await this.recipeService.activate(id);
       const data = successResponse(result, result.message);
+      responseModel.setData(data);
+    } catch (error) {
+      throw error;
+    }
+    return responseModel;
+  }
+
+  @Patch(':id/approve')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Approve a recipe',
+    description: 'Approves a recipe by setting status to approved. Only ADMIN or GENERAL_MANAGER can approve.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Recipe UUID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Recipe approved successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid UUID format',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - authentication required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Recipe not found',
+  })
+  async approve(@Param('id') id: string) {
+    const responseModel = new ResponseModel();
+    try {
+      const result = await this.recipeService.approve(id);
+      const data = successResponse(result, 'Recipe approved successfully');
+      responseModel.setData(data);
+    } catch (error) {
+      throw error;
+    }
+    return responseModel;
+  }
+
+  @Patch(':id/reject')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Reject a recipe',
+    description: 'Rejects a recipe by setting status to rejected. Only ADMIN or GENERAL_MANAGER can reject.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Recipe UUID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Recipe rejected successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid UUID format',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - authentication required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Recipe not found',
+  })
+  async reject(@Param('id') id: string) {
+    const responseModel = new ResponseModel();
+    try {
+      const result = await this.recipeService.reject(id);
+      const data = successResponse(result, 'Recipe rejected successfully');
       responseModel.setData(data);
     } catch (error) {
       throw error;

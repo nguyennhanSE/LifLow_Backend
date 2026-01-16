@@ -5,7 +5,6 @@ import { Prisma } from '@prisma/client';
 import { DuplicateError } from '../../../utils/customErrors';
 import { toProductEntity, toProductEntityWithRelations } from '../mapper/product.mapper';
 import { CreateProductDto, CreateProductSpecialOfferDto, UpdateProductDto } from '../dto/product.dto';
-import { isValidS3Url } from '../../../utils/s3-helper';
 
 export interface ProductFilters {
   search?: string;
@@ -50,18 +49,7 @@ export class ProductRepository {
       },
     });
 
-    // Filter products that have at least one valid S3 image URL
-    const filteredProducts = products.filter(product => {
-      const hasValidImage = 
-        (product.imageRegistrationDetail && isValidS3Url(product.imageRegistrationDetail)) ||
-        (product.imageRegistrationList && isValidS3Url(product.imageRegistrationList)) ||
-        (product.imageRegistrationSmallList && isValidS3Url(product.imageRegistrationSmallList)) ||
-        (product.imageRegistrationThumbnail && isValidS3Url(product.imageRegistrationThumbnail));
-      
-      return hasValidImage;
-    });
-
-    return filteredProducts.map(product => toProductEntityWithRelations(product));
+    return products.map(product => toProductEntityWithRelations(product));
   }
 
   /**
@@ -99,8 +87,9 @@ export class ProductRepository {
     const where: Prisma.ProductWhereInput = {};
 
     // Search: searches productName, brand, productCode
+    const searchConditions: Prisma.ProductWhereInput[] = [];
     if (filters.search) {
-      where.OR = [
+      searchConditions.push(
         {
           productName: {
             contains: filters.search,
@@ -119,7 +108,53 @@ export class ProductRepository {
             mode: 'insensitive',
           },
         },
-      ];
+      );
+    }
+
+    // Filter products that have at least one valid S3 image URL
+    // Check if any of the image fields contains S3 URL indicators (amazonaws.com)
+    // This condition is always applied to ensure products have valid S3 images
+    const s3UrlCondition: Prisma.ProductWhereInput = {
+      OR: [
+        {
+          imageRegistrationDetail: {
+            contains: 'amazonaws.com',
+          },
+        },
+        {
+          imageRegistrationList: {
+            contains: 'amazonaws.com',
+          },
+        },
+        {
+          imageRegistrationSmallList: {
+            contains: 'amazonaws.com',
+          },
+        },
+        {
+          imageRegistrationThumbnail: {
+            contains: 'amazonaws.com',
+          },
+        },
+      ],
+    };
+
+    // Build AND conditions: search (if exists) AND S3 URL condition
+    const andConditions: Prisma.ProductWhereInput[] = [];
+    
+    // Add search conditions if they exist
+    if (searchConditions.length > 0) {
+      andConditions.push({
+        OR: searchConditions,
+      });
+    }
+    
+    // Always add S3 URL condition
+    andConditions.push(s3UrlCondition);
+
+    // Combine all AND conditions
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     // Category filter - exact match with single category
@@ -138,8 +173,9 @@ export class ProductRepository {
     }
 
     // Display status filter
-    if (filters.displayStatus) {
-      where.displayStatus = filters.displayStatus;
+    // Only filter by 'Y' if explicitly requested, otherwise return both 'Y' and 'N'
+    if (filters.displayStatus === 'Y') {
+      where.displayStatus = 'Y';
     }
 
     return where;

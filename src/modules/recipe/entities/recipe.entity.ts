@@ -1,4 +1,5 @@
 import { UserEntity } from "src/modules/user/entities/user.entity";
+import { ProductEntity } from "src/modules/product/entities/product.entity";
 import { ERecipeCategory } from "../enums/recipe.enum";
 
 export class RecipeEntity {
@@ -20,4 +21,5 @@ export class RecipeEntity {
 
 export class RecipeEntityWithAuthor extends RecipeEntity {
   author: UserEntity | null;
+  product?: ProductEntity | null;
 }

@@ -12,6 +12,6 @@ import { RecipeUserInterceptor } from './interceptors/recipe.interceptor';
   imports: [PrismaModule, UserModule, LoggerModule, AwsModule],
   controllers: [RecipeController],
   providers: [RecipeService, RecipeRepository, RecipeUserInterceptor],
-  exports: [RecipeService],
+  exports: [RecipeService, RecipeRepository],
 })
 export class RecipeModule {}
