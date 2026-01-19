@@ -72,7 +72,9 @@ export class RecipeService {
       const category = createRecipeDto.category;
 
       // Use transaction to create recipe and upload thumbnail atomically
-      const result = await this.prisma.$transaction(async (tx) => {
+      // Increased timeout to handle file uploads that may take longer
+      const result = await this.prisma.$transaction(
+        async (tx) => {
         // Prepare recipe data
         const recipeData: any = {
           title,
@@ -136,7 +138,12 @@ export class RecipeService {
         }
 
         return recipe;
-      });
+      },
+      {
+        maxWait: 60000, // max time to wait to acquire a transaction (60 seconds)
+        timeout: 30000, // max time the interactive transaction can run before being canceled (30 seconds)
+      },
+    );
 
       return toRecipeEntityWithAuthor(result);
     } catch (error: any) {
@@ -365,7 +372,7 @@ export class RecipeService {
     options?: {
       page?: number;
       limit?: number;
-      status?: string;
+      status?: 'approved' | 'rejected' | 'pending';
     },
   ): Promise<RecipeEntityWithAuthor[]> {
     try {
@@ -407,7 +414,7 @@ export class RecipeService {
    */
   async getPopularRecipes(
     limit = 10,
-    status = 'approved',
+    status: 'approved' | 'rejected' | 'pending' = 'approved',
   ): Promise<RecipeEntityWithAuthor[]> {
     try {
       const recipes = await this.recipeRepository.getPopularRecipes(
@@ -425,7 +432,7 @@ export class RecipeService {
    */
   async getRecentRecipes(
     limit = 10,
-    status = 'approved',
+    status: 'approved' | 'rejected' | 'pending' = 'approved',
   ): Promise<RecipeEntityWithAuthor[]> {
     try {
       const recipes = await this.recipeRepository.getRecentRecipes(

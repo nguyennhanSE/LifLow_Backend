@@ -261,7 +261,7 @@ export class RecipeController {
     try {
       const recipes = await this.recipeService.getPopularRecipes(
         limit || 10,
-        'Active',
+        'approved',
       );
       const result = successResponse(recipes, 'Popular recipes retrieved successfully');
       responseModel.setData(result);
@@ -298,7 +298,7 @@ export class RecipeController {
     try {
       const recipes = await this.recipeService.getRecentRecipes(
         limit || 10,
-        'active',
+        'approved',
       );
       const result = successResponse(recipes, 'Recent recipes retrieved successfully');
       responseModel.setData(result);
@@ -361,7 +361,7 @@ export class RecipeController {
     @Param('authorId') authorId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @Query('status') status?: string,
+    @Query('status') status?: 'approved' | 'rejected' | 'pending',
   ) {
     const responseModel = new ResponseModel();
 
@@ -445,7 +445,7 @@ export class RecipeController {
     @Param('category') category: ERecipeCategory,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @Query('status') status?: string,
+    @Query('status') status?: 'approved' | 'rejected' | 'pending',
     @Query('sortBy') sortBy?: string,
     @Query('order') order?: 'asc' | 'desc',
   ) {

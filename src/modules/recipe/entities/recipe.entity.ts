@@ -11,7 +11,7 @@ export class RecipeEntity {
   dateOfWriting?: Date; // @map("date_of_writing")
   views?: number;
   status?: string; // e.g., Active | Hidden
-  thumbnailUrl?: string | null; // @map("thumbnail_url")
+  thumbnailUrl?: string[]; // @map("thumbnail_url")
   content?: string;
   ingredients?: string[]; // @map("ingredients")
   createdAt?: Date; // @map("created_at")

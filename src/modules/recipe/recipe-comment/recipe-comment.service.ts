@@ -43,13 +43,8 @@ export class RecipeCommentService {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
 
-    // Ensure authorId matches userId
-    if (createDto.authorId !== userId) {
-      throw new ForbiddenException('You can only create comments as yourself');
-    }
-
     // Create comment using repository
-    const comment = await this.recipeCommentRepository.create(createDto);
+    const comment = await this.recipeCommentRepository.create(createDto, userId);
 
     // Transform to ResponseDto
     return plainToInstance(RecipeCommentResponseDto, comment, {

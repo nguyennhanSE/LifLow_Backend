@@ -459,6 +459,10 @@ model Product {
   updatedAt DateTime? @updatedAt @map("updated_at")
 
   // extension
+  stockQuantity Int? @map("stock_quantity")
+  storageMethod String? @map("storage_method")
+  additionalImages String[] @map("additional_images")
+
   productCategoryNumber Int? @map("product_category_number")
   ctaButtonUrl String? @db.VarChar(500) @map("cta_button_url")
   // relation 

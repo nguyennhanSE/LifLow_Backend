@@ -33,10 +33,10 @@ export class CreateProductDto {
   @IsInt()
   category?: number;
 
-  @ApiPropertyOptional({ description: 'Brand name', example: 'Juwangsan' })
+  @ApiPropertyOptional({ description: 'Storage method', example: 'refrigerator' })
   @IsOptional()
   @IsString()
-  brand?: string;
+  storageMethod?: string;
 
   // manufacturer
   @ApiPropertyOptional({ description: 'Manufacturer', example: 'ABC Company' })
@@ -139,6 +139,15 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   saleStatus?: string;
+
+  // stock quantity
+  @ApiPropertyOptional({ description: 'Stock quantity', example: 100, minimum: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0, { message: 'Stock quantity must be a positive number' })
+  stockQuantity?: number;
+  
   // Additional optional fields can be added here as needed
   [key: string]: any;
 }

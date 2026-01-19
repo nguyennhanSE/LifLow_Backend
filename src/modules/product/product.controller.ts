@@ -93,6 +93,7 @@ export class ProductController {
     FileFieldsInterceptor([
       { name: 'imageRegistrationThumbnail', maxCount: 1 },
       { name: 'imageRegistrationDetail', maxCount: 1 },
+      { name: 'additionalImages', maxCount: 14 },
     ])
   )
   @ApiOperation({ summary: 'Create a new product' })
@@ -232,6 +233,7 @@ export class ProductController {
     @UploadedFiles() files: {
       imageRegistrationThumbnail?: Express.Multer.File[];
       imageRegistrationDetail?: Express.Multer.File[];
+      additionalImages?: Express.Multer.File[];
     },
   ) {
     const responseModel = new ResponseModel();
@@ -239,7 +241,8 @@ export class ProductController {
     try {
       const imageRegistrationThumbnail = files?.imageRegistrationThumbnail?.[0];
       const imageRegistrationDetail = files?.imageRegistrationDetail?.[0];
-      const product = await this.productService.createProduct(createProductDto, imageRegistrationThumbnail, imageRegistrationDetail);
+      const additionalImages = files?.additionalImages;
+      const product = await this.productService.createProduct(createProductDto, imageRegistrationThumbnail, imageRegistrationDetail, additionalImages);
       responseModel.setData(product);
     } catch (error) {
       throw error;

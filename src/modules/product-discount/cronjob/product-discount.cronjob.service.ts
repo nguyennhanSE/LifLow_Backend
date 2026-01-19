@@ -127,9 +127,17 @@ export class ProductDiscountCronjobService {
       where: { id: productDiscountId },
       select: {
         id: true,
+        productId: true,
         discountStartDate: true,
         discountEndDate: true,
         status: true,
+        product: {
+          select: {
+            id: true,
+            productPrice: true,
+            salePrice: true,
+          },
+        },
       },
     });
 
@@ -156,6 +164,25 @@ export class ProductDiscountCronjobService {
       this.logger.debug(
         `${action.charAt(0).toUpperCase() + action.slice(1)} product discount ${productDiscountId}`
       );
+      
+      // Reset salePrice to productPrice when discount expires
+      if (!shouldBeActive && discount.product && discount.product.productPrice !== null && discount.product.productPrice !== undefined) {
+        try {
+          await this.prisma.product.update({
+            where: { id: discount.productId },
+            data: { salePrice: discount.product.productPrice },
+          });
+          this.logger.debug(
+            `Reset salePrice to productPrice for product ${discount.productId}: ${discount.product.productPrice}`
+          );
+        } catch (error) {
+          this.logger.error(
+            `Error resetting salePrice for product ${discount.productId}: ${error.message}`,
+            error.stack
+          );
+        }
+      }
+      
       return { status: shouldBeActive, action };
     }
 
@@ -163,18 +190,19 @@ export class ProductDiscountCronjobService {
   }
 
   /**
-   * Recalculate sale prices for all products with active discounts
+   * Recalculate sale prices for all products with discounts
    * This method:
-   * 1. Finds all active product discounts (status = true)
-   * 2. Calculates new salePrice based on productPrice and discountRate
-   * 3. Updates the product's salePrice
+   * 1. Finds all product discounts (both active and inactive)
+   * 2. For active discounts: calculates new salePrice based on productPrice and discountRate
+   * 3. For inactive discounts: resets salePrice to productPrice
+   * 4. Updates the product's salePrice
    */
   async recalculateProductSalePrices(): Promise<{
     totalProcessed: number;
     totalUpdated: number;
     errors: number;
   }> {
-    this.logger.log('Starting product sale price recalculation based on active discounts');
+    this.logger.log('Starting product sale price recalculation based on discount status');
 
     const startTime = Date.now();
     let totalProcessed = 0;
@@ -182,14 +210,12 @@ export class ProductDiscountCronjobService {
     let errors = 0;
 
     try {
-      // Get all active product discounts with their product information
-      const activeDiscounts = await this.prisma.productDiscount.findMany({
-        where: {
-          status: true,
-        },
+      // Get all product discounts (both active and inactive) with their product information
+      const allDiscounts = await this.prisma.productDiscount.findMany({
         select: {
           id: true,
           productId: true,
+          status: true,
           discountRate: true,
           product: {
             select: {
@@ -201,10 +227,10 @@ export class ProductDiscountCronjobService {
         },
       });
 
-      this.logger.log(`Processing ${activeDiscounts.length} active product discounts`);
+      this.logger.log(`Processing ${allDiscounts.length} product discounts`);
 
-      // Process each active discount
-      for (const discount of activeDiscounts) {
+      // Process each discount
+      for (const discount of allDiscounts) {
         try {
           // Skip if product doesn't exist or productPrice is not set
           if (!discount.product || discount.product.productPrice === null || discount.product.productPrice === undefined) {
@@ -215,10 +241,17 @@ export class ProductDiscountCronjobService {
             continue;
           }
 
-          // Calculate new sale price: productPrice * (1 - discountRate / 100)
           const productPrice = discount.product.productPrice;
-          const discountRate = discount.discountRate;
-          const newSalePrice = Math.floor(productPrice * (1 - discountRate / 100));
+          let newSalePrice: number;
+
+          if (discount.status === true) {
+            // Active discount: calculate discounted price
+            const discountRate = discount.discountRate;
+            newSalePrice = Math.floor(productPrice * (1 - discountRate / 100));
+          } else {
+            // Inactive discount: reset to productPrice
+            newSalePrice = productPrice;
+          }
 
           // Only update if salePrice has changed
           if (discount.product.salePrice !== newSalePrice) {
@@ -228,11 +261,18 @@ export class ProductDiscountCronjobService {
             });
 
             totalUpdated++;
-            this.logger.debug(
-              `Updated sale price for product ${discount.productId}: ` +
-                `${discount.product.salePrice} -> ${newSalePrice} ` +
-                `(productPrice: ${productPrice}, discountRate: ${discountRate}%)`
-            );
+            if (discount.status === true) {
+              this.logger.debug(
+                `Updated sale price for product ${discount.productId}: ` +
+                  `${discount.product.salePrice} -> ${newSalePrice} ` +
+                  `(productPrice: ${productPrice}, discountRate: ${discount.discountRate}%)`
+              );
+            } else {
+              this.logger.debug(
+                `Reset sale price to productPrice for product ${discount.productId}: ` +
+                  `${discount.product.salePrice} -> ${newSalePrice} (discount expired)`
+              );
+            }
           }
 
           totalProcessed++;

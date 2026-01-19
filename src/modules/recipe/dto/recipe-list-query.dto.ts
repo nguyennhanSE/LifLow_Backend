@@ -7,6 +7,7 @@ import {
   Max,
   IsUUID,
   IsIn,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ERecipeCategory } from '../enums/recipe.enum';
@@ -52,7 +53,16 @@ export class RecipeListQueryDto {
   @IsOptional()
   @IsString({ message: 'Status must be a string' })
   @IsIn(['approved', 'pending', 'rejected'], { message: 'Status must be either "approved", "pending" or "rejected"' })
-  status?: string;
+  status?: 'approved' | 'rejected' | 'pending';
+
+  @ApiPropertyOptional({
+    description: 'Filter by active status',
+    example: true,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean({ message: 'IsActive must be a boolean' })
+  isActive?: boolean;
 
   @ApiPropertyOptional({
     description: 'Filter by author user ID',

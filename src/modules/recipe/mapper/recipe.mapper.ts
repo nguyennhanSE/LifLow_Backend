@@ -25,8 +25,8 @@ export function toRecipeEntity(recipe: Recipe): RecipeEntity {
     views: recipe.views,
     status: recipe.status,  
     thumbnailUrl: Array.isArray(recipe.thumbnailUrl) 
-      ? (recipe.thumbnailUrl.length > 0 ? recipe.thumbnailUrl[0] : null)
-      : (recipe.thumbnailUrl || null),
+      ? recipe.thumbnailUrl 
+      : (recipe.thumbnailUrl ? [recipe.thumbnailUrl] : []),
     content: recipe.content,
     ingredients: recipe.ingredients,
     createdAt: recipe.createdAt,
@@ -127,7 +127,7 @@ export interface RecipeSummaryDto {
   authorName: string;
   category: string | null;
   views: number;
-  thumbnailUrl: string | null;
+  thumbnailUrl: string[];
   createdAt: Date;
 }
 
@@ -139,8 +139,8 @@ export function mapToSummary(recipe: RecipeWithAuthor): RecipeSummaryDto {
     category: recipe.category,
     views: recipe.views,
     thumbnailUrl: Array.isArray(recipe.thumbnailUrl)
-      ? (recipe.thumbnailUrl.length > 0 ? recipe.thumbnailUrl[0] : null)
-      : (recipe.thumbnailUrl || null),
+      ? recipe.thumbnailUrl
+      : (recipe.thumbnailUrl ? [recipe.thumbnailUrl] : []),
     createdAt: recipe.createdAt,
   };
 }

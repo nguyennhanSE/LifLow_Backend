@@ -50,6 +50,7 @@ export class RecipeRepository {
       limit = 20,
       category,
       status,
+      isActive,
       authorId,
       sortBy = 'createdAt',
       order = 'desc',
@@ -64,7 +65,16 @@ export class RecipeRepository {
     }
 
     if (status) {
-      where.status = status;
+      // Validate status is one of the allowed values
+      if (status === 'approved' || status === 'rejected' || status === 'pending') {
+        where.status = status;
+      } else {
+        throw new BadRequestException('Status must be either "approved", "pending" or "rejected"');
+      }
+    }
+
+    if (typeof isActive === 'boolean') {
+      where.isActive = isActive;
     }
 
     if (authorId) {
@@ -170,7 +180,7 @@ export class RecipeRepository {
     options?: {
       page?: number;
       limit?: number;
-      status?: string;
+      status?: 'approved' | 'rejected' | 'pending';
       includeAuthor?: boolean;
     },
   ): Promise<RecipeWithAuthor[]> {
@@ -179,7 +189,12 @@ export class RecipeRepository {
     const where: Prisma.RecipeWhereInput = { authorId };
     
     if (status) {
-      where.status = status;
+      // Validate status is one of the allowed values
+      if (status === 'approved' || status === 'rejected' || status === 'pending') {
+        where.status = status;
+      } else {
+        throw new BadRequestException('Status must be either "approved", "pending" or "rejected"');
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -244,7 +259,7 @@ export class RecipeRepository {
    * Count recipes by filters
    */
   async countByFilters(query: Partial<RecipeListQueryDto>): Promise<number> {
-    const { category, status, authorId, q } = query;
+    const { category, status, isActive, authorId, q } = query;
 
     const where: Prisma.RecipeWhereInput = {};
 
@@ -253,7 +268,16 @@ export class RecipeRepository {
     }
 
     if (status) {
-      where.status = status;
+      // Validate status is one of the allowed values
+      if (status === 'approved' || status === 'rejected' || status === 'pending') {
+        where.status = status;
+      } else {
+        throw new BadRequestException('Status must be either "approved", "pending" or "rejected"');
+      }
+    }
+
+    if (typeof isActive === 'boolean') {
+      where.isActive = isActive;
     }
 
     if (authorId) {
@@ -281,7 +305,10 @@ export class RecipeRepository {
   /**
    * Count recipes by status
    */
-  async countByStatus(status: string): Promise<number> {
+  async countByStatus(status: 'approved' | 'rejected' | 'pending'): Promise<number> {
+    if (status !== 'approved' && status !== 'rejected' && status !== 'pending') {
+      throw new BadRequestException('Status must be either "approved", "pending" or "rejected"');
+    }
     return await this.prisma.recipe.count({ where: { status } });
   }
 
@@ -315,7 +342,10 @@ export class RecipeRepository {
   /**
    * Get popular recipes (by views)
    */
-  async getPopularRecipes(limit = 10, status = 'Active'): Promise<RecipeWithAuthor[]> {
+  async getPopularRecipes(limit = 10, status: 'approved' | 'rejected' | 'pending' = 'approved'): Promise<RecipeWithAuthor[]> {
+    if (status !== 'approved' && status !== 'rejected' && status !== 'pending') {
+      throw new BadRequestException('Status must be either "approved", "pending" or "rejected"');
+    }
     return await this.prisma.recipe.findMany({
       where: { status },
       orderBy: { views: 'desc' },
@@ -327,7 +357,10 @@ export class RecipeRepository {
   /**
    * Get recent recipes
    */
-  async getRecentRecipes(limit = 10, status = 'active'): Promise<RecipeWithAuthor[]> {
+  async getRecentRecipes(limit = 10, status: 'approved' | 'rejected' | 'pending' = 'approved'): Promise<RecipeWithAuthor[]> {
+    if (status !== 'approved' && status !== 'rejected' && status !== 'pending') {
+      throw new BadRequestException('Status must be either "approved", "pending" or "rejected"');
+    }
     return await this.prisma.recipe.findMany({
       where: { status },
       orderBy: { updatedAt: 'desc' },

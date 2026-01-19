@@ -89,7 +89,7 @@ export class ProductService {
   /**
    * Create a new product
    */
-  async createProduct(data: CreateProductDto, imageRegistrationThumbnail?: Express.Multer.File, imageRegistrationDetail?: Express.Multer.File): Promise<ProductEntity> {
+  async createProduct(data: CreateProductDto, imageRegistrationThumbnail?: Express.Multer.File, imageRegistrationDetail?: Express.Multer.File, additionalImages?: Express.Multer.File[]): Promise<ProductEntity> {
     // Validate business rules
     validatePriceHierarchy(data);
     // validateOrderQuantity(data);
@@ -168,8 +168,34 @@ export class ProductService {
             throw new BadRequestException(`Failed to upload image registration detail: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
         }
+        // Upload additional images
+        if (additionalImages && additionalImages.length > 0) {
+          try {
+            const additionalImagesUrls: string[] = [];
+            const prefix: string = `products/${product.id}/additional`;
+            for (const image of additionalImages) {
+              if (!image) continue;
+              const url = await this.awsService.uploadFile(prefix, product.id, image);
+              additionalImagesUrls.push(url!);
+            }
+            await tx.product.update({
+              where: { id: product.id },
+              data: { additionalImages: additionalImagesUrls },
+            });
+          } catch (error) {
+            throw new BadRequestException(
+              `Failed to upload additional images: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+          }
+        }
         return product;
-      });
+        
+      },
+      {
+        maxWait: 60000, // max time to wait to acquire a transaction (60 seconds)
+        timeout: 30000, // max time the interactive transaction can run before being canceled (30 seconds)
+      },
+    );
 
       // Return product entity
       return toProductEntity(result);

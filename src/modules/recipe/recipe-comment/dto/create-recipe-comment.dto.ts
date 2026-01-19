@@ -17,14 +17,6 @@ export class CreateRecipeCommentDto {
   recipeId!: string;
 
   @ApiProperty({
-    description: 'Author ID (UUID)',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  @IsNotEmpty({ message: 'Author ID is required' })
-  @IsUUID('4', { message: 'Author ID must be a valid UUID' })
-  authorId!: string;
-
-  @ApiProperty({
     description: 'Comment content',
     example: 'This recipe looks amazing! I will definitely try it.',
     minLength: 1,

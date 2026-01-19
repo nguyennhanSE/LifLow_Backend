@@ -35,12 +35,12 @@ export class RecipeCommentRepository {
   /**
    * Create a new recipe comment
    */
-  async create(data: CreateRecipeCommentDto): Promise<RecipeCommentWithRelations> {
+  async create(data: CreateRecipeCommentDto, userId: string): Promise<RecipeCommentWithRelations> {
     try {
       return await this.recipeComments.create({
         data: {
           recipeId: data.recipeId,
-          authorId: data.authorId,
+          authorId: userId,
           content: data.content,
         },
         include: {
@@ -204,11 +204,6 @@ export class RecipeCommentRepository {
       if (data.recipeId !== undefined) {
         updateData.recipeId = data.recipeId;
       }
-
-      if (data.authorId !== undefined) {
-        updateData.authorId = data.authorId;
-      }
-
       if (data.content !== undefined) {
         updateData.content = data.content;
       }
