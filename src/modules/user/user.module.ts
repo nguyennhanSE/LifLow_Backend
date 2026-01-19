@@ -9,8 +9,10 @@ import { LoggerModule } from '../../libs/logger/logger.module';
 import { MembershipsModule } from '../memberships/memberships.module';
 import { OrderModule } from '../order/order.module';
 import { OrderRepository } from '../order/repositories/order.repository';
+import { AwsModule } from '../../libs/integration/aws/aws.module';
+import { EmailModule } from '../email/email.module';
 @Module({
-  imports: [PrismaModule, PermissionsModule, RolesModule, LoggerModule, MembershipsModule, OrderModule],
+  imports: [PrismaModule, PermissionsModule, RolesModule, LoggerModule, MembershipsModule, OrderModule, AwsModule, EmailModule],
   controllers: [UserController],
   providers: [UserService, UserRepository, OrderRepository],
   exports: [UserService],

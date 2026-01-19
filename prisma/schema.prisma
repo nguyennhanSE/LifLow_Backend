@@ -44,6 +44,10 @@ model User {
   recipeAccess Boolean? @default(false) @map("recipe_access")
   bannerAccess Boolean? @default(false) @map("banner_access")
   
+  // Extension
+  mobilePhoneNumber String? @map("mobile_phone_number")
+  nickName String? @map("nick_name")
+  statusMessage String? @map("status_message")
   // Relations
   userRole UserRole[]
   userMembership UserMembership?
@@ -471,6 +475,7 @@ model Product {
   // productRecipes ProductRecipe[]
   productSpecialOffer ProductSpecialOffer?
   productDiscount ProductDiscount?
+  productBadges productBadges[]
   cartItems CartItem[]
   productReviews ProductReviews[]
   productInquiries ProductInquiries[]
@@ -478,7 +483,18 @@ model Product {
   @@map("products")
 }
 
+model productBadges {
+  id String @id @default(uuid())
+  productId String @map("product_id")
 
+  isHotDeal Boolean @default(false) @map("is_hot_deal")
+  isNewProduct Boolean @default(false) @map("is_new_product")
+  isBestSeller Boolean @default(false) @map("is_best_seller")
+
+  // Relations
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@map("product_badges")
+}
 
 model ProductReviews {
   id String @id @default(uuid())

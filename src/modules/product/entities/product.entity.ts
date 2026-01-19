@@ -1,5 +1,6 @@
 import { ProductDiscountEntity } from "src/modules/product-discount/entities/product-discount.entity";
 import { BannerEntity } from "src/modules/banner/entities/banner.entity";
+import { ProductBadgeResponseDto } from "src/modules/product-badges/dto/product-badge-response.dto";
 
 export class ProductEntity {
   id!: string;
@@ -103,6 +104,7 @@ export class ProductEntity {
   productSpecialOffer?: ProductSpecialOfferEntity | null;
   productDiscount?: ProductDiscountEntity | null;
   banner?: BannerEntity[] | null;
+  productBadges?: ProductBadgeResponseDto | null;
 }
 
 

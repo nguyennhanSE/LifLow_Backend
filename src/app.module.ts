@@ -32,6 +32,7 @@ import { ProductInquiriesModule } from './modules/product-inquiries/product-inqu
 import { PolicyModule } from './modules/policy/policy.module';
 import { AnnouncementsModule } from './modules/announcements/announcements.module';
 import { RecipeCommentModule } from './modules/recipe/recipe-comment/recipe-comment.module';
+import { ProductBadgesModule } from './modules/product-badges/product-badges.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { RecipeCommentModule } from './modules/recipe/recipe-comment/recipe-comm
     CartsModule,
     PaymentModule,
     PolicyModule,
+    ProductBadgesModule,
   ],
   controllers: [AppController],
   providers: [

@@ -46,6 +46,7 @@ export class ProductRepository {
         productSpecialOffer: true,
         productDiscount: true,
         banner: true,
+        productBadges: true,
       },
     });
 
@@ -62,6 +63,7 @@ export class ProductRepository {
         productSpecialOffer: true,
         productDiscount: true,
         banner: true,
+        productBadges: true,
       },
     });
 
@@ -585,6 +587,7 @@ export class ProductRepository {
         productSpecialOffer: true,
         productDiscount: true,
         banner: true,
+        productBadges: true,
       },
     });
 

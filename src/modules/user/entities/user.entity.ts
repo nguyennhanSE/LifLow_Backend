@@ -6,6 +6,7 @@ export class UserEntity {
   membershipLevel?: string | null;
   email?: string;
   phoneNumber?: string; // @map("phone_number")
+  mobilePhoneNumber?: string; // @map("mobile_phone_number")
   totalPurchaseAmount?: number | null; // @map("total_purchase_amount")
   totalUsedPoints?: number; // @map("total_used_points")
   availablePoints?: number; // @map("available_points")
@@ -22,6 +23,8 @@ export class UserEntity {
   membership?: MembershipInfo | null; // Memberships from userMembership table
   // Extensions
   orderNumber?: number; // Order number from order table
+  nickName?: string | null; // @map("nick_name")
+  statusMessage?: string | null; // @map("status_message")
 }
 
 export class RoleInfo {

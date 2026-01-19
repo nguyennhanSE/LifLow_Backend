@@ -25,6 +25,7 @@ import { QueryCouponDto } from './dto/query-coupon.dto';
 import { ResponseModel } from '../../libs/models/response/response.model';
 import { ERoleName } from '../roles/enums/role.enum';
 import { Roles } from 'src/libs/decorator/roles.decorator';
+import { Public } from 'src/libs/decorator/public.decorator';
 @ApiTags('Coupons')
 @Controller('coupons')
 @ApiBearerAuth()
@@ -59,7 +60,7 @@ export class CouponsController {
   }
 
   @Get('list')
-  @Roles(ERoleName.ADMIN)
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get all coupons',
@@ -117,7 +118,7 @@ export class CouponsController {
   }
 
   @Get('code/:code')
-  @Roles(ERoleName.ADMIN)
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get coupon by code',
@@ -150,7 +151,7 @@ export class CouponsController {
   }
 
   @Get(':id')
-  @Roles(ERoleName.ADMIN)
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get coupon by ID',

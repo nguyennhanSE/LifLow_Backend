@@ -90,9 +90,9 @@ export class UserRepository {
   /**
    * Create a new user
    */
-  async createUser(createUserDto: CreateUserDto & {password?: string; phoneNumber?: string }): Promise<UserEntity> {
+  async createUser(createUserDto: CreateUserDto & {password?: string; phoneNumber?: string; avatarImageUrl?: string }): Promise<UserEntity> {
     // Default role to USER if not provided
-    const roleName = createUserDto.role || ERoleName.USER;
+    const roleName = ERoleName.USER;
 
     // Find the role in the database
     const role = await this.prisma.role.findUnique({
@@ -103,7 +103,7 @@ export class UserRepository {
       throw new BadRequestException(`Role ${roleName} not found in database`);
     }
 
-    // Create user and assign role in a transaction
+    // Create user, assign role, and create shipping address in a transaction
     const createdUserId = await this.prisma.$transaction(async (tx) => {
       // Create the user
       const createdUser = await tx.user.create({
@@ -117,6 +117,23 @@ export class UserRepository {
           roleId: role.id,
         },
       });
+
+      // Create shipping address if address information is provided
+      if (createUserDto.zipCode && createUserDto.addressName && createUserDto.addressFull) {
+        await tx.userShippingAddress.create({
+          data: {
+            userId: createdUser.id,
+            recipientName: createUserDto.name,
+            deliveryAddress: createUserDto.addressName,
+            address: createUserDto.addressName,
+            addressFull: createUserDto.addressFull,
+            postalCode: createUserDto.zipCode,
+            mobilePhone: createUserDto.mobilePhoneNumber || undefined,
+            phoneNumber: createUserDto.phoneNumber || '',
+            setAsDefault: true, // Set as default address for new user
+          },
+        });
+      }
 
       return createdUser.id;
     });
@@ -888,6 +905,77 @@ export class UserRepository {
       });
     } catch (error) {
       console.error('Prisma error in createUserShippingAddress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user by email and name
+   */
+  async getUserByEmailAndName(email: string, name: string): Promise<UserEntity | null> {
+    try {
+      const user = await this.prisma.user.findFirst({
+        where: {
+          email: email.trim(),
+          name: name.trim(),
+        },
+        include: {
+          userRole: {
+            include: {
+              role: true,
+            },
+          },
+          userMembership: {
+            include: {
+              membership: true,
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      return toUserEntityWithRelations(user);
+    } catch (error) {
+      console.error('Prisma error in getUserByEmailAndName:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user by ID, name and email (for password reset verification)
+   */
+  async getUserByIdNameAndEmail(id: string, name: string, email: string): Promise<UserEntity | null> {
+    try {
+      const user = await this.prisma.user.findFirst({
+        where: {
+          id: id.trim(),
+          name: name.trim(),
+          email: email.trim(),
+        },
+        include: {
+          userRole: {
+            include: {
+              role: true,
+            },
+          },
+          userMembership: {
+            include: {
+              membership: true,
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      return toUserEntityWithRelations(user);
+    } catch (error) {
+      console.error('Prisma error in getUserByIdNameAndEmail:', error);
       throw error;
     }
   }

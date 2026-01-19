@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from "class-validator";
 import { Transform } from "class-transformer";
 import { trim, toLower } from "../../../utils/helper";
 import { ERoleName } from "../../roles/enums/role.enum";
@@ -11,6 +11,26 @@ type AdminListFilterType = Exclude<ERoleName, ERoleName.USER> | 'ALL';
 // Admin list filter options (excludes USER role)
 const AdminListFilterOptions = [...Object.values(ERoleName).filter(role => role !== ERoleName.USER), 'ALL'] as const;
 export class CreateUserDto {
+    @ApiPropertyOptional({
+        description: 'User ID',
+        example: '1234567890',
+        type: String
+    })
+    @IsNotEmpty()
+    @IsString()
+    @trim()
+    id!: string;
+    @ApiPropertyOptional({
+        description: 'User password',
+        example: 'password123',
+        type: String
+    })
+    @IsNotEmpty()
+    @IsString()
+    @MinLength(10)
+    @MaxLength(16)
+    password!: string;
+
     @ApiProperty({
         description: 'User full name',
         example: 'John Doe',
@@ -18,6 +38,28 @@ export class CreateUserDto {
     })
     @IsString() @IsNotEmpty() @trim() @MaxLength(100)
     name!: string;
+
+    @ApiPropertyOptional({
+        description: 'User nick name',
+        example: '010-1234-5678',
+        maxLength: 100
+    })
+    @IsOptional()
+    @IsString()
+    @trim()
+    @MaxLength(100)
+    mobilePhoneNumber?: string;
+
+    @ApiPropertyOptional({
+        description: 'User status message',
+        example: 'I am a user',
+        maxLength: 100
+    })
+    @IsNotEmpty()
+    @IsString()
+    @trim()
+    @MaxLength(100)
+    phoneNumber!: string;
 
     @ApiProperty({
         description: 'User email address',
@@ -27,21 +69,77 @@ export class CreateUserDto {
     @IsEmail() @toLower() @trim()
     email!: string;
 
-    @ApiPropertyOptional({ 
-        description: 'User role (defaults to USER if not provided)',
-        example: 'USER',
-        enum: ERoleName
+    @ApiPropertyOptional({
+        description: 'User zip code',
+        example: 12345,
+        minimum: 10000,
+        maximum: 99999
     })
-    @IsOptional() 
-    @IsEnum(ERoleName, { message: 'Role must be one of: ADMIN, GENERAL_MANAGER, MANAGER, MD, CS_MANAGER, USER' })
-    role?: ERoleName;
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === undefined || value === null || value === '') {
+            return undefined;
+        }
+        const num = typeof value === 'string' ? parseInt(value, 10) : value;
+        return isNaN(num) ? undefined : num;
+    })
+    @IsNumber()
+    zipCode?: number;
 
     @ApiPropertyOptional({
-        description: 'Phone number',
-        example: '010-1234-5678'
+        description: 'User address name',
+        example: 'Home',
+        maxLength: 100
     })
-    @IsOptional() @IsString() @trim()
-    phoneNumber?: string;
+    @IsOptional()
+    @IsString()
+    @trim()
+    @MaxLength(100)
+    addressName?: string;
+
+    @ApiPropertyOptional({
+        description: 'User address',
+        example: '123 Main St, Anytown, USA',
+        maxLength: 500
+    })
+    @IsOptional()
+    @IsString()
+    @trim()
+    @MaxLength(500)
+    addressFull?: string;
+
+    @ApiPropertyOptional({
+        description: 'User date of birth',
+        example: '1990-01-01',
+        format: 'date'
+    })
+    @IsNotEmpty()
+    @IsString()
+    @trim()
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date of birth must be in YYYY-MM-DD format' })
+    dateOfBirth!: string;
+
+    @ApiPropertyOptional({
+        description: 'User gender',
+        example: 'male',
+        enum: ['male', 'female']
+    })
+    @IsOptional()
+    @IsString()
+    @trim()
+    @MaxLength(100)
+    nickName?: string;
+
+    @ApiPropertyOptional({
+        description: 'User status message',
+        example: 'I am a user',
+        maxLength: 100
+    })
+    @IsOptional()
+    @IsString()
+    @trim()
+    @MaxLength(100)
+    statusMessage?: string;
 }
 export class CreateUser extends CreateUserDto {
 }
@@ -121,6 +219,20 @@ export class UpdateUserDto {
     @MinLength(8) 
     @MaxLength(128)
     password?: string;
+
+    @ApiPropertyOptional({ description: 'User nick name', example: 'Johnny', maxLength: 100 })
+    @IsOptional()
+    @IsString()
+    @trim()
+    @MaxLength(100)
+    nickName?: string;
+
+    @ApiPropertyOptional({ description: 'User status message', example: 'I am a user', maxLength: 100 })
+    @IsOptional()
+    @IsString()
+    @trim()
+    @MaxLength(100)
+    statusMessage?: string;
 
 }
 
@@ -519,6 +631,20 @@ export class UpdateUserProfileDto {
     @trim()
     phoneNumber?: string;
 
+    @ApiPropertyOptional({ description: 'User nick name', example: 'Johnny', maxLength: 100 })
+    @IsOptional()
+    @IsString()
+    @trim()
+    @MaxLength(100)
+    nickName?: string;
+
+    @ApiPropertyOptional({ description: 'User status message', example: 'I am a user', maxLength: 100 })
+    @IsOptional()
+    @IsString()
+    @trim()
+    @MaxLength(100)
+    statusMessage?: string;
+
     // @ApiPropertyOptional({ description: 'User age', example: 30 })
     // @IsOptional()
     // @IsNumber()
@@ -605,4 +731,60 @@ export class CreateShippingAddressDto {
     @IsOptional()
     @IsBoolean()
     setAsDefault?: boolean;
+}
+
+export class FindUserIdDto {
+    @ApiProperty({
+        description: 'User full name',
+        example: 'John Doe',
+        maxLength: 100
+    })
+    @IsString()
+    @IsNotEmpty()
+    @trim()
+    @MaxLength(100)
+    name!: string;
+
+    @ApiProperty({
+        description: 'User email address',
+        example: 'john.doe@gmail.com',
+        format: 'email'
+    })
+    @IsEmail()
+    @toLower()
+    @trim()
+    email!: string;
+}
+
+export class FindPasswordDto {
+    @ApiProperty({
+        description: 'User ID',
+        example: '1234567890',
+        type: String
+    })
+    @IsNotEmpty()
+    @IsString()
+    @trim()
+    id!: string;
+
+    @ApiProperty({
+        description: 'User full name',
+        example: 'John Doe',
+        maxLength: 100
+    })
+    @IsString()
+    @IsNotEmpty()
+    @trim()
+    @MaxLength(100)
+    name!: string;
+
+    @ApiProperty({
+        description: 'User email address',
+        example: 'john.doe@gmail.com',
+        format: 'email'
+    })
+    @IsEmail()
+    @toLower()
+    @trim()
+    email!: string;
 }

@@ -5,10 +5,15 @@ import { UserRepository } from './repositories/user.repository';
 import { IPaginate, PaginateOptions } from '../../libs/models/paginate/pagimate.model';
 import { ERoleName } from '../roles/enums/role.enum';
 import * as bcrypt from 'bcrypt';
+import { UserEmailService } from '../email/email.service';
+import { SendEmailDto } from '../email/dto/email.dto';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly emailService: UserEmailService
+  ) {}
 
   async countNewSignupsToday(): Promise<{ date: string; count: number }> {
     const now = new Date();
@@ -41,21 +46,44 @@ export class UserService {
    * Create a new user with role assignment
    * Default role is USER if not provided
    */
-  async create(createUserDto: CreateUserDto): Promise<UserEntity> {
+  async create(createUserDto: CreateUserDto, avatarImageUrl?: string): Promise<UserEntity> {
     // Check if user already exists
-    const existingUser = await this.userRepository.getUserByEmail(createUserDto.email);
+    const existingUser = await this.userRepository.getUserByAccount(createUserDto.id);
     if (existingUser) {
-      throw new BadRequestException('User with this email already exists');
+      throw new BadRequestException('User with this id already exists');
     }
 
     // Generate a random password if not provided
-    const password = await bcrypt.hash('password123', 10); // Default password
+    const plainPassword = createUserDto.password || 'password123';
+    const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-    return this.userRepository.createUser({
+    const createdUser = await this.userRepository.createUser({
       ...createUserDto,
-      password,
+      password: hashedPassword,
       phoneNumber: createUserDto.phoneNumber || '',
+      avatarImageUrl,
     });
+
+    // Send welcome email
+    try {
+      const emailData: SendEmailDto = {
+        id: createdUser.id,
+        name: createdUser.name,
+        email: createUserDto.email,
+        phone: createUserDto.phoneNumber || null,
+        bankName: '',
+        bankAccountNumber: '',
+        password: plainPassword,
+        createdAt: createdUser.createdAt || new Date(),
+        avatarUrl: avatarImageUrl || null,
+      };
+      await this.emailService.sendWelcomeEmail(emailData, plainPassword);
+    } catch (error) {
+      // Log error but don't fail user creation if email fails
+      console.error('Error sending welcome email:', error);
+    }
+
+    return createdUser;
   }
 
   /**
@@ -214,6 +242,8 @@ export class UserService {
     email?: string;
     phoneNumber?: string;
     age?: number;
+    nickName?: string;
+    statusMessage?: string;
   }): Promise<UserEntity> {
     try {
       // Check if user exists
@@ -266,6 +296,64 @@ export class UserService {
       return await this.userRepository.createUserShippingAddress(userId, addressData);
     } catch (error) {
       console.error('Error in createUserShippingAddress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Find user ID by email and name
+   */
+  async findUserIdByEmailAndName(email: string, name: string): Promise<string | null> {
+    try {
+      const user = await this.userRepository.getUserByEmailAndName(email, name);
+      return user?.id || null;
+    } catch (error) {
+      console.error('Error in findUserIdByEmailAndName:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reset password by ID, name and email
+   * Generates a new random password and updates it
+   */
+  async resetPasswordByIdNameAndEmail(id: string, name: string, email: string): Promise<boolean> {
+    try {
+      // Verify user exists with matching credentials
+      const user = await this.userRepository.getUserByIdNameAndEmail(id, name, email);
+      if (!user) {
+        return false;
+      }
+
+      // Generate a new random password
+      const newPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password
+      await this.userRepository.updateUser(id, { password: hashedPassword });
+
+      // Send password changed email
+      try {
+        const emailData: SendEmailDto = {
+          id: user.id,
+          name: user.name,
+          email: user.email || email,
+          phone: user.phoneNumber || null,
+          bankName: '',
+          bankAccountNumber: '',
+          password: newPassword,
+          createdAt: user.createdAt || new Date(),
+          avatarUrl: null,
+        };
+        await this.emailService.sendPasswordChangedEmail(emailData);
+      } catch (error) {
+        // Log error but don't fail password reset if email fails
+        console.error('Error sending password changed email:', error);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error in resetPasswordByIdNameAndEmail:', error);
       throw error;
     }
   }

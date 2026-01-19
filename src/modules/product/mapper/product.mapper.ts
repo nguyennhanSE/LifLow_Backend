@@ -1,12 +1,14 @@
-import { Product, Prisma, ProductSpecialOffer, Banner } from "@prisma/client";
+import { Product, Prisma, ProductSpecialOffer, Banner, productBadges } from "@prisma/client";
 import { ProductEntity, ProductSpecialOfferEntity } from "../entities/product.entity";
 import { BannerMapper } from "src/modules/banner/mappers/banner.mapper";
+import { ProductBadgeMapper } from "src/modules/product-badges/mappers/product-badge.mapper";
 
 type ProductWithRelations = Prisma.ProductGetPayload<{
   include: { 
     productSpecialOffer: true,
     productDiscount: true,
-    banner: true
+    banner: true,
+    productBadges: true
   }
 }>
 
@@ -152,5 +154,8 @@ export function toProductEntityWithRelations(product: ProductWithRelations): Pro
       updatedAt: product.productDiscount.updatedAt,
     } : null,
     banner: product.banner ? product.banner.map((banner: Banner) => BannerMapper.toEntity(banner)) : null,
+    productBadges: product.productBadges && product.productBadges.length > 0 
+      ? ProductBadgeMapper.toResponseDto(product.productBadges[0]) 
+      : null,
   }
 }

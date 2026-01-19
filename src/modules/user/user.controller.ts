@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException, NotFoundException, BadRequestException, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto, UpdateUserProfileDto, CreateShippingAddressDto } from './dto/user.dto';
+import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto, UpdateUserProfileDto, CreateShippingAddressDto, FindUserIdDto, FindPasswordDto } from './dto/user.dto';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { toResponse } from './mapper/user.mapper';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { ResponseModel } from '../../libs/models/response/response.model';
 import { PermissionsService } from '../permissions/permissions.service';
 import { UpdateUserPermissionsDto } from '../permissions/dto/permissions.dto';
@@ -15,6 +15,9 @@ import { TokenPayload } from 'src/libs/constants/interface';
 import { MembershipsService } from '../memberships/memberships.service';
 import { QueryUserMembershipsDto } from '../memberships/dto/membership.dto';  
 import { OrderRepository } from '../order/repositories/order.repository';
+import { Public } from 'src/libs/decorator/public.decorator';
+import { AwsService } from '../../libs/integration/aws/aws.service';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
@@ -25,19 +28,111 @@ export class UserController {
     private readonly permissionsService: PermissionsService,
     private readonly rolesService: RolesService,
     private readonly membershipsService: MembershipsService,
-    private readonly orderRepository: OrderRepository
+    private readonly orderRepository: OrderRepository,
+    private readonly awsService: AwsService
   ) {}
 
   @Post("create")
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER)
+  @Public()
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'avatarImage', maxCount: 1 },
+    ])
+  )
   @ApiOperation({ summary: 'Create a new user with role assignment' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Create user with avatar image',
+    schema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'User ID',
+          example: '1234567890',
+        },
+        password: {
+          type: 'string',
+          description: 'User password (10-16 characters)',
+          example: 'password123',
+        },
+        name: {
+          type: 'string',
+          description: 'User full name',
+          example: 'John Doe',
+        },
+        mobilePhoneNumber: {
+          type: 'string',
+          description: 'Mobile phone number',
+          example: '010-1234-5678',
+        },
+        phoneNumber: {
+          type: 'string',
+          description: 'Phone number',
+          example: '010-1234-5678',
+        },
+        email: {
+          type: 'string',
+          format: 'email',
+          description: 'User email address',
+          example: 'john.doe@gmail.com',
+        },
+        zipCode: {
+          type: 'number',
+          description: 'User zip code',
+          example: 12345,
+        },
+        addressName: {
+          type: 'string',
+          description: 'User address name',
+          example: 'Home',
+        },
+        addressFull: {
+          type: 'string',
+          description: 'User full address',
+          example: '123 Main St, Anytown, USA',
+        },
+        dateOfBirth: {
+          type: 'string',
+          format: 'date',
+          description: 'User date of birth (YYYY-MM-DD)',
+          example: '1990-01-01',
+        },
+        nickName: {
+          type: 'string',
+          description: 'User nick name',
+          example: 'Johnny',
+        },
+        statusMessage: {
+          type: 'string',
+          description: 'User status message',
+          example: 'I am a user',
+        },
+        avatarImage: {
+          type: 'string',
+          format: 'binary',
+          description: 'Avatar image (max 5MB, jpg/jpeg/png/webp)',
+        },
+      },
+      required: ['id', 'password', 'name', 'phoneNumber', 'email', 'dateOfBirth'],
+    },
+  })
   @ApiResponse({ status: 201, description: 'User created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error or user already exists' })
-  async create(@Body() createUserDto: CreateUserDto) {
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @UploadedFiles() files: { avatarImage?: Express.Multer.File[] }
+  ) {
     const responseModel = new ResponseModel();
+    const avatarImage = files?.avatarImage?.[0];
+    if (!avatarImage) {
+      throw new BadRequestException('Avatar image is required');
+    }
+    
+    const avatarImageUrl = await this.awsService.uploadFile('users', createUserDto.id, avatarImage);
 
     try {
-      const user = await this.userService.create(createUserDto);
+      const user = await this.userService.create(createUserDto, avatarImageUrl);
       const result = toResponse(user);
       responseModel.setData(result);
     } catch (error) {
@@ -604,5 +699,72 @@ export class UserController {
     return responseModel;
   }
 
-  
+  @Get('/check-id')
+  @Public()
+  @ApiOperation({ summary: 'Check if user ID exists' })
+  @ApiQuery({ name: 'id', required: true, description: 'User ID to check', type: String })
+  @ApiResponse({ status: 200, description: 'User ID check completed' })
+  async checkUserId(@Query('id') id: string) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const user = await this.userService.getUserByAccount(id);
+      responseModel.setData({ exists: !!user, userId: id });
+    } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  @Get('/find-id')
+  @Public()
+  @ApiOperation({ summary: 'Find user ID by name and email' })
+  @ApiQuery({ name: 'name', required: true, description: 'User full name', type: String })
+  @ApiQuery({ name: 'email', required: true, description: 'User email address', type: String })
+  @ApiResponse({ status: 200, description: 'User ID found successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async findUserId(@Query() findUserIdDto: FindUserIdDto) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const userId = await this.userService.findUserIdByEmailAndName(findUserIdDto.email, findUserIdDto.name);
+      if (!userId) {
+        throw new NotFoundException('User not found with the provided name and email');
+      }
+      responseModel.setData({ userId });
+    } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  @Get('/find-password')
+  @Public()
+  @ApiOperation({ summary: 'Find/Reset password by ID, name and email' })
+  @ApiQuery({ name: 'id', required: true, description: 'User ID', type: String })
+  @ApiQuery({ name: 'name', required: true, description: 'User full name', type: String })
+  @ApiQuery({ name: 'email', required: true, description: 'User email address', type: String })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async findPassword(@Query() findPasswordDto: FindPasswordDto) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const result = await this.userService.resetPasswordByIdNameAndEmail(
+        findPasswordDto.id,
+        findPasswordDto.name,
+        findPasswordDto.email
+      );
+      if (!result) {
+        throw new NotFoundException('User not found with the provided ID, name and email');
+      }
+      responseModel.setData({ message: 'Password has been reset. Please check your email for the new password.' });
+    } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  }
 }

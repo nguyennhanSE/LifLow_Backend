@@ -48,6 +48,7 @@ export function toUserEntity(user: User): UserEntity {
     membershipLevel: user.membershipLevel,
     email: user.email ?? undefined,
     phoneNumber: user.phoneNumber ?? undefined,
+    mobilePhoneNumber: user.mobilePhoneNumber ?? undefined,
     totalUsedPoints: user.totalUsedPoints ?? undefined,
     availablePoints: user.availablePoints ?? undefined,
     registrationDate: user.registrationDate ?? undefined,
@@ -60,6 +61,8 @@ export function toUserEntity(user: User): UserEntity {
     situation: calculateSituation(user.withdrawalDate, user.dormancyDate),
     membership: null,
     totalPurchaseAmount: user.totalPurchaseAmount,
+    nickName: user.nickName ?? undefined,
+    statusMessage: user.statusMessage ?? undefined,
   };
 }
 
@@ -153,6 +156,7 @@ export function toUserEntityWithRelations(user: UserWithRelations): UserEntity {
     membershipLevel: user.membershipLevel,
     email: user.email ?? undefined,
     phoneNumber: user.phoneNumber ?? undefined,
+    mobilePhoneNumber: user.mobilePhoneNumber ?? undefined,
     totalUsedPoints: user.totalUsedPoints ?? undefined,
     availablePoints: user.availablePoints ?? undefined,
     registrationDate: user.registrationDate ?? undefined,
@@ -167,13 +171,15 @@ export function toUserEntityWithRelations(user: UserWithRelations): UserEntity {
     membership: user.userMembership ? toUserMembershipInfo(user.userMembership) : null,
     situation: calculateSituation(user.withdrawalDate, user.dormancyDate),
     totalPurchaseAmount: user.totalPurchaseAmount ?? 0,
+    nickName: user.nickName ?? undefined,
+    statusMessage: user.statusMessage ?? undefined,
   };
 }
 
 /**
  * Maps CreateUserDto to Prisma User create input
  */
-export function toPrismaUserCreateInput(dto: CreateUserDto & {password?: string; phoneNumber?: string; id?: string }) {
+export function toPrismaUserCreateInput(dto: CreateUserDto & {password?: string; phoneNumber?: string; id?: string; avatarImageUrl?: string }) {
   const registrationDate = new Date().toISOString().split('T')[0];
   
   return {
@@ -182,6 +188,7 @@ export function toPrismaUserCreateInput(dto: CreateUserDto & {password?: string;
     name: dto.name,
     email: dto.email,
     phoneNumber: dto.phoneNumber || '',
+    mobilePhoneNumber: dto.mobilePhoneNumber || '',
     totalUsedPoints: 0,
     availablePoints: 0,
     registrationDate: registrationDate,
@@ -191,6 +198,9 @@ export function toPrismaUserCreateInput(dto: CreateUserDto & {password?: string;
     withdrawalType: null,
     reasonForWithdrawal: null,
     totalPurchaseAmount: 0,
+    nickName: dto.nickName ?? null,
+    statusMessage: dto.statusMessage ?? null,
+    avatarURL: dto.avatarImageUrl ?? null,
   };
 }
 
