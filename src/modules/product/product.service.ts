@@ -500,6 +500,13 @@ export class ProductService {
     // If productSpecialOffer doesn't exist, create it
     if (!productSpecialOffer) {
       await this.productRepository.createProductSpecialOffer(id, data);
+      // Update product salePrice to specialPriceApplied if provided
+      if (data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
+        await this.prisma.product.update({
+          where: { id },
+          data: { salePrice: data.specialPriceApplied },
+        });
+      }
       const updatedProduct = await this.productRepository.findById(id);
       if (!updatedProduct) {
         throw new NotFoundException(`Product with id ${id} not found after creation`);
@@ -509,6 +516,13 @@ export class ProductService {
 
     // Update product special offer
     await this.productRepository.updateProductSpecialOffer(id, data);
+    // Update product salePrice to specialPriceApplied if provided
+    if (data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
+      await this.prisma.product.update({
+        where: { id },
+        data: { salePrice: data.specialPriceApplied },
+      });
+    }
     const updatedProduct = await this.productRepository.findById(id);
     if (!updatedProduct) {
       throw new NotFoundException(`Product with id ${id} not found after update`);

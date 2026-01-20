@@ -13,10 +13,11 @@ export class ProductDiscountCronjobService {
    */
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async handleScheduledProductDiscountStatusUpdate() {
-    this.logger.log('Starting scheduled product discount status update...');
+    this.logger.log('Starting scheduled product discount and special offer status update...');
     await this.updateAllProductDiscountStatuses();
+    await this.updateAllProductSpecialOfferStatuses();
     await this.recalculateProductSalePrices();
-    this.logger.log('Completed scheduled product discount status update');
+    this.logger.log('Completed scheduled product discount and special offer status update');
   }
 
   /**
@@ -134,7 +135,7 @@ export class ProductDiscountCronjobService {
         product: {
           select: {
             id: true,
-            productPrice: true,
+            consumerPrice: true,
             salePrice: true,
           },
         },
@@ -165,19 +166,13 @@ export class ProductDiscountCronjobService {
         `${action.charAt(0).toUpperCase() + action.slice(1)} product discount ${productDiscountId}`
       );
       
-      // Reset salePrice to productPrice when discount expires
-      if (!shouldBeActive && discount.product && discount.product.productPrice !== null && discount.product.productPrice !== undefined) {
+      // Recalculate sale price considering both productDiscount and specialOffer
+      if (discount.product && discount.product.consumerPrice !== null && discount.product.consumerPrice !== undefined) {
         try {
-          await this.prisma.product.update({
-            where: { id: discount.productId },
-            data: { salePrice: discount.product.productPrice },
-          });
-          this.logger.debug(
-            `Reset salePrice to productPrice for product ${discount.productId}: ${discount.product.productPrice}`
-          );
+          await this.recalculateProductSalePricesById(discount.productId);
         } catch (error) {
           this.logger.error(
-            `Error resetting salePrice for product ${discount.productId}: ${error.message}`,
+            `Error recalculating salePrice for product ${discount.productId}: ${error.message}`,
             error.stack
           );
         }
@@ -190,87 +185,63 @@ export class ProductDiscountCronjobService {
   }
 
   /**
-   * Recalculate sale prices for all products with discounts
-   * This method:
-   * 1. Finds all product discounts (both active and inactive)
-   * 2. For active discounts: calculates new salePrice based on productPrice and discountRate
-   * 3. For inactive discounts: resets salePrice to productPrice
-   * 4. Updates the product's salePrice
+   * Update all product special offer statuses based on their date ranges
    */
-  async recalculateProductSalePrices(): Promise<{
+  async updateAllProductSpecialOfferStatuses(): Promise<{
     totalProcessed: number;
-    totalUpdated: number;
+    totalActivated: number;
+    totalDeactivated: number;
     errors: number;
   }> {
-    this.logger.log('Starting product sale price recalculation based on discount status');
+    this.logger.log('Starting product special offer status update for all records');
 
     const startTime = Date.now();
     let totalProcessed = 0;
-    let totalUpdated = 0;
+    let totalActivated = 0;
+    let totalDeactivated = 0;
     let errors = 0;
 
     try {
-      // Get all product discounts (both active and inactive) with their product information
-      const allDiscounts = await this.prisma.productDiscount.findMany({
+      // Get all product special offers
+      const productSpecialOffers = await this.prisma.productSpecialOffer.findMany({
         select: {
           id: true,
           productId: true,
+          startDate: true,
+          endDate: true,
           status: true,
-          discountRate: true,
-          product: {
-            select: {
-              id: true,
-              productPrice: true,
-              salePrice: true,
-            },
-          },
         },
       });
 
-      this.logger.log(`Processing ${allDiscounts.length} product discounts`);
+      this.logger.log(`Processing ${productSpecialOffers.length} product special offers`);
 
-      // Process each discount
-      for (const discount of allDiscounts) {
+      const now = new Date();
+
+      // Process each product special offer
+      for (const specialOffer of productSpecialOffers) {
         try {
-          // Skip if product doesn't exist or productPrice is not set
-          if (!discount.product || discount.product.productPrice === null || discount.product.productPrice === undefined) {
-            this.logger.warn(
-              `Skipping product ${discount.productId}: product not found or productPrice not set`
-            );
-            totalProcessed++;
-            continue;
-          }
+          const shouldBeActive = this.shouldSpecialOfferBeActive(
+            specialOffer.startDate,
+            specialOffer.endDate,
+            now
+          );
 
-          const productPrice = discount.product.productPrice;
-          let newSalePrice: number;
-
-          if (discount.status === true) {
-            // Active discount: calculate discounted price
-            const discountRate = discount.discountRate;
-            newSalePrice = Math.floor(productPrice * (1 - discountRate / 100));
-          } else {
-            // Inactive discount: reset to productPrice
-            newSalePrice = productPrice;
-          }
-
-          // Only update if salePrice has changed
-          if (discount.product.salePrice !== newSalePrice) {
-            await this.prisma.product.update({
-              where: { id: discount.productId },
-              data: { salePrice: newSalePrice },
+          // Only update if status needs to change
+          if (specialOffer.status !== shouldBeActive) {
+            await this.prisma.productSpecialOffer.update({
+              where: { id: specialOffer.id },
+              data: { status: shouldBeActive },
             });
 
-            totalUpdated++;
-            if (discount.status === true) {
+            if (shouldBeActive) {
+              totalActivated++;
               this.logger.debug(
-                `Updated sale price for product ${discount.productId}: ` +
-                  `${discount.product.salePrice} -> ${newSalePrice} ` +
-                  `(productPrice: ${productPrice}, discountRate: ${discount.discountRate}%)`
+                `Activated product special offer for product ${specialOffer.productId}`
               );
             } else {
+              totalDeactivated++;
               this.logger.debug(
-                `Reset sale price to productPrice for product ${discount.productId}: ` +
-                  `${discount.product.salePrice} -> ${newSalePrice} (discount expired)`
+                `Deactivated product special offer for product ${specialOffer.productId}`
               );
             }
           }
@@ -278,7 +249,219 @@ export class ProductDiscountCronjobService {
           totalProcessed++;
         } catch (error) {
           this.logger.error(
-            `Error recalculating sale price for product ${discount.productId}: ${error.message}`,
+            `Error processing product special offer ${specialOffer.id}: ${error.message}`,
+            error.stack
+          );
+          errors++;
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `Product special offer status update completed in ${duration}ms. ` +
+          `Processed: ${totalProcessed}, Activated: ${totalActivated}, ` +
+          `Deactivated: ${totalDeactivated}, Errors: ${errors}`
+      );
+
+      return {
+        totalProcessed,
+        totalActivated,
+        totalDeactivated,
+        errors,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Failed to update product special offer statuses',
+        error.stack
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Update status for a specific product special offer
+   * Useful when creating or updating a special offer manually
+   */
+  async updateProductSpecialOfferStatus(
+    productSpecialOfferId: string
+  ): Promise<{ status: boolean; action: 'activated' | 'deactivated' | 'unchanged' }> {
+    const specialOffer = await this.prisma.productSpecialOffer.findUnique({
+      where: { id: productSpecialOfferId },
+      select: {
+        id: true,
+        productId: true,
+        startDate: true,
+        endDate: true,
+        status: true,
+      },
+    });
+
+    if (!specialOffer) {
+      this.logger.warn(`Product special offer ${productSpecialOfferId} not found`);
+      throw new Error(`Product special offer ${productSpecialOfferId} not found`);
+    }
+
+    const now = new Date();
+    const shouldBeActive = this.shouldSpecialOfferBeActive(
+      specialOffer.startDate,
+      specialOffer.endDate,
+      now
+    );
+
+    // Only update if status needs to change
+    if (specialOffer.status !== shouldBeActive) {
+      await this.prisma.productSpecialOffer.update({
+        where: { id: productSpecialOfferId },
+        data: { status: shouldBeActive },
+      });
+
+      const action = shouldBeActive ? 'activated' : 'deactivated';
+      this.logger.debug(
+        `${action.charAt(0).toUpperCase() + action.slice(1)} product special offer ${productSpecialOfferId}`
+      );
+      
+      // Recalculate sale price considering both productDiscount and specialOffer
+      try {
+        const product = await this.prisma.product.findUnique({
+          where: { id: specialOffer.productId },
+          select: {
+            id: true,
+            consumerPrice: true,
+          },
+        });
+
+        if (product && product.consumerPrice !== null && product.consumerPrice !== undefined) {
+          await this.recalculateProductSalePricesById(specialOffer.productId);
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error recalculating salePrice for product ${specialOffer.productId}: ${error.message}`,
+          error.stack
+        );
+      }
+      
+      return { status: shouldBeActive, action };
+    }
+
+    return { status: specialOffer.status, action: 'unchanged' };
+  }
+
+  /**
+   * Recalculate sale prices for all products with discounts and special offers
+   * This method:
+   * 1. Finds all products with discounts or special offers (both active and inactive)
+   * 2. For active productDiscount: calculates discounted price based on consumerPrice and discountRate
+   * 3. For active specialOffer: subtracts discountAmount from the price (after productDiscount if both are active)
+   * 4. Priority: productDiscount is applied first, then specialOffer
+   * 5. Updates the product's salePrice
+   */
+  async recalculateProductSalePrices(): Promise<{
+    totalProcessed: number;
+    totalUpdated: number;
+    errors: number;
+  }> {
+    this.logger.log('Starting product sale price recalculation based on discount and special offer status');
+
+    const startTime = Date.now();
+    let totalProcessed = 0;
+    let totalUpdated = 0;
+    let errors = 0;
+
+    try {
+      // Get all products that have either discount or special offer
+      const productsWithDiscounts = await this.prisma.product.findMany({
+        where: {
+          OR: [
+            { productDiscount: { isNot: null } },
+            { productSpecialOffer: { isNot: null } },
+          ],
+        },
+        select: {
+          id: true,
+          consumerPrice: true,
+          salePrice: true,
+          productDiscount: {
+            select: {
+              id: true,
+              status: true,
+              discountRate: true,
+            },
+          },
+          productSpecialOffer: {
+            select: {
+              id: true,
+              status: true,
+              discountAmount: true,
+            },
+          },
+        },
+      });
+
+      this.logger.log(`Processing ${productsWithDiscounts.length} products with discounts or special offers`);
+
+      // Process each product
+      for (const product of productsWithDiscounts) {
+        try {
+          // Skip if consumerPrice is not set
+          if (product.consumerPrice === null || product.consumerPrice === undefined) {
+            this.logger.warn(
+              `Skipping product ${product.id}: consumerPrice not set`
+            );
+            totalProcessed++;
+            continue;
+          }
+
+          const consumerPrice = product.consumerPrice;
+          let newSalePrice: number = consumerPrice;
+
+          // Apply productDiscount first if active
+          if (product.productDiscount && product.productDiscount.status === true) {
+            const discountRate = product.productDiscount.discountRate;
+            newSalePrice = Math.floor(consumerPrice * (1 - discountRate / 100));
+            this.logger.debug(
+              `Applied productDiscount for product ${product.id}: ` +
+                `${consumerPrice} -> ${newSalePrice} (discountRate: ${discountRate}%)`
+            );
+          }
+
+          // Then apply specialOffer if active (subtract discountAmount from already discounted price)
+          if (product.productSpecialOffer && product.productSpecialOffer.status === true) {
+            const discountAmount = product.productSpecialOffer.discountAmount;
+            newSalePrice = Math.max(0, newSalePrice - discountAmount); // Ensure price doesn't go below 0
+            this.logger.debug(
+              `Applied specialOffer for product ${product.id}: ` +
+                `price -> ${newSalePrice} (discountAmount: ${discountAmount})`
+            );
+          }
+
+          // If both discounts are inactive, reset to consumerPrice
+          const hasActiveDiscount = product.productDiscount?.status === true;
+          const hasActiveSpecialOffer = product.productSpecialOffer?.status === true;
+          if (!hasActiveDiscount && !hasActiveSpecialOffer) {
+            newSalePrice = consumerPrice;
+          }
+
+          // Only update if salePrice has changed
+          if (product.salePrice !== newSalePrice) {
+            await this.prisma.product.update({
+              where: { id: product.id },
+              data: { salePrice: newSalePrice },
+            });
+
+            totalUpdated++;
+            this.logger.debug(
+              `Updated sale price for product ${product.id}: ` +
+                `${product.salePrice} -> ${newSalePrice} ` +
+                `(consumerPrice: ${consumerPrice}, ` +
+                `productDiscount: ${hasActiveDiscount && product.productDiscount ? `${product.productDiscount.discountRate}%` : 'inactive'}, ` +
+                `specialOffer: ${hasActiveSpecialOffer && product.productSpecialOffer ? `${product.productSpecialOffer.discountAmount}` : 'inactive'})`
+            );
+          }
+
+          totalProcessed++;
+        } catch (error) {
+          this.logger.error(
+            `Error recalculating sale price for product ${product.id}: ${error.message}`,
             error.stack
           );
           errors++;
@@ -342,10 +525,11 @@ export class ProductDiscountCronjobService {
   /**
    * Recalculate sale price for a specific product by productId
    * This method:
-   * 1. Finds the product discount for the given productId
-   * 2. If discount is active, calculates new salePrice based on productPrice and discountRate
-   * 3. If discount is not active or doesn't exist, sets salePrice to productPrice
-   * 4. Updates the product's salePrice
+   * 1. Finds the product discount and special offer for the given productId
+   * 2. If productDiscount is active, calculates discounted price based on consumerPrice and discountRate
+   * 3. If specialOffer is active, subtracts discountAmount from the price (after productDiscount if both are active)
+   * 4. Priority: productDiscount is applied first, then specialOffer
+   * 5. Updates the product's salePrice
    */
   async recalculateProductSalePricesById(productId: string): Promise<{
     salePrice: number;
@@ -353,13 +537,27 @@ export class ProductDiscountCronjobService {
     this.logger.log(`Starting product sale price recalculation for product ${productId}`);
 
     try {
-      // Get product with its current price information
+      // Get product with its current price information, discount, and special offer
       const product = await this.prisma.product.findUnique({
         where: { id: productId },
         select: {
           id: true,
-          productPrice: true,
+          consumerPrice: true,
           salePrice: true,
+          productDiscount: {
+            select: {
+              id: true,
+              status: true,
+              discountRate: true,
+            },
+          },
+          productSpecialOffer: {
+            select: {
+              id: true,
+              status: true,
+              discountAmount: true,
+            },
+          },
         },
       });
 
@@ -368,36 +566,41 @@ export class ProductDiscountCronjobService {
         throw new Error(`Product ${productId} not found`);
       }
 
-      if (product.productPrice === null || product.productPrice === undefined) {
-        this.logger.warn(`Product ${productId} does not have productPrice set`);
-        throw new Error(`Product ${productId} does not have productPrice set`);
+      if (product.consumerPrice === null || product.consumerPrice === undefined) {
+        this.logger.warn(`Product ${productId} does not have consumerPrice set`);
+        throw new Error(`Product ${productId} does not have consumerPrice set`);
       }
 
-      // Get product discount for this product
-      const discount = await this.prisma.productDiscount.findUnique({
-        where: { productId },
-        select: {
-          id: true,
-          status: true,
-          discountRate: true,
-        },
-      });
+      const consumerPrice = product.consumerPrice;
+      let newSalePrice: number = consumerPrice;
 
-      let newSalePrice: number;
-
-      // If discount exists and is active, calculate discounted price
-      if (discount && discount.status === true) {
-        // Calculate new sale price: productPrice * (1 - discountRate / 100)
-        newSalePrice = Math.floor(product.productPrice * (1 - discount.discountRate / 100));
+      // Apply productDiscount first if active
+      if (product.productDiscount && product.productDiscount.status === true) {
+        const discountRate = product.productDiscount.discountRate;
+        newSalePrice = Math.floor(consumerPrice * (1 - discountRate / 100));
         this.logger.debug(
           `Calculating discounted price for product ${productId}: ` +
-            `${product.productPrice} * (1 - ${discount.discountRate}%) = ${newSalePrice}`
+            `${consumerPrice} * (1 - ${discountRate}%) = ${newSalePrice}`
         );
-      } else {
-        // If no discount or discount is not active, set salePrice to productPrice
-        newSalePrice = product.productPrice;
+      }
+
+      // Then apply specialOffer if active (subtract discountAmount from already discounted price)
+      if (product.productSpecialOffer && product.productSpecialOffer.status === true) {
+        const discountAmount = product.productSpecialOffer.discountAmount;
+        newSalePrice = Math.max(0, newSalePrice - discountAmount); // Ensure price doesn't go below 0
         this.logger.debug(
-          `No active discount for product ${productId}, setting salePrice to productPrice: ${newSalePrice}`
+          `Applied specialOffer for product ${productId}: ` +
+            `price -> ${newSalePrice} (discountAmount: ${discountAmount})`
+        );
+      }
+
+      // If both discounts are inactive, reset to consumerPrice
+      const hasActiveDiscount = product.productDiscount?.status === true;
+      const hasActiveSpecialOffer = product.productSpecialOffer?.status === true;
+      if (!hasActiveDiscount && !hasActiveSpecialOffer) {
+        newSalePrice = consumerPrice;
+        this.logger.debug(
+          `No active discounts for product ${productId}, setting salePrice to consumerPrice: ${newSalePrice}`
         );
       }
 
@@ -408,7 +611,10 @@ export class ProductDiscountCronjobService {
       });
 
       this.logger.log(
-        `Updated sale price for product ${productId}: ${product.salePrice} -> ${newSalePrice}`
+        `Updated sale price for product ${productId}: ${product.salePrice} -> ${newSalePrice} ` +
+          `(consumerPrice: ${consumerPrice}, ` +
+          `productDiscount: ${hasActiveDiscount && product.productDiscount ? `${product.productDiscount.discountRate}%` : 'inactive'}, ` +
+          `specialOffer: ${hasActiveSpecialOffer && product.productSpecialOffer ? `${product.productSpecialOffer.discountAmount}` : 'inactive'})`
       );
 
       return {
@@ -421,6 +627,40 @@ export class ProductDiscountCronjobService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Determine if a special offer should be active based on date range
+   * Returns true if:
+   * - Both dates are set and current date is within range
+   * - Only startDate is set and current date >= startDate
+   * - Only endDate is set and current date <= endDate
+   * Returns false if:
+   * - Both dates are null
+   * - Current date is outside the date range
+   */
+  private shouldSpecialOfferBeActive(
+    startDate: Date | null,
+    endDate: Date | null,
+    currentDate: Date
+  ): boolean {
+    // If both dates are null, special offer should not be active
+    if (!startDate && !endDate) {
+      return false;
+    }
+
+    // Check start date
+    if (startDate && currentDate < startDate) {
+      return false;
+    }
+
+    // Check end date
+    if (endDate && currentDate > endDate) {
+      return false;
+    }
+
+    // If we get here, special offer should be active
+    return true;
   }
 }
 

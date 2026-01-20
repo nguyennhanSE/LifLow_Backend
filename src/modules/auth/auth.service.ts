@@ -33,7 +33,7 @@ export class AuthService {
                 throw new BadRequestException("Username is required");
             }
 
-            const user = await this.userService.getUserByEmail(account);
+            const user = await this.userService.getUserByAccount(account);
             this.logger.debug(`[${this.context}] login user fetched`, { account, user });
             if (!user) {
                 throw new BadRequestException("User not exist");
@@ -92,7 +92,7 @@ export class AuthService {
                     { secret: config.JWT_SECRET_REFRESH_TOKEN },
                     ip,
                 );
-                this.logger.debug(`[${this.context}] login refresh token stored`, { stored });
+                // this.logger.debug(`[${this.context}] login refresh token stored`, { stored });
             }
 
             this.logger.debug(`[${this.context}] login done`, { account });
@@ -291,6 +291,7 @@ export class AuthService {
                     name: user.name,
                     id: user.id,
                     account: user.id,
+                    roles : roles,
                 },
                 accessToken,
                 refreshToken,

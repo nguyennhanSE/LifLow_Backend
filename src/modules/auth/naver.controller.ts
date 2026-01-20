@@ -1,8 +1,10 @@
-import { Controller, Get, Query, Req } from '@nestjs/common';
+import { Controller, Get, Query, Req, Res } from '@nestjs/common';
 import { Public } from 'src/libs/decorator/public.decorator';
 import { ResponseModel } from 'src/libs/models/response/response.model';
 import { NaverOAuthService } from './naver-oauth.service';
 import { AuthService } from './auth.service';
+import type { Response } from 'express';
+import { config } from 'src/libs/config';
 
 @Controller('auth/naver')
 export class NaverController {
@@ -26,7 +28,7 @@ export class NaverController {
 
   /**
    * GET /api/v1/auth/naver/callback?code=...&state=...
-   * Exchanges code, finds/creates user, returns Liflow JWT tokens.
+   * Exchanges code, finds/creates user, redirects to frontend with tokens.
    */
   @Get('callback')
   @Public()
@@ -34,13 +36,27 @@ export class NaverController {
     @Query('code') code: string,
     @Query('state') state: string,
     @Req() req: any,
+    @Res() res: Response,
   ) {
-    const user = await this.naverOAuthService.handleNaverCallback(code, state);
-    const ip: string | undefined = req?.ip || req?.connection?.remoteAddress;
-    const result = await this.authService.oauthLogin(user.id, user.email, ip);
+    const frontendUrl = config.FRONTEND_URL || 'http://localhost:3000';
+    
+    try {
+      const user = await this.naverOAuthService.handleNaverCallback(code, state);
+      const ip: string | undefined = req?.ip || req?.connection?.remoteAddress;
+      const result = await this.authService.oauthLogin(user.id, user.email, ip);
 
-    const responseModel = new ResponseModel();
-    responseModel.setData(result);
-    return responseModel;
+      // Encode result as base64 JSON string for URL safety
+      const resultJson = JSON.stringify(result);
+      const encodedResult = Buffer.from(resultJson).toString('base64');
+      
+      // Redirect to frontend with result
+      const redirectUrl = `${frontendUrl}/sign-in?result=${encodeURIComponent(encodedResult)}`;
+      return res.redirect(redirectUrl);
+    } catch (error) {
+      // On error, redirect with error message
+      const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+      const redirectUrl = `${frontendUrl}/sign-in?error=${encodeURIComponent(errorMessage)}`;
+      return res.redirect(redirectUrl);
+    }
   }
 }

@@ -32,7 +32,7 @@ export const config = {
   // Naver Configuration
   NAVER_CLIENT_ID: process.env.NAVER_CLIENT_ID ?? '',
   NAVER_CLIENT_SECRET: process.env.NAVER_CLIENT_SECRET ?? '',
-  NAVER_REDIRECT_URI: 'http://localhost:3000/sign-in',
+  NAVER_REDIRECT_URI: process.env.NAVER_REDIRECT_URI ?? 'http://localhost:3500/api/v1/auth/naver/callback',
 
   // Email Configuration
   EMAIL_HOST: process.env.EMAIL_HOST ?? 'smtp.naver.com',

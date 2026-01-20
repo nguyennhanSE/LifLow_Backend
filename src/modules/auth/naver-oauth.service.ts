@@ -63,6 +63,7 @@ export class NaverOAuthService {
       client_id: clientId,
       redirect_uri: redirectUri,
       state,
+      auth_type: 'reauthenticate', // Force user to login again instead of using saved session
     });
 
     return `${this.NAVER_AUTH_URL}/oauth2.0/authorize?${params.toString()}`;
@@ -143,7 +144,7 @@ export class NaverOAuthService {
 
     const token = await this.exchangeCodeForToken(code, state);
     const naverUser = await this.getUserInfo(token.access_token);
-
+    console.log('naverUser', naverUser);
     const email = naverUser.response?.email;
     if (!email) {
       throw new BadRequestException('Naver account email is required');

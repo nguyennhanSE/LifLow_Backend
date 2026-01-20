@@ -105,6 +105,11 @@ export class ProductEntity {
   productDiscount?: ProductDiscountEntity | null;
   banner?: BannerEntity[] | null;
   productBadges?: ProductBadgeResponseDto | null;
+  category?: {
+    productCategoryNumber: number;
+    name: string;
+    description?: string | null;
+  } | null;
 }
 
 

@@ -50,7 +50,27 @@ export class ProductRepository {
       },
     });
 
-    return products.map(product => toProductEntityWithRelations(product));
+    const productsWithCategory = await Promise.all(
+      products.map(async (product) => {
+        const entity = toProductEntityWithRelations(product);
+        // Fetch category based on productCategoryNumber
+        if (product.productCategoryNumber) {
+          const category = await this.prisma.category.findUnique({
+            where: { productCategoryNumber: product.productCategoryNumber },
+          });
+          if (category) {
+            entity.category = {
+              productCategoryNumber: category.productCategoryNumber,
+              name: category.name,
+              description: category.description,
+            };
+          }
+        }
+        return entity;
+      })
+    );
+
+    return productsWithCategory;
   }
 
   /**
@@ -71,7 +91,23 @@ export class ProductRepository {
       return null;
     }
 
-    return toProductEntityWithRelations(product);
+    const entity = toProductEntityWithRelations(product);
+    
+    // Fetch category based on productCategoryNumber
+    if (product.productCategoryNumber) {
+      const category = await this.prisma.category.findUnique({
+        where: { productCategoryNumber: product.productCategoryNumber },
+      });
+      if (category) {
+        entity.category = {
+          productCategoryNumber: category.productCategoryNumber,
+          name: category.name,
+          description: category.description,
+        };
+      }
+    }
+
+    return entity;
   }
 
   /**
@@ -591,7 +627,27 @@ export class ProductRepository {
       },
     });
 
-    return products.map(product => toProductEntityWithRelations(product));
+    const productsWithCategory = await Promise.all(
+      products.map(async (product) => {
+        const entity = toProductEntityWithRelations(product);
+        // Fetch category based on productCategoryNumber
+        if (product.productCategoryNumber) {
+          const category = await this.prisma.category.findUnique({
+            where: { productCategoryNumber: product.productCategoryNumber },
+          });
+          if (category) {
+            entity.category = {
+              productCategoryNumber: category.productCategoryNumber,
+              name: category.name,
+              description: category.description,
+            };
+          }
+        }
+        return entity;
+      })
+    );
+
+    return productsWithCategory;
   }
 
   /**
