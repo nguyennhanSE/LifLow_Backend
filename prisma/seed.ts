@@ -1635,13 +1635,13 @@ async function seedBanners() {
       status: 'ACTIVE',
       productId: mainProductId,
       category: null,
-      title: 'Main Product Featured Banner',
-      badgeText: 'Special Offer',
+      title: '쭈왕산가든이 처음이라면 주저 말고 담아가세요 👍🏻',
+      badgeText: '신규회원 전용',
       mainText: 'Discover our premium selection of fresh products',
-      ctaButtonText: 'Shop Now',
+      ctaButtonText: '구매하러 가기',
       ctaButtonUrl: '/products',
-      imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&h=800&fit=crop',
-      mobileImageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=800&fit=crop',
+      imageUrl: 'https://liflow-bucket.s3.ap-northeast-2.amazonaws.com/Section.jpg',
+      mobileImageUrl: 'https://liflow-bucket.s3.ap-northeast-2.amazonaws.com/ImageWithFallback.png',
       displayOrder: 1,
       startDate: new Date(),
       endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
@@ -2518,10 +2518,10 @@ async function main() {
   // await seedCategories();      // Seed categories and update products
   // await seedMemberships();     // Seed memberships only
   // await seedUserMemberships(); // Seed memberships and user memberships
-  // await seedBanners();         // Seed all 5 types of banners      
+  await seedBanners();         // Seed all 5 types of banners      
   // await seedRecipes();          // Seed recipes from CSV
-  await seedCoupons();          // Seed coupons from CSV
-  await updateAdmin();          // Update admin membership level
+  // await seedCoupons();          // Seed coupons from CSV
+  // await updateAdmin();          // Update admin membership level
 
   
   console.log('\n✨ All seed functions completed successfully!');

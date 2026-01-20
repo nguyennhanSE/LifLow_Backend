@@ -14,7 +14,11 @@ export type ProductInquiryWithRelations = Prisma.ProductInquiriesGetPayload<{
   include: {
     user: true;
     product: true;
-    productInquiryAnswers: true;
+    productInquiryAnswers: {
+      include: {
+        user: true;
+      };
+    };
   };
 }>;
 
@@ -74,7 +78,11 @@ export class ProductInquiriesRepository {
         include: {
           user: true,
           product: true,
-          productInquiryAnswers: true,
+          productInquiryAnswers: {
+            include: {
+              user: true,
+            },
+          },
         },
       });
 
@@ -180,7 +188,11 @@ export class ProductInquiriesRepository {
         include: {
           user: true,
           product: true,
-          productInquiryAnswers: true,
+          productInquiryAnswers: {
+            include: {
+              user: true,
+            },
+          },
         },
       }),
       this.prisma.productInquiries.count({ where }),
@@ -203,7 +215,11 @@ export class ProductInquiriesRepository {
       include: {
         user: true,
         product: true,
-        productInquiryAnswers: true,
+        productInquiryAnswers: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 
@@ -259,7 +275,11 @@ export class ProductInquiriesRepository {
       include: {
         user: true,
         product: true,
-        productInquiryAnswers: true,
+        productInquiryAnswers: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 
@@ -280,7 +300,11 @@ export class ProductInquiriesRepository {
       include: {
         user: true,
         product: true,
-        productInquiryAnswers: true,
+        productInquiryAnswers: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 
@@ -303,6 +327,9 @@ export class ProductInquiriesRepository {
         productInquiryAnswers: {
           orderBy: {
             createdAt: 'asc',
+          },
+          include: {
+            user: true,
           },
         },
       },
@@ -354,7 +381,11 @@ export class ProductInquiriesRepository {
         include: {
           user: true,
           product: true,
-          productInquiryAnswers: true,
+          productInquiryAnswers: {
+            include: {
+              user: true,
+            },
+          },
         },
       });
 
@@ -442,7 +473,11 @@ export class ProductInquiriesRepository {
       include: {
         user: true,
         product: true,
-        productInquiryAnswers: true,
+        productInquiryAnswers: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 

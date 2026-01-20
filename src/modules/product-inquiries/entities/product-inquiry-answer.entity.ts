@@ -1,4 +1,5 @@
 import { ProductInquiryEntity } from './product-inquiry.entity';
+import { UserEntity } from '../../user/entities/user.entity';
 
 /**
  * ProductInquiryAnswer entity representing an answer to a product inquiry
@@ -24,5 +25,8 @@ export class ProductInquiryAnswerEntity {
 
   /** Product inquiry this answer belongs to */
   productInquiry?: ProductInquiryEntity | null;
+
+  /** User who authored this answer */
+  user?: UserEntity | null;
 }
 

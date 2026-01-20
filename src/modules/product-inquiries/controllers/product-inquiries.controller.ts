@@ -531,13 +531,14 @@ export class ProductInquiriesController {
     description: 'Inquiry not found',
   })
   async createAnswer(
+    @Request() req: AuthenticatedRequest,
     @Param('inquiryId') inquiryId: string,
     @Body() createDto: CreateProductInquiryAnswerDto,
   ) {
     const responseModel = new ResponseModel();
 
     try {
-      const answer = await this.productInquiryAnswersService.create(inquiryId, createDto);
+      const answer = await this.productInquiryAnswersService.create(inquiryId, createDto, req.user.sub);
       responseModel.setData(answer);
     } catch (error) {
       throw error;

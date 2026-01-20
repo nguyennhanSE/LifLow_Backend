@@ -31,6 +31,7 @@ type ProductInquiryWithUser = ProductInquiryBase & {
     name: string;
     email: string | null;
     membershipLevel: string | null;
+    avatarURL: string | null;
   } | null;
 };
 
@@ -67,7 +68,11 @@ type ProductInquiryWithRelations = Prisma.ProductInquiriesGetPayload<{
   include: {
     user: true;
     product: true;
-    productInquiryAnswers: true;
+    productInquiryAnswers: {
+      include: {
+        user: true;
+      };
+    };
   };
 }>;
 
@@ -108,6 +113,7 @@ export class ProductInquiryMapper {
         name: prismaInquiry.user.name,
         email: prismaInquiry.user.email ?? null,
         membershipLevel: prismaInquiry.user.membershipLevel ?? null,
+        avatarURL: prismaInquiry.user.avatarURL ?? null,
       } as any;
     } else {
       entity.user = null;
@@ -186,6 +192,7 @@ export class ProductInquiryMapper {
         name: prismaInquiry.user.name,
         email: prismaInquiry.user.email ?? null,
         membershipLevel: prismaInquiry.user.membershipLevel ?? null,
+        avatarURL: prismaInquiry.user.avatarURL ?? null,
       } as any;
     } else {
       entity.user = null;
@@ -206,13 +213,30 @@ export class ProductInquiryMapper {
     
     // Map answers if included
     if (prismaInquiry.productInquiryAnswers) {
-      entity.productInquiryAnswers = prismaInquiry.productInquiryAnswers.map((answer) => ({
-        id: answer.id,
-        inquiryId: answer.inquiryId,
-        answer: answer.answer,
-        createdAt: answer.createdAt,
-        updatedAt: answer.updatedAt,
-      })) as any;
+      entity.productInquiryAnswers = prismaInquiry.productInquiryAnswers.map((answer) => {
+        const answerEntity: any = {
+          id: answer.id,
+          inquiryId: answer.inquiryId,
+          answer: answer.answer,
+          createdAt: answer.createdAt,
+          updatedAt: answer.updatedAt,
+        };
+        
+        // Map user if included
+        if (answer.user) {
+          answerEntity.user = {
+            id: answer.user.id,
+            name: answer.user.name,
+            email: answer.user.email ?? null,
+            membershipLevel: answer.user.membershipLevel ?? null,
+            avatarURL: answer.user.avatarURL ?? null,
+          };
+        } else {
+          answerEntity.user = null;
+        }
+        
+        return answerEntity;
+      }) as any;
     }
     
     return entity;
@@ -241,6 +265,7 @@ export class ProductInquiryMapper {
       userInfo.name = entity.user.name;
       userInfo.email = entity.user.email ?? null;
       userInfo.membershipLevel = entity.user.membershipLevel ?? null;
+      userInfo.avatarUrl = (entity.user as any).avatarURL ?? null;
       dto.user = userInfo;
     } else {
       dto.user = null;
@@ -268,6 +293,20 @@ export class ProductInquiryMapper {
         answerDto.answer = answer.answer;
         answerDto.createdAt = answer.createdAt;
         answerDto.updatedAt = answer.updatedAt;
+        
+        // Map user if present
+        if (answer.user) {
+          const userInfo = new InquiryUserInfoDto();
+          userInfo.id = answer.user.id;
+          userInfo.name = answer.user.name;
+          userInfo.email = answer.user.email ?? null;
+          userInfo.membershipLevel = answer.user.membershipLevel ?? null;
+          userInfo.avatarUrl = (answer.user as any).avatarURL ?? null;
+          answerDto.user = userInfo;
+        } else {
+          answerDto.user = null;
+        }
+        
         return answerDto;
       });
     }

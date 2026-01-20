@@ -63,6 +63,7 @@ model User {
   productInquiries ProductInquiries[]
   userShippingAddress UserShippingAddress[]
   announcement Announcement[]
+  productInquiryAnswers ProductInquiryAnswers[]
   @@map("users")
 }
 
@@ -568,12 +569,14 @@ model ProductInquiries {
 model ProductInquiryAnswers {
   id String @id @default(uuid())
   inquiryId String @map("inquiry_id")
+  authorId String @map("author_id")
   answer String @map("answer")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   productInquiry ProductInquiries? @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [authorId], references: [id], onDelete: Cascade)
   @@map("product_inquiry_answers")
 }
 

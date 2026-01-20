@@ -28,7 +28,7 @@ export class ProductInquiryAnswersRepository {
    * @param createDto - Data for creating the answer
    * @returns Created ProductInquiryAnswerEntity with relations
    */
-  async create(inquiryId: string, createDto: CreateProductInquiryAnswerDto): Promise<ProductInquiryAnswerEntity> {
+  async create(inquiryId: string, createDto: CreateProductInquiryAnswerDto, authorId: string): Promise<ProductInquiryAnswerEntity> {
     try {
       // Verify inquiry exists
       const inquiry = await this.prisma.productInquiries.findUnique({
@@ -47,6 +47,7 @@ export class ProductInquiryAnswersRepository {
           data: {
             inquiryId: inquiryId,
             answer: createDto.answer,
+            authorId: authorId,
           },
           include: {
             productInquiry: true,

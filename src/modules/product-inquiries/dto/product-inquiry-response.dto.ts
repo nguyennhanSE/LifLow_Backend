@@ -15,6 +15,9 @@ export class InquiryUserInfoDto {
 
   @ApiPropertyOptional({ description: 'Membership level', example: 'GOLD' })
   membershipLevel?: string | null;
+
+  @ApiPropertyOptional({ description: 'User avatar URL', example: 'https://example.com/avatar.jpg' })
+  avatarUrl?: string | null;
 }
 
 /**
@@ -55,6 +58,12 @@ export class ProductInquiryAnswerResponseDto {
 
   @ApiProperty({ description: 'Updated at timestamp' })
   updatedAt!: Date;
+
+  @ApiPropertyOptional({
+    description: 'User information (author of the answer)',
+    type: InquiryUserInfoDto,
+  })
+  user?: InquiryUserInfoDto | null;
 }
 
 /**

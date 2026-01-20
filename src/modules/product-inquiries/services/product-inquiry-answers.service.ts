@@ -34,6 +34,7 @@ export class ProductInquiryAnswersService {
   async create(
     inquiryId: string,
     createDto: CreateProductInquiryAnswerDto,
+    authorId: string,
   ): Promise<ProductInquiryAnswerStandaloneResponseDto> {
     try {
       this.logger.log(
@@ -56,7 +57,7 @@ export class ProductInquiryAnswersService {
       // }
 
       // Create the answer (repository handles inquiry existence validation)
-      const answerEntity = await this.productInquiryAnswersRepository.create(inquiryId, createDto);
+      const answerEntity = await this.productInquiryAnswersRepository.create(inquiryId, createDto, authorId);
 
       // Convert to response DTO
       const responseDto = ProductInquiryAnswerMapper.toStandaloneResponseDto(answerEntity);
