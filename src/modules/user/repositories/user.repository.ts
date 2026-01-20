@@ -703,16 +703,62 @@ export class UserRepository {
         throw new NotFoundException(`User with id ${userId} not found`);
       }
 
-      // Map membership from userMembership if included
+      // Normalize data: ensure included relations return null/[] if no data exists
+      // Prisma already returns null for one-to-one and [] for one-to-many when no data,
+      // but we ensure it's explicitly set for consistency
+      const userWithRelations = user as any;
+
+      // Normalize one-to-one relations (should be null if no data)
       if (options.includeMembership) {
-        const userWithMembership = user as any;
-        if (userWithMembership.userMembership?.membership) {
-          userWithMembership.membership = userWithMembership.userMembership.membership;
-          delete userWithMembership.userMembership;
+        if (!userWithRelations.userMembership) {
+          userWithRelations.userMembership = null;
+        } else if (userWithRelations.userMembership?.membership) {
+          userWithRelations.membership = userWithRelations.userMembership.membership;
+          delete userWithRelations.userMembership;
+        } else {
+          userWithRelations.membership = null;
+          delete userWithRelations.userMembership;
         }
       }
 
-      return toUserEntity(user);
+      // Normalize one-to-many relations (should be [] if no data)
+      if (options.includePermissions) {
+        userWithRelations.userRole = userWithRelations.userRole ?? [];
+      }
+
+      if (options.includePoint) {
+        userWithRelations.point = userWithRelations.point ?? [];
+      }
+
+      if (options.includeOrders) {
+        userWithRelations.orders = userWithRelations.orders ?? [];
+      }
+
+      if (options.includeCarts) {
+        userWithRelations.carts = userWithRelations.carts ?? [];
+      }
+
+      if (options.includePayments) {
+        userWithRelations.payments = userWithRelations.payments ?? [];
+      }
+
+      if (options.includeProductReviews) {
+        userWithRelations.productReviews = userWithRelations.productReviews ?? [];
+      }
+
+      if (options.includeProductInquiries) {
+        userWithRelations.productInquiries = userWithRelations.productInquiries ?? [];
+      }
+
+      if (options.includeCouponHistories) {
+        userWithRelations.couponHistories = userWithRelations.couponHistories ?? [];
+      }
+
+      if (options.includeRecipes) {
+        userWithRelations.recipes = userWithRelations.recipes ?? [];
+      }
+
+      return userWithRelations;
     } catch (error) {
       console.error('Prisma error in getUserInfo:', error);
       throw error;

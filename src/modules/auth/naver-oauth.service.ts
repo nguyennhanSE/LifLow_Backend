@@ -50,7 +50,8 @@ export class NaverOAuthService {
   getAuthorizationUrl(): string {
     const clientId = config.NAVER_CLIENT_ID;
     const redirectUri = config.NAVER_REDIRECT_URI;
-
+    console.log('clientId', clientId);
+    console.log('redirectUri', redirectUri);
     if (!clientId || !redirectUri) {
       throw new InternalServerErrorException(
         'Naver OAuth configuration is missing. Please set NAVER_CLIENT_ID and NAVER_REDIRECT_URI.',
