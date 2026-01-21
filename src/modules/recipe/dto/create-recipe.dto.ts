@@ -78,9 +78,16 @@ export class CreateRecipeDto {
     description: 'Product ID (UUID)',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
+  @Transform(({ value }) => {
+    // Convert empty string to null/undefined to skip validation
+    if (value === '' || value === null || value === undefined) {
+      return null;
+    }
+    return value;
+  })
   @IsOptional()
   @IsUUID('4', { message: 'Product ID must be a valid UUID' })
-  productId?: string;
+  productId?: string | null;
 
 
   @ApiPropertyOptional({
