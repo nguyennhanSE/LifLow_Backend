@@ -248,7 +248,7 @@ export class RecipeService {
 
         // Handle productId update
         if (updateRecipeDto.productId !== undefined) {
-          if (updateRecipeDto.productId === null) {
+          if (updateRecipeDto.productId === null || updateRecipeDto.productId === '') {
             // Disconnect product if null
             updateData.product = {
               disconnect: true,
