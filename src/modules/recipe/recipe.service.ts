@@ -227,6 +227,8 @@ export class RecipeService {
       //   );
       // }
 
+
+
       // Use transaction to update recipe and upload thumbnail atomically
       const result = await this.prisma.$transaction(async (tx) => {
         // Prepare update data
@@ -244,12 +246,27 @@ export class RecipeService {
           updateData.ingredients = updateRecipeDto.ingredients;
         }
 
+        // Handle productId update
+        if (updateRecipeDto.productId !== undefined) {
+          if (updateRecipeDto.productId === null) {
+            // Disconnect product if null
+            updateData.product = {
+              disconnect: true,
+            };
+          } else {
+            // Connect product if productId is provided
+            updateData.product = {
+              connect: { id: updateRecipeDto.productId },
+            };
+          }
+        }
         // Update recipe (only provided fields)
         const updatedRecipe = await tx.recipe.update({
           where: { id },
           data: updateData,
           include: {
             author: true,
+            product: true,
           },
         });
 
@@ -278,6 +295,7 @@ export class RecipeService {
               data: { thumbnailUrl: finalThumbnailUrls },
               include: {
                 author: true,
+                product: true,
               },
             });
             return finalRecipe;
