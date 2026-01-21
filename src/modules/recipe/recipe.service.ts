@@ -208,6 +208,7 @@ export class RecipeService {
     thumbnails?: Express.Multer.File[],
   ): Promise<RecipeEntityWithAuthor> {
     try {
+
       // Validate UUID format
       if (!this.isValidUUID(id)) {
         throw new BadRequestException('Invalid recipe ID format');
@@ -220,11 +221,11 @@ export class RecipeService {
       }
 
       // Check ownership
-      if (existingRecipe.authorId !== userId) {
-        throw new ForbiddenException(
-          'You do not have permission to update this recipe',
-        );
-      }
+      // if (existingRecipe.authorId !== userId) {
+      //   throw new ForbiddenException(
+      //     'You do not have permission to update this recipe',
+      //   );
+      // }
 
       // Use transaction to update recipe and upload thumbnail atomically
       const result = await this.prisma.$transaction(async (tx) => {

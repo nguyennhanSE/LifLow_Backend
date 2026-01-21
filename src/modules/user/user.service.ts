@@ -52,6 +52,10 @@ export class UserService {
     if (existingUser) {
       throw new BadRequestException('User with this id already exists');
     }
+    const existingUserByEmail = await this.userRepository.getUserByEmail(createUserDto.email);
+    if (existingUserByEmail) {
+      throw new BadRequestException('User with this email already exists');
+    }
 
     // Generate a random password if not provided
     const plainPassword = createUserDto.password || 'password123';

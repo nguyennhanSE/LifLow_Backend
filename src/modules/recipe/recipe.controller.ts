@@ -521,6 +521,7 @@ export class RecipeController {
   @Patch(':id')
   @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
   @UseInterceptors(
+    RecipeUserInterceptor,
     FileFieldsInterceptor([
       { name: 'thumbnail', maxCount: 10 },
     ])
@@ -629,6 +630,7 @@ export class RecipeController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @UseInterceptors(RecipeUserInterceptor)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Delete a recipe',
