@@ -220,7 +220,13 @@ export class ProductService {
   /**
    * Update an existing product
    */
-  async updateProduct(id: string, data: UpdateProductDto): Promise<ProductEntity> {
+  async updateProduct(
+    id: string,
+    data: UpdateProductDto,
+    imageRegistrationThumbnail?: Express.Multer.File,
+    imageRegistrationDetail?: Express.Multer.File,
+    additionalImages?: Express.Multer.File[],
+  ): Promise<ProductEntity> {
     // Check if product exists
     const existingProduct = await this.productRepository.findById(id);
     if (!existingProduct) {
@@ -245,8 +251,140 @@ export class ProductService {
       }
     }
 
-    // Update product
-    return await this.productRepository.update(id, data);
+    // Extract discount data from product data
+    const {
+      hsCode,
+      category,
+      discountRate,
+      discountStartDate,
+      discountEndDate,
+      ...productData
+    } = data;
+    const hasDiscountData = discountRate !== undefined && discountRate !== null;
+
+    // Use transaction to update product, discount, and images atomically
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Prepare product data
+        const updateProductData: Prisma.ProductUpdateInput = productData as Prisma.ProductUpdateInput;
+        if (hsCode !== undefined) {
+          updateProductData.hsCode = hsCode !== null ? BigInt(String(hsCode)) : null;
+        }
+
+        // Add category to update data if provided
+        if (category !== undefined) {
+          updateProductData.productCategoryNumber = category;
+        }
+
+        // Update product
+        const product = await tx.product.update({
+          where: { id },
+          data: updateProductData,
+        });
+
+        // Handle discount update
+        if (hasDiscountData && discountRate !== undefined && discountRate !== null) {
+          const existingDiscount = await tx.productDiscount.findUnique({
+            where: { productId: id },
+          });
+
+          if (existingDiscount) {
+            // Update existing discount
+            await tx.productDiscount.update({
+              where: { productId: id },
+              data: {
+                discountRate: discountRate,
+                discountStartDate: discountStartDate ?? null,
+                discountEndDate: discountEndDate ?? null,
+              },
+            });
+          } else {
+            // Create new discount
+            await tx.productDiscount.create({
+              data: {
+                productId: id,
+                discountRate: discountRate,
+                status: true,
+                discountStartDate: discountStartDate ?? null,
+                discountEndDate: discountEndDate ?? null,
+              },
+            });
+          }
+        }
+
+        // Upload image registration thumbnail if provided
+        if (imageRegistrationThumbnail) {
+          const imageRegistrationThumbnailUrl = await this.awsService.uploadFile('products', id, imageRegistrationThumbnail);
+          try {
+            await tx.product.update({
+              where: { id },
+              data: { imageRegistrationThumbnail: imageRegistrationThumbnailUrl },
+            });
+          } catch (error) {
+            throw new BadRequestException(`Failed to upload image registration thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+
+        // Upload image registration detail if provided
+        if (imageRegistrationDetail) {
+          const imageRegistrationDetailUrl = await this.awsService.uploadFile('products', id, imageRegistrationDetail);
+          try {
+            await tx.product.update({
+              where: { id },
+              data: { imageRegistrationDetail: imageRegistrationDetailUrl },
+            });
+          } catch (error) {
+            throw new BadRequestException(`Failed to upload image registration detail: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+
+        // Upload additional images if provided
+        if (additionalImages && additionalImages.length > 0) {
+          try {
+            const additionalImagesUrls: string[] = [];
+            const prefix: string = `products/${id}/additional`;
+            for (const image of additionalImages) {
+              if (!image) continue;
+              const url = await this.awsService.uploadFile(prefix, id, image);
+              additionalImagesUrls.push(url!);
+            }
+            await tx.product.update({
+              where: { id },
+              data: { additionalImages: additionalImagesUrls },
+            });
+          } catch (error) {
+            throw new BadRequestException(
+              `Failed to upload additional images: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+          }
+        }
+
+        return product;
+      },
+      {
+        maxWait: 60000, // max time to wait to acquire a transaction (60 seconds)
+        timeout: 30000, // max time the interactive transaction can run before being canceled (30 seconds)
+      },
+    );
+
+      // Return product entity
+      return toProductEntity(result);
+    } catch (error: any) {
+      // Handle Prisma unique constraint violation
+      if (error.code === 'P2002') {
+        const field = error.meta?.target?.[0] || 'field';
+        if (field === 'productId') {
+          throw new DuplicateError(`Product discount for this product already exists`);
+        }
+        throw new DuplicateError(`Product with this ${field} already exists`);
+      }
+      // Handle foreign key constraint violation
+      if (error.code === 'P2003') {
+        throw new NotFoundException(`Related record not found`);
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   /**

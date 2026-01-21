@@ -1628,12 +1628,18 @@ async function seedBanners() {
 
   const mainProductId = product ? product.id : null;
   
+  const tempProduct = await prisma.product.findFirst({
+    where: { productCode: 'P00000CJ' },
+    select: { id: true },
+  });
+  const tempProductId = tempProduct ? tempProduct.id : null;
+
   const banners = [
     // 1. MAIN_PRODUCTS Banner (1 banner)
     {
       type: 'MAIN_PRODUCTS',
       status: 'ACTIVE',
-      productId: mainProductId,
+      productId: tempProductId,
       category: null,
       title: '쭈왕산가든이 처음이라면 주저 말고 담아가세요 👍🏻',
       badgeText: '신규회원 전용',
@@ -1641,7 +1647,7 @@ async function seedBanners() {
       ctaButtonText: '구매하러 가기',
       ctaButtonUrl: '/products',
       imageUrl: 'https://liflow-bucket.s3.ap-northeast-2.amazonaws.com/Section.jpg',
-      mobileImageUrl: 'https://liflow-bucket.s3.ap-northeast-2.amazonaws.com/ImageWithFallback.png',
+      mobileImageUrl: 'https://liflow-bucket.s3.ap-northeast-2.amazonaws.com/seed/10. 한우불고기 전골, 실속형/AAA01642.JPG',
       displayOrder: 1,
       startDate: new Date(),
       endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now

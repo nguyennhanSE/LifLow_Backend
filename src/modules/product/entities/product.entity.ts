@@ -99,7 +99,11 @@ export class ProductEntity {
   createdAt?: Date | null;
   updatedAt?: Date | null;
   // extension
+  stockQuantity?: number | null;
+  storageMethod?: string | null;
+  additionalImages?: string[] | null;
   ctaButtonUrl?: string | null;
+
   // relation
   productSpecialOffer?: ProductSpecialOfferEntity | null;
   productDiscount?: ProductDiscountEntity | null;

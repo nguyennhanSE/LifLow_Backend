@@ -253,17 +253,175 @@ export class ProductController {
 
   @Patch(':id')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD)
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'imageRegistrationThumbnail', maxCount: 1 },
+      { name: 'imageRegistrationDetail', maxCount: 1 },
+      { name: 'additionalImages', maxCount: 14 },
+    ])
+  )
   @ApiOperation({ summary: 'Update an existing product' })
-  @ApiBody({ type: UpdateProductDto })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Update product with optional thumbnail and detail images',
+    schema: {
+      type: 'object',
+      properties: {
+        productName: {
+          type: 'string',
+          description: 'Product name',
+          example: 'Organic Apple',
+          maxLength: 128,
+        },
+        productCode: {
+          type: 'string',
+          description: 'Product code',
+          example: 'PROD001',
+        },
+        category: {
+          type: 'number',
+          description: 'Category number',
+          example: 1,
+        },
+        brand: {
+          type: 'string',
+          description: 'Brand name',
+          example: 'Juwangsan',
+        },
+        manufacturer: {
+          type: 'string',
+          description: 'Manufacturer',
+          example: 'ABC Company',
+        },
+        origin: {
+          type: 'string',
+          description: 'Origin',
+          example: 'Korea',
+        },
+        productVolume: {
+          type: 'string',
+          description: 'Product volume',
+          example: '100ml',
+        },
+        consumerPrice: {
+          type: 'number',
+          description: 'Consumer price (원)',
+          example: 15000,
+          minimum: 0,
+        },
+        supplyPrice: {
+          type: 'number',
+          description: 'Supply price (원)',
+          example: 12000,
+          minimum: 0,
+        },
+        productPrice: {
+          type: 'number',
+          description: 'Product price (원)',
+          example: 13000,
+          minimum: 0,
+        },
+        salePrice: {
+          type: 'number',
+          description: 'Sale price (원)',
+          example: 10000,
+          minimum: 0,
+        },
+        discountRate: {
+          type: 'number',
+          description: 'Discount rate',
+          example: 10,
+          minimum: 0,
+        },
+        discountStartDate: {
+          type: 'string',
+          format: 'date',
+          description: 'Discount start date',
+          example: '2025-01-01',
+        },
+        discountEndDate: {
+          type: 'string',
+          format: 'date',
+          description: 'Discount end date',
+          example: '2025-01-01',
+        },
+        deliveryMethod: {
+          type: 'string',
+          description: 'Delivery method',
+          example: '택배',
+        },
+        deliveryFeeInput: {
+          type: 'string',
+          description: 'Delivery fee input',
+          example: '10000',
+        },
+        productBriefExplanation: {
+          type: 'string',
+          description: 'Brief explanation',
+          example: 'This is a brief explanation of the product',
+        },
+        seoDescription: {
+          type: 'string',
+          description: 'Seo description',
+          example: 'This is a seo description of the product',
+        },
+        seoKeywords: {
+          type: 'string',
+          description: 'Seo keywords',
+          example: 'This is a list of seo keywords for the product',
+        },
+        saleStatus: {
+          type: 'string',
+          description: 'Sale status',
+          example: '판매중',
+        },
+        imageRegistrationThumbnail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image registration thumbnail (max 5MB, jpg/jpeg/png/webp)',
+        },
+        imageRegistrationDetail: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image registration detail (max 5MB, jpg/jpeg/png/webp)',
+        },
+        additionalImages: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Additional images (max 14 images, max 5MB each, jpg/jpeg/png/webp)',
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 200, description: 'Product updated successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @ApiResponse({ status: 409, description: 'Conflict - duplicate product code' })
-  async updateProduct(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
+  async updateProduct(
+    @Param('id') id: string,
+    @Body() updateProductDto: UpdateProductDto,
+    @UploadedFiles() files: {
+      imageRegistrationThumbnail?: Express.Multer.File[];
+      imageRegistrationDetail?: Express.Multer.File[];
+      additionalImages?: Express.Multer.File[];
+    },
+  ) {
     const responseModel = new ResponseModel();
 
     try {
-      const product = await this.productService.updateProduct(id, updateProductDto);
+      const imageRegistrationThumbnail = files?.imageRegistrationThumbnail?.[0];
+      const imageRegistrationDetail = files?.imageRegistrationDetail?.[0];
+      const additionalImages = files?.additionalImages;
+      const product = await this.productService.updateProduct(
+        id,
+        updateProductDto,
+        imageRegistrationThumbnail,
+        imageRegistrationDetail,
+        additionalImages,
+      );
       responseModel.setData(product);
     } catch (error) {
       throw error;

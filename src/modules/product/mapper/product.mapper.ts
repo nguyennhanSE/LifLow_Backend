@@ -135,6 +135,9 @@ export function toProductEntity(product: Product): ProductEntity {
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
     // extension
+    stockQuantity: product.stockQuantity,
+    storageMethod: product.storageMethod,
+    additionalImages: product.additionalImages,
     ctaButtonUrl: product.ctaButtonUrl,
   };
 }
