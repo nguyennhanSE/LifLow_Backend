@@ -52,7 +52,14 @@ export class AnnouncementsController {
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
   @HttpCode(HttpStatus.CREATED)
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fieldSize: 10 * 1024 * 1024, // 10MB for field values (to handle base64 images in content)
+        fileSize: 5 * 1024 * 1024, // 5MB for file uploads
+      },
+    }),
+  )
   @ApiOperation({ summary: 'Create a new announcement with image upload' })
   @ApiBody({
     schema: {

@@ -145,6 +145,53 @@ export class AwsService implements IAwsService {
             throw error;
         }
     }
+
+    /**
+     * Upload base64 image to S3
+     * @param prefix S3 prefix (folder path)
+     * @param id User or entity ID
+     * @param base64Data Base64 encoded image data (without data URL prefix)
+     * @param mimeType Image MIME type (e.g., 'image/png', 'image/jpeg')
+     * @returns Public URL of uploaded image
+     */
+    async uploadBase64Image(
+        prefix: string,
+        id: string,
+        base64Data: string,
+        mimeType: string,
+    ): Promise<string> {
+        try {
+            // Convert base64 to buffer
+            const buffer = Buffer.from(base64Data, 'base64');
+            
+            // Determine file extension from MIME type
+            const mimeToExt: Record<string, string> = {
+                'image/jpeg': 'jpg',
+                'image/jpg': 'jpg',
+                'image/png': 'png',
+                'image/gif': 'gif',
+                'image/webp': 'webp',
+                'image/svg+xml': 'svg',
+            };
+            
+            const ext = mimeToExt[mimeType] || 'jpg';
+            const key = `${prefix}/${id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+            
+            const { url } = await this.uploadObject({
+                key,
+                body: buffer,
+                contentType: mimeType,
+                isPublic: true,
+                cacheControl: 'public, max-age=31536000',
+            });
+            
+            this.logger.debug(`upload base64 image done, prefix: ${prefix}, id: ${id}`);
+            return url || this.getPublicUrl(key);
+        } catch (error) {
+            this.logger.error(`upload base64 image failed`, { prefix, id, error });
+            throw error;
+        }
+    }
 }
 
 

@@ -13,6 +13,10 @@ import { AnnouncementEntity } from './entities/announcement.entity';
 import { EAnnouncementStatus } from './enums/announcement.enum';
 import { AwsService } from '../../libs/integration/aws/aws.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import {
+  extractBase64Images,
+  replaceBase64WithUrls,
+} from './helpers/html-image.helper';
 
 export interface AnnouncementStatistics {
   totalCount: number;
@@ -52,6 +56,7 @@ export class AnnouncementsService {
   ): Promise<AnnouncementEntity> {
     let uploadedImageUrl: string | undefined;
     let imageKey: string | undefined;
+    const uploadedBase64ImageKeys: string[] = [];
 
     try {
       // Validate authorId is provided
@@ -71,7 +76,48 @@ export class AnnouncementsService {
         }
       }
 
-      // Step 2: Upload image to AWS if file is provided
+      // Step 2: Process base64 images in content and replace with S3 URLs
+      if (createDto.content) {
+        const base64Images = extractBase64Images(createDto.content);
+        
+        if (base64Images.length > 0) {
+          const replacements = new Map<string, string>();
+          
+          // Upload each base64 image to S3
+          for (const image of base64Images) {
+            try {
+              const s3Url = await this.awsService.uploadBase64Image(
+                'announcements/content',
+                authorId,
+                image.base64Data,
+                image.mimeType,
+              );
+              
+              replacements.set(image.dataUrl, s3Url);
+              
+              // Store key for potential rollback
+              const urlParts = s3Url.split('.amazonaws.com/');
+              const key = urlParts && urlParts.length > 1 ? urlParts[1] : undefined;
+              if (key) {
+                uploadedBase64ImageKeys.push(key);
+              }
+            } catch (uploadError) {
+              console.error('Failed to upload base64 image:', uploadError);
+              // Continue with other images, but log the error
+            }
+          }
+          
+          // Replace base64 URLs with S3 URLs in content
+          if (replacements.size > 0) {
+            createDto.content = replaceBase64WithUrls(
+              createDto.content,
+              replacements,
+            );
+          }
+        }
+      }
+
+      // Step 3: Upload image to AWS if file is provided
       if (file) {
         uploadedImageUrl = await this.awsService.uploadFile(
           'announcements',
@@ -86,7 +132,7 @@ export class AnnouncementsService {
         imageKey = urlParts && urlParts.length > 1 ? urlParts[1] : undefined;
       }
 
-      // Step 3: Create announcement through repository
+      // Step 4: Create announcement through repository
       const announcement = await this.announcementsRepository.create(
         createDto,
         authorId,
@@ -94,13 +140,22 @@ export class AnnouncementsService {
 
       return announcement;
     } catch (error) {
-      // Rollback: Delete uploaded image if announcement creation fails
+      // Rollback: Delete uploaded images if announcement creation fails
       if (uploadedImageUrl && imageKey) {
         try {
           await this.awsService.deleteObject(imageKey);
         } catch (deleteError) {
           // Log delete error but don't throw to preserve original error
           console.error('Failed to delete uploaded image during rollback:', deleteError);
+        }
+      }
+
+      // Rollback: Delete all uploaded base64 images
+      for (const key of uploadedBase64ImageKeys) {
+        try {
+          await this.awsService.deleteObject(key);
+        } catch (deleteError) {
+          console.error(`Failed to delete base64 image ${key} during rollback:`, deleteError);
         }
       }
 
@@ -197,6 +252,7 @@ export class AnnouncementsService {
     let uploadedImageUrl: string | undefined;
     let imageKey: string | undefined;
     let oldImageUrl: string | undefined;
+    const uploadedBase64ImageKeys: string[] = [];
 
     try {
       // Find the announcement first
@@ -216,7 +272,48 @@ export class AnnouncementsService {
       // Store old image URL for potential deletion
       oldImageUrl = announcement.imageUrl || undefined;
 
-      // Step 2: Upload new image to AWS if file is provided
+      // Step 2: Process base64 images in content and replace with S3 URLs
+      if (updateDto.content) {
+        const base64Images = extractBase64Images(updateDto.content);
+        
+        if (base64Images.length > 0) {
+          const replacements = new Map<string, string>();
+          
+          // Upload each base64 image to S3
+          for (const image of base64Images) {
+            try {
+              const s3Url = await this.awsService.uploadBase64Image(
+                'announcements/content',
+                authorId,
+                image.base64Data,
+                image.mimeType,
+              );
+              
+              replacements.set(image.dataUrl, s3Url);
+              
+              // Store key for potential rollback
+              const urlParts = s3Url.split('.amazonaws.com/');
+              const key = urlParts && urlParts.length > 1 ? urlParts[1] : undefined;
+              if (key) {
+                uploadedBase64ImageKeys.push(key);
+              }
+            } catch (uploadError) {
+              console.error('Failed to upload base64 image:', uploadError);
+              // Continue with other images, but log the error
+            }
+          }
+          
+          // Replace base64 URLs with S3 URLs in content
+          if (replacements.size > 0) {
+            updateDto.content = replaceBase64WithUrls(
+              updateDto.content,
+              replacements,
+            );
+          }
+        }
+      }
+
+      // Step 3: Upload new image to AWS if file is provided
       if (file) {
         uploadedImageUrl = await this.awsService.uploadFile(
           'announcements',
@@ -230,13 +327,13 @@ export class AnnouncementsService {
         imageKey = urlParts && urlParts.length > 1 ? urlParts[1] : undefined;
       }
 
-      // Step 3: Update the announcement
+      // Step 4: Update the announcement
       const updatedAnnouncement = await this.announcementsRepository.update(
         id,
         updateDto,
       );
 
-      // Step 4: Delete old image if new image was uploaded successfully
+      // Step 5: Delete old image if new image was uploaded successfully
       if (file && oldImageUrl) {
         try {
           const oldUrlParts = oldImageUrl.split('.amazonaws.com/');
@@ -258,6 +355,15 @@ export class AnnouncementsService {
           await this.awsService.deleteObject(imageKey);
         } catch (deleteError) {
           console.error('Failed to delete uploaded image during rollback:', deleteError);
+        }
+      }
+
+      // Rollback: Delete all uploaded base64 images
+      for (const key of uploadedBase64ImageKeys) {
+        try {
+          await this.awsService.deleteObject(key);
+        } catch (deleteError) {
+          console.error(`Failed to delete base64 image ${key} during rollback:`, deleteError);
         }
       }
 
