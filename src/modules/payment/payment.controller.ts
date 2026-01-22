@@ -108,8 +108,12 @@ export class PaymentController {
     @Body() confirmDto: ConfirmPaymentRequestDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<PaymentResponseDto> {
-    // Set userId from authenticated request
-    const dto = { ...confirmDto, userId: req.user.sub };
+    // Set userId from authenticated request (ensure it's a string)
+    if (!req.user?.sub) {
+      throw new BadRequestException('User ID not found in authenticated request');
+    }
+    const dto = { ...confirmDto, userId: String(req.user.sub) };
+    console.log('userId', req.user.sub);
     return this.paymentService.confirmPayment(dto);
   }
 

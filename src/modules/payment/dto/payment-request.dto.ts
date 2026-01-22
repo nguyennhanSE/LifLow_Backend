@@ -152,9 +152,10 @@ export class ConfirmPaymentRequestDto {
   @IsNumber()
   amount: number;
 
-  @ApiProperty({ description: '사용자 ID' })
+  @ApiPropertyOptional({ description: '사용자 ID (optional, will be set from authenticated request)' })
+  @IsOptional()
   @IsString()
-  userId: string;
+  userId?: string;
 
   @ApiProperty({ description: '배송비' })
   @IsNumber()

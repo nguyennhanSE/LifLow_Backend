@@ -284,16 +284,25 @@ export class PaymentService {
   async confirmPayment(
     dto: ConfirmPaymentRequestDto,
   ): Promise<PaymentResponseDto> {
-    this.logger.log(`Confirming payment: ${dto.orderGroupNumber}`);
+    // Validate userId is provided and is a string
+    if (!dto.userId || typeof dto.userId !== 'string') {
+      throw new BadRequestException('User ID is required and must be a string');
+    }
+
+    // Ensure userId is a string (TypeScript assertion after validation)
+    const userId: string = String(dto.userId);
+    const validatedDto = { ...dto, userId };
+
+    this.logger.log(`Confirming payment: ${validatedDto.orderGroupNumber}`);
 
     try {
       // 1. Confirm payment with Toss API FIRST (external call, must be before transaction)
       this.logger.log('Confirming payment with Toss');
       const tossPayment = await this.tossApiService.confirmPayment({
-        paymentKey: dto.paymentKey,
-        orderId: dto.orderGroupNumber,
-        amount: dto.amount,
-        deliveryFee: dto.deliveryFee,
+        paymentKey: validatedDto.paymentKey,
+        orderId: validatedDto.orderGroupNumber,
+        amount: validatedDto.amount,
+        deliveryFee: validatedDto.deliveryFee,
       });
       this.logger.log('Payment confirmed with Toss successfully');
 
@@ -303,18 +312,18 @@ export class PaymentService {
 
         // 2.1. Get OrderGroup by orderGroupNumber
         const orderGroup = await tx.orderGroup.findUnique({
-          where: { orderGroupNumber: dto.orderGroupNumber },
+          where: { orderGroupNumber: validatedDto.orderGroupNumber },
         });
 
         if (!orderGroup) {
-          throw new NotFoundException(`OrderGroup with number ${dto.orderGroupNumber} not found`);
+          throw new NotFoundException(`OrderGroup with number ${validatedDto.orderGroupNumber} not found`);
         }
 
         this.logger.log(`OrderGroup found with ${orderGroup.cartItemIds.length} cart items`);
 
         // 2.2. Get User
         const user = await tx.user.findUnique({
-          where: { id: dto.userId },
+          where: { id: userId },
           select: {
             id: true,
             name: true,
@@ -324,7 +333,7 @@ export class PaymentService {
         });
 
         if (!user) {
-          throw new NotFoundException(`User with ID ${dto.userId} not found`);
+          throw new NotFoundException(`User with ID ${userId} not found`);
         }
 
         // 2.2.1. Get User Shipping Address
@@ -341,18 +350,18 @@ export class PaymentService {
           setAsDefault: boolean;
         } | null = null;
         
-        if (dto.userShippingAddressId) {
+        if (validatedDto.userShippingAddressId) {
           // Get specific shipping address by ID
           const address = await tx.userShippingAddress.findUnique({
-            where: { id: dto.userShippingAddressId },
+            where: { id: validatedDto.userShippingAddressId },
           });
 
           if (!address) {
-            throw new NotFoundException(`Shipping address with ID ${dto.userShippingAddressId} not found`);
+            throw new NotFoundException(`Shipping address with ID ${validatedDto.userShippingAddressId} not found`);
           }
 
           // Verify that the shipping address belongs to the user
-          if (address.userId !== dto.userId) {
+          if (address.userId !== userId) {
             throw new BadRequestException('Shipping address does not belong to this user');
           }
           
@@ -360,7 +369,7 @@ export class PaymentService {
         } else {
           // Get default shipping address by userId
           shippingAddress = await tx.userShippingAddress.findFirst({
-            where: { userId: dto.userId },
+            where: { userId: userId },
           });
         }
 
@@ -368,11 +377,11 @@ export class PaymentService {
 
         // 2.3. Get Cart
         const cart = await tx.cart.findUnique({
-          where: { userId: dto.userId },
+          where: { userId: userId },
         });
 
         if (!cart) {
-          throw new NotFoundException(`Cart for user ${dto.userId} not found`);
+          throw new NotFoundException(`Cart for user ${userId} not found`);
         }
 
         // 2.4. Get Cart Items using cartItemIds from OrderGroup
@@ -400,7 +409,7 @@ export class PaymentService {
         // 2.5. Get user's active membership
         const userMembership = await tx.userMembership.findFirst({
           where: {
-            userId: dto.userId,
+            userId: userId,
             startDate: { lte: new Date() },
             endDate: { gte: new Date() },
           },
@@ -415,8 +424,8 @@ export class PaymentService {
         const allCouponIds = new Set<string>();
 
         // Process cart item coupons from DTO
-        if (dto.cartItemCoupons && dto.cartItemCoupons.length > 0) {
-          for (const item of dto.cartItemCoupons) {
+        if (validatedDto.cartItemCoupons && validatedDto.cartItemCoupons.length > 0) {
+          for (const item of validatedDto.cartItemCoupons) {
             if (item.couponIds && item.couponIds.length > 0) {
               cartItemCouponMap.set(item.cartItemId, item.couponIds);
               item.couponIds.forEach(id => allCouponIds.add(id));
@@ -454,7 +463,7 @@ export class PaymentService {
 
         for (const cartItem of cartItems) {
           const orderNumber = await this.ordersService.generateUniqueOrderNumber(
-            dto.orderGroupNumber,
+            validatedDto.orderGroupNumber,
           );
           const totalOrderAmount = cartItem.salePrice * cartItem.quantity;
           let totalDiscount = 0;
@@ -501,7 +510,7 @@ export class PaymentService {
           const orderData: Prisma.OrderCreateInput = {
             orderNumber,
             orderGroup: {
-              connect: { orderGroupNumber: dto.orderGroupNumber },
+              connect: { orderGroupNumber: validatedDto.orderGroupNumber },
             },
             totalOrderAmount,
             totalPaymentAmount,
@@ -530,7 +539,7 @@ export class PaymentService {
               connect: { id: cartItem.productId },
             },
             user: {
-              connect: { id: dto.userId },
+              connect: { id: userId },
             },
           };
 
@@ -583,7 +592,7 @@ export class PaymentService {
               const existingHistory = await tx.couponHistory.findFirst({
                 where: {
                   couponId: coupon.id,
-                  userId: dto.userId,
+                  userId: userId,
                   status: 'ISSUED',
                 },
               });
@@ -605,7 +614,7 @@ export class PaymentService {
                 await tx.couponHistory.create({
                   data: {
                     couponId: coupon.id,
-                    userId: dto.userId,
+                    userId: userId,
                     orderId: order.id,
                     status: 'USED',
                     issuedAt: new Date(),
@@ -629,18 +638,18 @@ export class PaymentService {
           await tx.point.create({
             data: {
               date: today,
-              userId: dto.userId,
-              orderGroupNumber: dto.orderGroupNumber,
+              userId: userId,
+              orderGroupNumber: validatedDto.orderGroupNumber,
               pointsType: 'USED',
               availablePointsDeduction: orderGroup.pointsUsed,
               availablePointsBalance: (user?.availablePoints || 0) - orderGroup.pointsUsed,
-              content: `Points used for order ${dto.orderGroupNumber}`,
+              content: `Points used for order ${validatedDto.orderGroupNumber}`,
             },
           });
 
           // Update user's available points
           await tx.user.update({
-            where: { id: dto.userId },
+            where: { id: userId },
             data: {
               availablePoints: { decrement: orderGroup.pointsUsed },
               totalUsedPoints: { increment: orderGroup.pointsUsed },
@@ -652,7 +661,7 @@ export class PaymentService {
 
         // 2.10. Update user's total purchase amount
         await tx.user.update({
-          where: { id: dto.userId },
+          where: { id: userId },
           data: {
             totalPurchaseAmount: { increment: orderGroup.finalAmount },
           },
@@ -662,7 +671,7 @@ export class PaymentService {
         this.logger.log('Saving payment to database');
         const savedPayment = await tx.payment.create({
           data: {
-            userId: dto.userId,
+            userId: userId,
             orderGroupNumber: tossPayment.orderId,
             paymentKey: tossPayment.paymentKey,
             transactionKey: tossPayment.transactionKey,
@@ -719,10 +728,10 @@ export class PaymentService {
       // Try to save failed payment record
       try {
         await this.paymentRepository.create({
-          userId: dto.userId,
-          orderGroupNumber: dto.orderGroupNumber,
-          paymentKey: dto.paymentKey,
-          totalAmount: dto.amount,
+          userId: userId,
+          orderGroupNumber: validatedDto.orderGroupNumber,
+          paymentKey: validatedDto.paymentKey,
+          totalAmount: validatedDto.amount,
           balanceAmount: 0,
           status: PaymentStatus.FAILED,
           type: PaymentType.NORMAL,
