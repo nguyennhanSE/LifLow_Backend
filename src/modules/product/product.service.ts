@@ -144,8 +144,7 @@ export class ProductService {
         // Create discount if discount data is provided
         if (hasDiscountData && discountRate !== undefined && discountRate !== null) {
           // Check if discountStartDate is in the future, if so set status to false
-          const today = new Date();
-          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          const today = new Date(); // Use current time when request hits server
           const shouldBeActive = discountStartDate 
             ? new Date(discountStartDate) <= today 
             : true; // If no startDate, default to active
@@ -215,8 +214,7 @@ export class ProductService {
           });
 
           // Check if startDate is in the future, if so set status to false
-          const today = new Date();
-          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          const today = new Date(); // Use current time when request hits server
           const shouldBeActive = specialOffer.startDate 
             ? new Date(specialOffer.startDate) <= today 
             : (specialOffer.status ?? false); // If no startDate, use provided status or default to false
@@ -405,8 +403,7 @@ export class ProductService {
           });
 
           // Check if discountStartDate is in the future, if so set status to false
-          const today = new Date();
-          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          const today = new Date(); // Use current time when request hits server
           const shouldBeActive = discountStartDate 
             ? new Date(discountStartDate) <= today 
             : true; // If no startDate, default to active
@@ -494,11 +491,15 @@ export class ProductService {
 
         if (hasSpecialOfferData && specialOffer) {
           // Check if startDate is in the future, if so set status to false
-          const today = new Date();
-          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          const today = new Date(); // Use current time when request hits server
           const shouldBeActive = specialOffer.startDate 
             ? new Date(specialOffer.startDate) <= today 
             : (specialOffer.status ?? false); // If no startDate, use provided status or default to false
+
+          // Determine final status: if startDate is in future, force false; otherwise use provided status
+          const finalStatus = specialOffer.startDate && new Date(specialOffer.startDate) > today 
+            ? false 
+            : (specialOffer.status ?? false);
 
           // If hasSpecialOfferData, update or create according to DTO
           if (existingSpecialOffer) {
@@ -507,8 +508,8 @@ export class ProductService {
               where: { productId: id },
               data: {
                 status: shouldBeActive,
-                discountAmount: specialOffer.discountAmount ?? 0,
-                specialPriceApplied: specialOffer.specialPriceApplied ?? null,
+                discountAmount: specialOffer.discountAmount ?? existingSpecialOffer.discountAmount ?? 0,
+                specialPriceApplied: specialOffer.specialPriceApplied ?? existingSpecialOffer.specialPriceApplied ?? null,
                 startDate: specialOffer.startDate ?? null,
                 endDate: specialOffer.endDate ?? null,
               },
@@ -527,8 +528,18 @@ export class ProductService {
             });
           }
 
+          // If status is false, set salePrice = specialPriceApplied + discountAmount
+          if (finalStatus === false) {
+            const specialPriceApplied = specialOffer.specialPriceApplied ?? existingSpecialOffer?.specialPriceApplied ?? 0;
+            const discountAmount = specialOffer.discountAmount ?? existingSpecialOffer?.discountAmount ?? 0;
+            const newSalePrice = specialPriceApplied + discountAmount;
+            await tx.product.update({
+              where: { id },
+              data: { salePrice: newSalePrice },
+            });
+          }
           // Update product salePrice to specialPriceApplied if provided and status is true
-          if (shouldBeActive && specialOffer.specialPriceApplied !== undefined && specialOffer.specialPriceApplied !== null) {
+          else if (shouldBeActive && specialOffer.specialPriceApplied !== undefined && specialOffer.specialPriceApplied !== null) {
             await tx.product.update({
               where: { id },
               data: { salePrice: specialOffer.specialPriceApplied },
@@ -543,6 +554,14 @@ export class ProductService {
               data: {
                 status: false,
               },
+            });
+            // Set salePrice = specialPriceApplied + discountAmount when status is set to false
+            const specialPriceApplied = existingSpecialOffer.specialPriceApplied ?? 0;
+            const discountAmount = existingSpecialOffer.discountAmount ?? 0;
+            const newSalePrice = specialPriceApplied + discountAmount;
+            await tx.product.update({
+              where: { id },
+              data: { salePrice: newSalePrice },
             });
           } else {
             // If no existing special offer and no data, create with status = false
@@ -925,8 +944,7 @@ export class ProductService {
     const productSpecialOffer = await this.productRepository.getProductSpecialOfferByProductId(id);
 
     // First, check if startDate is in the future, if so set status to false
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    const today = new Date(); // Use current time when request hits server
     const shouldBeActive = data.startDate 
       ? new Date(data.startDate) <= today 
       : (data.status ?? false); // If no startDate, use provided status or default to false
