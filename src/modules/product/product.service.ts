@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { ProductRepository, ProductFilters, ProductPagination } from './repositories/product.repository';
 import { ProductEntity } from './entities/product.entity';
 import { ProductListQueryDto, ProductListResponse, PaginationMeta, CreateProductDto, UpdateProductDto, BulkDeleteProductDto, UpdateProductStatusDto, ProductBulkUpdateStatusDto, ProductStats, CreateProductSpecialOfferDto } from './dto/product.dto';
@@ -102,16 +102,25 @@ export class ProductService {
       }
     }
 
-    // Extract discount data from product data
+    // Extract discount data, productBadges, and specialOffer from product data
     const {
       hsCode,
       category,
       discountRate,
       discountStartDate,
       discountEndDate,
+      productBadges,
+      specialOffer,
       ...productData
     } = data;
-    const hasDiscountData = discountRate !== undefined && discountRate !== null;
+    const hasDiscountData = discountRate !== undefined && discountRate !== null && discountRate !== 0;
+    const hasProductBadgesData = productBadges !== undefined && productBadges !== null;
+    const hasSpecialOfferData = specialOffer !== undefined && specialOffer !== null;
+
+    // Debug logging
+    if (hasProductBadgesData) {
+      console.log('ProductBadges data received:', JSON.stringify(productBadges));
+    }
 
     // Use transaction to create product and discount atomically
     try {
@@ -143,6 +152,94 @@ export class ProductService {
               discountEndDate: discountEndDate ?? null,
             },
           });
+        }
+
+        // Create product badges if productBadges data is provided
+        if (hasProductBadgesData && productBadges) {
+          // Check if at least one badge field is set
+          const hasAnyBadgeField = 
+            productBadges.isHotDeal !== undefined ||
+            productBadges.isNewProduct !== undefined ||
+            productBadges.isBestSeller !== undefined;
+
+          console.log('hasAnyBadgeField:', hasAnyBadgeField, 'productBadges:', JSON.stringify(productBadges));
+
+          if (hasAnyBadgeField) {
+            // Check if badge already exists for the product
+            const existingBadge = await tx.productBadges.findFirst({
+              where: { productId: product.id },
+            });
+
+            if (existingBadge) {
+              // Update existing badge
+              const updatedBadge = await tx.productBadges.update({
+                where: { id: existingBadge.id },
+                data: {
+                  isHotDeal: productBadges.isHotDeal ?? false,
+                  isNewProduct: productBadges.isNewProduct ?? false,
+                  isBestSeller: productBadges.isBestSeller ?? false,
+                },
+              });
+              console.log('Updated productBadges:', updatedBadge.id);
+            } else {
+              // Create new badge
+              const createdBadge = await tx.productBadges.create({
+                data: {
+                  productId: product.id,
+                  isHotDeal: productBadges.isHotDeal ?? false,
+                  isNewProduct: productBadges.isNewProduct ?? false,
+                  isBestSeller: productBadges.isBestSeller ?? false,
+                },
+              });
+              console.log('Created productBadges:', createdBadge.id);
+            }
+          } else {
+            console.log('No badge fields set, skipping productBadges creation');
+          }
+        } else {
+          console.log('No productBadges data provided');
+        }
+
+        // Create product special offer if specialOffer data is provided
+        if (hasSpecialOfferData && specialOffer) {
+          // Check if special offer already exists for the product
+          const existingSpecialOffer = await tx.productSpecialOffer.findUnique({
+            where: { productId: product.id },
+          });
+
+          if (existingSpecialOffer) {
+            // Update existing special offer
+            await tx.productSpecialOffer.update({
+              where: { productId: product.id },
+              data: {
+                status: specialOffer.status ?? false,
+                discountAmount: specialOffer.discountAmount ?? 0,
+                specialPriceApplied: specialOffer.specialPriceApplied ?? null,
+                startDate: specialOffer.startDate ?? null,
+                endDate: specialOffer.endDate ?? null,
+              },
+            });
+          } else {
+            // Create new special offer
+            await tx.productSpecialOffer.create({
+              data: {
+                productId: product.id,
+                status: specialOffer.status ?? false,
+                discountAmount: specialOffer.discountAmount ?? 0,
+                specialPriceApplied: specialOffer.specialPriceApplied ?? null,
+                startDate: specialOffer.startDate ?? null,
+                endDate: specialOffer.endDate ?? null,
+              },
+            });
+          }
+
+          // Update product salePrice to specialPriceApplied if provided and status is true
+          if (specialOffer.status && specialOffer.specialPriceApplied !== undefined && specialOffer.specialPriceApplied !== null) {
+            await tx.product.update({
+              where: { id: product.id },
+              data: { salePrice: specialOffer.specialPriceApplied },
+            });
+          }
         }
         // Upload image registration thumbnail
         if (imageRegistrationThumbnail) {
@@ -251,19 +348,24 @@ export class ProductService {
       }
     }
 
-    // Extract discount data from product data
+    // Extract discount data, productBadges, and specialOffer from product data
     const {
       hsCode,
       category,
       discountRate,
       discountStartDate,
       discountEndDate,
+      productBadges,
+      specialOffer,
       ...productData
     } = data;
     const hasDiscountData = discountRate !== undefined && discountRate !== null;
+    const hasProductBadgesData = productBadges !== undefined && productBadges !== null;
+    const hasSpecialOfferData = specialOffer !== undefined && specialOffer !== null;
 
     // Use transaction to update product, discount, and images atomically
     try {
+      console.log('updateProduct data received:', data);
       const result = await this.prisma.$transaction(async (tx) => {
         // Prepare product data
         const updateProductData: Prisma.ProductUpdateInput = productData as Prisma.ProductUpdateInput;
@@ -307,6 +409,122 @@ export class ProductService {
                 status: true,
                 discountStartDate: discountStartDate ?? null,
                 discountEndDate: discountEndDate ?? null,
+              },
+            });
+          }
+        }
+
+        // Handle product badges update
+        if (hasProductBadgesData && productBadges) {
+          console.log('productBadges data received:', JSON.stringify(productBadges));
+          // Check if at least one badge field is set
+          const hasAnyBadgeField = 
+            productBadges.isHotDeal !== undefined ||
+            productBadges.isNewProduct !== undefined ||
+            productBadges.isBestSeller !== undefined;
+
+          if (hasAnyBadgeField) {
+            // Check if badge already exists for the product
+            const existingBadge = await tx.productBadges.findFirst({
+              where: { productId: id },
+            });
+
+            if (existingBadge) {
+              // Update existing badge - only update fields that are provided
+              const updateData: {
+                isHotDeal?: boolean;
+                isNewProduct?: boolean;
+                isBestSeller?: boolean;
+              } = {};
+
+              if (productBadges.isHotDeal !== undefined) {
+                updateData.isHotDeal = productBadges.isHotDeal;
+              }
+              if (productBadges.isNewProduct !== undefined) {
+                updateData.isNewProduct = productBadges.isNewProduct;
+              }
+              if (productBadges.isBestSeller !== undefined) {
+                updateData.isBestSeller = productBadges.isBestSeller;
+              }
+
+              await tx.productBadges.update({
+                where: { id: existingBadge.id },
+                data: updateData,
+              });
+            } else {
+              // Create new badge
+              await tx.productBadges.create({
+                data: {
+                  productId: id,
+                  isHotDeal: productBadges.isHotDeal ?? false,
+                  isNewProduct: productBadges.isNewProduct ?? false,
+                  isBestSeller: productBadges.isBestSeller ?? false,
+                },
+              });
+            }
+          }
+        }
+
+        // Handle product special offer update
+        const existingSpecialOffer = await tx.productSpecialOffer.findUnique({
+          where: { productId: id },
+        });
+
+        if (hasSpecialOfferData && specialOffer) {
+          // If hasSpecialOfferData, update or create according to DTO
+          if (existingSpecialOffer) {
+            // Update existing special offer
+            await tx.productSpecialOffer.update({
+              where: { productId: id },
+              data: {
+                status: specialOffer.status ?? false,
+                discountAmount: specialOffer.discountAmount ?? 0,
+                specialPriceApplied: specialOffer.specialPriceApplied ?? null,
+                startDate: specialOffer.startDate ?? null,
+                endDate: specialOffer.endDate ?? null,
+              },
+            });
+          } else {
+            // Create new special offer
+            await tx.productSpecialOffer.create({
+              data: {
+                productId: id,
+                status: specialOffer.status ?? false,
+                discountAmount: specialOffer.discountAmount ?? 0,
+                specialPriceApplied: specialOffer.specialPriceApplied ?? null,
+                startDate: specialOffer.startDate ?? null,
+                endDate: specialOffer.endDate ?? null,
+              },
+            });
+          }
+
+          // Update product salePrice to specialPriceApplied if provided and status is true
+          if (specialOffer.status && specialOffer.specialPriceApplied !== undefined && specialOffer.specialPriceApplied !== null) {
+            await tx.product.update({
+              where: { id },
+              data: { salePrice: specialOffer.specialPriceApplied },
+            });
+          }
+        } else {
+          // If no hasSpecialOfferData
+          if (existingSpecialOffer) {
+            // Set status to false if special offer exists
+            await tx.productSpecialOffer.update({
+              where: { productId: id },
+              data: {
+                status: false,
+              },
+            });
+          } else {
+            // If no existing special offer and no data, create with status = false
+            await tx.productSpecialOffer.create({
+              data: {
+                productId: id,
+                status: false,
+                discountAmount: 0,
+                specialPriceApplied: null,
+                startDate: null,
+                endDate: null,
               },
             });
           }
@@ -391,18 +609,73 @@ export class ProductService {
    * Delete a single product
    */
   async deleteProduct(id: string): Promise<{ message: string }> {
-    // Verify product exists
+    // Verify product exists and get image URLs
     const product = await this.productRepository.findById(id);
     if (!product) {
       throw new NotFoundException(`Product with id ${id} not found`);
     }
 
-    // Delete product
-    await this.productRepository.delete(id);
-
-    return {
-      message: `Product ${id} deleted successfully`,
+    // Helper function to extract S3 key from URL
+    const extractS3KeyFromUrl = (url: string | null | undefined): string | null => {
+      if (!url) return null;
+      try {
+        // URL format: https://bucket.s3.region.amazonaws.com/key
+        const urlObj = new URL(url);
+        // Remove leading slash from pathname
+        return urlObj.pathname.substring(1);
+      } catch (error) {
+        // If URL parsing fails, try to extract key directly
+        // Assume the URL contains the key after the domain
+        const match = url.match(/amazonaws\.com\/(.+)$/);
+        return match ? match[1] : null;
+      }
     };
+
+    // Collect all image URLs to delete
+    const imageUrls: string[] = [];
+    if (product.imageRegistrationThumbnail) {
+      imageUrls.push(product.imageRegistrationThumbnail);
+    }
+    if (product.imageRegistrationDetail) {
+      imageUrls.push(product.imageRegistrationDetail);
+    }
+    if (product.additionalImages && product.additionalImages.length > 0) {
+      imageUrls.push(...product.additionalImages);
+    }
+
+    // Extract S3 keys from URLs
+    const s3Keys = imageUrls
+      .map(extractS3KeyFromUrl)
+      .filter((key): key is string => key !== null);
+
+    // Use transaction to delete images and product atomically
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Delete images from S3 (don't fail transaction if image deletion fails)
+        const deletePromises = s3Keys.map(async (key) => {
+          try {
+            await this.awsService.deleteObject(key);
+          } catch (error) {
+            // Log error but don't throw - continue with product deletion
+            throw new InternalServerErrorException(new Error(`Failed to delete image from S3 with key ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`));
+          }
+        });
+        await Promise.all(deletePromises);
+
+        // Delete product (this will cascade delete related records)
+        await tx.product.delete({
+          where: { id },
+        });
+      });
+
+      return {
+        message: `Product ${id} deleted successfully`,
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
   }
 
   /**
@@ -638,8 +911,8 @@ export class ProductService {
     // If productSpecialOffer doesn't exist, create it
     if (!productSpecialOffer) {
       await this.productRepository.createProductSpecialOffer(id, data);
-      // Update product salePrice to specialPriceApplied if provided
-      if (data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
+      // Update product salePrice to specialPriceApplied if provided and status is true
+      if (data.status && data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
         await this.prisma.product.update({
           where: { id },
           data: { salePrice: data.specialPriceApplied },
@@ -654,8 +927,8 @@ export class ProductService {
 
     // Update product special offer
     await this.productRepository.updateProductSpecialOffer(id, data);
-    // Update product salePrice to specialPriceApplied if provided
-    if (data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
+    // Update product salePrice to specialPriceApplied if provided and status is true
+    if (data.status && data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
       await this.prisma.product.update({
         where: { id },
         data: { salePrice: data.specialPriceApplied },

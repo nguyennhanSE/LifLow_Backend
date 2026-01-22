@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, Min, IsNotEmpty, MaxLength, ValidateIf, IsArray, IsUUID, ArrayMinSize, IsEnum, ValidateNested, IsBoolean, IsNumber, IsDate, IsObject,  } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsInt, Min, IsNotEmpty, MaxLength, ValidateIf, IsArray, IsUUID, ArrayMinSize, IsEnum, ValidateNested, IsBoolean, IsNumber, IsDate } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 // Enums for status fields
 export enum DisplayStatus {
@@ -11,6 +11,54 @@ export enum DisplayStatus {
 export enum SaleStatus {
   ON_SALE = '판매함',
   NOT_ON_SALE = '판매안함',
+}
+
+// Product Badges DTO
+export class ProductBadgesDto {
+  @ApiPropertyOptional({ description: 'Whether the product is a hot deal', example: false, default: false })
+  @IsOptional()
+  @IsBoolean({ message: 'isHotDeal must be a boolean' })
+  isHotDeal?: boolean;
+
+  @ApiPropertyOptional({ description: 'Whether the product is a new product', example: false, default: false })
+  @IsOptional()
+  @IsBoolean({ message: 'isNewProduct must be a boolean' })
+  isNewProduct?: boolean;
+
+  @ApiPropertyOptional({ description: 'Whether the product is a best seller', example: false, default: false })
+  @IsOptional()
+  @IsBoolean({ message: 'isBestSeller must be a boolean' })
+  isBestSeller?: boolean;
+}
+
+export class CreateProductSpecialOfferDto {
+  @ApiPropertyOptional({ description: 'Special offer status', example: true })
+  @IsOptional()
+  @IsBoolean()
+  status?: boolean;
+
+  @ApiPropertyOptional({ description: 'Special offer discount amount', example: 10000 })
+  @IsOptional()
+  @IsInt()
+  @Min(0, { message: 'Special offer discount amount must be a positive number' })
+  discountAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Special offer price applied', example: 10000 })
+  @IsOptional()
+  @IsInt()
+  specialPriceApplied?: number;
+
+  @ApiPropertyOptional({ description: 'Special offer start date', example: '2025-01-01' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  startDate?: Date;
+
+  @ApiPropertyOptional({ description: 'Special offer end date', example: '2025-01-01' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  endDate?: Date;
 }
 
 // Create Product DTO
@@ -147,7 +195,155 @@ export class CreateProductDto {
   @IsInt()
   @Min(0, { message: 'Stock quantity must be a positive number' })
   stockQuantity?: number;
-  
+
+  @ApiPropertyOptional({ 
+    description: 'Product badges (send as JSON string for multipart/form-data, e.g., \'{"isHotDeal":true,"isNewProduct":true,"isBestSeller":false}\')', 
+    example: { isHotDeal: true, isNewProduct: true, isBestSeller: false },
+  })
+  @IsOptional()
+  @Transform(({ value, obj }) => {
+    let badgesData: { isHotDeal?: boolean; isNewProduct?: boolean; isBestSeller?: boolean } | null = null;
+    
+    // If value is already an object, use it
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      console.log('productBadges Transform: value is already object', value);
+      badgesData = value;
+    }
+    // If value is a string, try to parse it as JSON
+    else if (typeof value === 'string' && value.trim() !== '') {
+      // Skip if it's the string "[object Object]" which means object was stringified incorrectly
+      if (value === '[object Object]') {
+        console.log('productBadges Transform: received [object Object] string, returning undefined');
+        return undefined;
+      }
+      try {
+        const parsed = JSON.parse(value);
+        // Only use if it's an object
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          console.log('productBadges Transform: parsed JSON successfully', parsed);
+          badgesData = parsed;
+        }
+      } catch (e) {
+        console.log('productBadges Transform: JSON parse failed, trying separate fields', e);
+        // If parsing fails, try to check if it's sent as separate fields
+        // For multipart/form-data, sometimes object fields come as separate properties
+        // Check if we have productBadges.isHotDeal, etc.
+        if (obj && typeof obj === 'object') {
+          const tempBadges: { isHotDeal?: boolean; isNewProduct?: boolean; isBestSeller?: boolean } = {};
+          if (obj['productBadges.isHotDeal'] !== undefined) {
+            tempBadges.isHotDeal = obj['productBadges.isHotDeal'] === 'true' || obj['productBadges.isHotDeal'] === true;
+          }
+          if (obj['productBadges.isNewProduct'] !== undefined) {
+            tempBadges.isNewProduct = obj['productBadges.isNewProduct'] === 'true' || obj['productBadges.isNewProduct'] === true;
+          }
+          if (obj['productBadges.isBestSeller'] !== undefined) {
+            tempBadges.isBestSeller = obj['productBadges.isBestSeller'] === 'true' || obj['productBadges.isBestSeller'] === true;
+          }
+          if (Object.keys(tempBadges).length > 0) {
+            badgesData = tempBadges;
+            console.log('productBadges Transform: built from separate fields', badgesData);
+          }
+        }
+        if (!badgesData) {
+          console.log('productBadges Transform: returning undefined after failed parse');
+          return undefined;
+        }
+      }
+    }
+    
+    // If we have badgesData, create an instance of ProductBadgesDto
+    if (badgesData) {
+      const badges = new ProductBadgesDto();
+      if (badgesData.isHotDeal !== undefined) badges.isHotDeal = badgesData.isHotDeal;
+      if (badgesData.isNewProduct !== undefined) badges.isNewProduct = badgesData.isNewProduct;
+      if (badgesData.isBestSeller !== undefined) badges.isBestSeller = badgesData.isBestSeller;
+      return badges;
+    }
+    
+    // For other types or empty string, return undefined
+    console.log('productBadges Transform: value is not object or string, returning undefined. Type:', typeof value, 'Value:', value);
+    return undefined;
+  })
+  @ValidateIf((o) => {
+    // Only validate if productBadges exists and is an object after transform
+    const value = o.productBadges;
+    return value !== undefined && value !== null && typeof value === 'object' && !Array.isArray(value);
+  })
+  @ValidateNested()
+  @Type(() => ProductBadgesDto)
+  productBadges?: ProductBadgesDto;
+
+
+  @ApiPropertyOptional({ 
+    description: 'Special offer (send as JSON string for multipart/form-data, e.g., \'{"status":true,"discountAmount":10000,"specialPriceApplied":10000,"startDate":"2025-01-01","endDate":"2025-01-01"}\')', 
+    example: { status: true, discountAmount: 10000, specialPriceApplied: 10000, startDate: '2025-01-01', endDate: '2025-01-01' },
+  })
+  @IsOptional()
+  @Transform(({ value, obj }) => {
+    let specialOfferData: {
+      status?: boolean;
+      discountAmount?: number;
+      specialPriceApplied?: number;
+      startDate?: Date | string;
+      endDate?: Date | string;
+    } | null = null;
+    
+    // If value is already an object, use it
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      specialOfferData = value;
+    }
+    // If value is a string, try to parse it as JSON
+    else if (typeof value === 'string' && value.trim() !== '') {
+      // Skip if it's the string "[object Object]" which means object was stringified incorrectly
+      if (value === '[object Object]') {
+        console.log('specialOffer Transform: received [object Object] string, returning undefined');
+        return undefined;
+      }
+      try {
+        const parsed = JSON.parse(value);
+        // Only use if it's an object
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          console.log('specialOffer Transform: parsed JSON successfully', parsed);
+          specialOfferData = parsed;
+        }
+      } catch (e) {
+        console.log('specialOffer Transform: JSON parse failed', e);
+        return undefined;
+      }
+    }
+    
+    // If we have specialOfferData, create an instance of CreateProductSpecialOfferDto
+    if (specialOfferData) {
+      const specialOffer = new CreateProductSpecialOfferDto();
+      if (specialOfferData.status !== undefined) specialOffer.status = specialOfferData.status;
+      if (specialOfferData.discountAmount !== undefined) specialOffer.discountAmount = specialOfferData.discountAmount;
+      if (specialOfferData.specialPriceApplied !== undefined) specialOffer.specialPriceApplied = specialOfferData.specialPriceApplied;
+      if (specialOfferData.startDate !== undefined) {
+        specialOffer.startDate = specialOfferData.startDate instanceof Date 
+          ? specialOfferData.startDate 
+          : new Date(specialOfferData.startDate);
+      }
+      if (specialOfferData.endDate !== undefined) {
+        specialOffer.endDate = specialOfferData.endDate instanceof Date 
+          ? specialOfferData.endDate 
+          : new Date(specialOfferData.endDate);
+      }
+      return specialOffer;
+    }
+    
+    // For other types or empty string, return undefined
+    console.log('specialOffer Transform: value is not object or string, returning undefined. Type:', typeof value, 'Value:', value);
+    return undefined;
+  })
+  @ValidateIf((o) => {
+    // Only validate if specialOffer exists and is an object after transform
+    const value = o.specialOffer;
+    return value !== undefined && value !== null && typeof value === 'object' && !Array.isArray(value);
+  })
+  @ValidateNested()
+  @Type(() => CreateProductSpecialOfferDto)
+  specialOffer?: CreateProductSpecialOfferDto;
+
   // Additional optional fields can be added here as needed
   [key: string]: any;
 }
@@ -312,32 +508,3 @@ export interface ProductStats {
   averageSalePrice: number;
 }
 
-export class CreateProductSpecialOfferDto {
-  @ApiPropertyOptional({ description: 'Special offer status', example: true })
-  @IsOptional()
-  @IsBoolean()
-  status?: boolean;
-
-  @ApiPropertyOptional({ description: 'Special offer discount amount', example: 10000 })
-  @IsOptional()
-  @IsInt()
-  @Min(0, { message: 'Special offer discount amount must be a positive number' })
-  discountAmount?: number;
-
-  @ApiPropertyOptional({ description: 'Special offer price applied', example: 10000 })
-  @IsOptional()
-  @IsInt()
-  specialPriceApplied?: number;
-
-  @ApiPropertyOptional({ description: 'Special offer start date', example: '2025-01-01' })
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  startDate?: Date;
-
-  @ApiPropertyOptional({ description: 'Special offer end date', example: '2025-01-01' })
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  endDate?: Date;
-}
