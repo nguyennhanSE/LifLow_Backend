@@ -143,11 +143,18 @@ export class ProductService {
 
         // Create discount if discount data is provided
         if (hasDiscountData && discountRate !== undefined && discountRate !== null) {
+          // Check if discountStartDate is in the future, if so set status to false
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          const shouldBeActive = discountStartDate 
+            ? new Date(discountStartDate) <= today 
+            : true; // If no startDate, default to active
+          
           await tx.productDiscount.create({
             data: {
               productId: product.id,
               discountRate: discountRate,
-              status: true, // Default to active
+              status: shouldBeActive,
               discountStartDate: discountStartDate ?? null,
               discountEndDate: discountEndDate ?? null,
             },
@@ -207,12 +214,19 @@ export class ProductService {
             where: { productId: product.id },
           });
 
+          // Check if startDate is in the future, if so set status to false
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          const shouldBeActive = specialOffer.startDate 
+            ? new Date(specialOffer.startDate) <= today 
+            : (specialOffer.status ?? false); // If no startDate, use provided status or default to false
+
           if (existingSpecialOffer) {
             // Update existing special offer
             await tx.productSpecialOffer.update({
               where: { productId: product.id },
               data: {
-                status: specialOffer.status ?? false,
+                status: shouldBeActive,
                 discountAmount: specialOffer.discountAmount ?? 0,
                 specialPriceApplied: specialOffer.specialPriceApplied ?? null,
                 startDate: specialOffer.startDate ?? null,
@@ -224,7 +238,7 @@ export class ProductService {
             await tx.productSpecialOffer.create({
               data: {
                 productId: product.id,
-                status: specialOffer.status ?? false,
+                status: shouldBeActive,
                 discountAmount: specialOffer.discountAmount ?? 0,
                 specialPriceApplied: specialOffer.specialPriceApplied ?? null,
                 startDate: specialOffer.startDate ?? null,
@@ -234,7 +248,7 @@ export class ProductService {
           }
 
           // Update product salePrice to specialPriceApplied if provided and status is true
-          if (specialOffer.status && specialOffer.specialPriceApplied !== undefined && specialOffer.specialPriceApplied !== null) {
+          if (shouldBeActive && specialOffer.specialPriceApplied !== undefined && specialOffer.specialPriceApplied !== null) {
             await tx.product.update({
               where: { id: product.id },
               data: { salePrice: specialOffer.specialPriceApplied },
@@ -390,12 +404,20 @@ export class ProductService {
             where: { productId: id },
           });
 
+          // Check if discountStartDate is in the future, if so set status to false
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          const shouldBeActive = discountStartDate 
+            ? new Date(discountStartDate) <= today 
+            : true; // If no startDate, default to active
+
           if (existingDiscount) {
             // Update existing discount
             await tx.productDiscount.update({
               where: { productId: id },
               data: {
                 discountRate: discountRate,
+                status: shouldBeActive,
                 discountStartDate: discountStartDate ?? null,
                 discountEndDate: discountEndDate ?? null,
               },
@@ -406,7 +428,7 @@ export class ProductService {
               data: {
                 productId: id,
                 discountRate: discountRate,
-                status: true,
+                status: shouldBeActive,
                 discountStartDate: discountStartDate ?? null,
                 discountEndDate: discountEndDate ?? null,
               },
@@ -471,13 +493,20 @@ export class ProductService {
         });
 
         if (hasSpecialOfferData && specialOffer) {
+          // Check if startDate is in the future, if so set status to false
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Reset time to start of day
+          const shouldBeActive = specialOffer.startDate 
+            ? new Date(specialOffer.startDate) <= today 
+            : (specialOffer.status ?? false); // If no startDate, use provided status or default to false
+
           // If hasSpecialOfferData, update or create according to DTO
           if (existingSpecialOffer) {
             // Update existing special offer
             await tx.productSpecialOffer.update({
               where: { productId: id },
               data: {
-                status: specialOffer.status ?? false,
+                status: shouldBeActive,
                 discountAmount: specialOffer.discountAmount ?? 0,
                 specialPriceApplied: specialOffer.specialPriceApplied ?? null,
                 startDate: specialOffer.startDate ?? null,
@@ -489,7 +518,7 @@ export class ProductService {
             await tx.productSpecialOffer.create({
               data: {
                 productId: id,
-                status: specialOffer.status ?? false,
+                status: shouldBeActive,
                 discountAmount: specialOffer.discountAmount ?? 0,
                 specialPriceApplied: specialOffer.specialPriceApplied ?? null,
                 startDate: specialOffer.startDate ?? null,
@@ -499,7 +528,7 @@ export class ProductService {
           }
 
           // Update product salePrice to specialPriceApplied if provided and status is true
-          if (specialOffer.status && specialOffer.specialPriceApplied !== undefined && specialOffer.specialPriceApplied !== null) {
+          if (shouldBeActive && specialOffer.specialPriceApplied !== undefined && specialOffer.specialPriceApplied !== null) {
             await tx.product.update({
               where: { id },
               data: { salePrice: specialOffer.specialPriceApplied },
@@ -895,8 +924,31 @@ export class ProductService {
 
     const productSpecialOffer = await this.productRepository.getProductSpecialOfferByProductId(id);
 
-    // If status is false, delete the productSpecialOffer (if it exists)
-    if (data.status === false) {
+    // First, check if startDate is in the future, if so set status to false
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    const shouldBeActive = data.startDate 
+      ? new Date(data.startDate) <= today 
+      : (data.status ?? false); // If no startDate, use provided status or default to false
+
+    // Determine final status: if startDate is in future, force false; otherwise use provided status
+    const finalStatus = data.startDate && new Date(data.startDate) > today 
+      ? false 
+      : (data.status ?? false);
+
+    // If status is false, delete the productSpecialOffer (if it exists) and set salePrice
+    if (finalStatus === false) {
+      // Get specialPriceApplied and discountAmount from data or existing offer
+      const specialPriceApplied = data.specialPriceApplied ?? productSpecialOffer?.specialPriceApplied ?? 0;
+      const discountAmount = data.discountAmount ?? productSpecialOffer?.discountAmount ?? 0;
+      
+      // Set salePrice = specialPriceApplied + discountAmount
+      const newSalePrice = specialPriceApplied + discountAmount;
+      await this.prisma.product.update({
+        where: { id },
+        data: { salePrice: newSalePrice },
+      });
+
       if (productSpecialOffer) {
         await this.productRepository.deleteProductSpecialOffer(id);
       }
@@ -910,9 +962,11 @@ export class ProductService {
 
     // If productSpecialOffer doesn't exist, create it
     if (!productSpecialOffer) {
-      await this.productRepository.createProductSpecialOffer(id, data);
+      // Create with calculated status based on startDate
+      const createData = { ...data, status: shouldBeActive };
+      await this.productRepository.createProductSpecialOffer(id, createData);
       // Update product salePrice to specialPriceApplied if provided and status is true
-      if (data.status && data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
+      if (shouldBeActive && data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
         await this.prisma.product.update({
           where: { id },
           data: { salePrice: data.specialPriceApplied },
@@ -925,10 +979,11 @@ export class ProductService {
       return updatedProduct;
     }
 
-    // Update product special offer
-    await this.productRepository.updateProductSpecialOffer(id, data);
+    // Update product special offer with calculated status
+    const updateData = { ...data, status: shouldBeActive };
+    await this.productRepository.updateProductSpecialOffer(id, updateData);
     // Update product salePrice to specialPriceApplied if provided and status is true
-    if (data.status && data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
+    if (shouldBeActive && data.specialPriceApplied !== undefined && data.specialPriceApplied !== null) {
       await this.prisma.product.update({
         where: { id },
         data: { salePrice: data.specialPriceApplied },
