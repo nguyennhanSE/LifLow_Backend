@@ -53,7 +53,6 @@ model User {
   userMembership UserMembership?
   point Point[]
   session Session[]
-  orders Order[]
   recipes Recipe[]
   couponHistories CouponHistory[]
   recipeComments RecipeComments[]
@@ -64,6 +63,7 @@ model User {
   userShippingAddress UserShippingAddress[]
   announcement Announcement[]
   productInquiryAnswers ProductInquiryAnswers[]
+  orderGroups OrderGroup[]
   @@map("users")
 }
 
@@ -255,14 +255,10 @@ model Order {
 
   // Extension
   productId String? @map("product_id")
-  situation OrderSituation? @map("situation") // 상황
-  courierCompany String? @map("courier_company") // 택배사
-  invoiceNumber String? @map("invoice_number") // 송장번호
   couponUsed String[] @map("coupon_used")
   discountAmount Int @default(0) @map("discount_amount")
 
   // Relation to User (optional, handles null ordererId)
-  user User? @relation(fields: [ordererId], references: [id], onDelete: SetNull)
   couponHistories CouponHistory[]
   // Relation to OrderItems (one order can have many items)
   product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -279,6 +275,7 @@ model OrderGroup {
 
   originalAmount Int @map("original_amount")
   discountAmount Int @map("discount_amount")
+  ordererId String? @map("orderer_id")
   situation OrderSituation @default(ORDER_PAYMENT_PENDING) @map("situation")
   finalAmount Int @map("final_amount")
   pointsUsed Int @map("points_used")
@@ -288,6 +285,11 @@ model OrderGroup {
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  // extension
+  user User? @relation(fields: [ordererId], references: [id], onDelete: SetNull)
+  courierCompany String? @map("courier_company") // 택배사
+  invoiceNumber String? @map("invoice_number") // 송장번호
 
   orders Order[]
   payments Payment[]

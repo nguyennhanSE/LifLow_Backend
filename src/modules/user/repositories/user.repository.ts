@@ -667,7 +667,7 @@ export class UserRepository {
       }
 
       if (options.includeOrders) {
-        include.orders = true;
+        include.orderGroups = true;
       }
 
       if (options.includeCarts) {
@@ -731,7 +731,7 @@ export class UserRepository {
       }
 
       if (options.includeOrders) {
-        userWithRelations.orders = userWithRelations.orders ?? [];
+        userWithRelations.orderGroups = userWithRelations.orderGroups ?? [];
       }
 
       if (options.includeCarts) {

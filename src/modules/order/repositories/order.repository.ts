@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { Prisma, Order, User } from '@prisma/client';
+import { Prisma, Order, User, OrderSituation } from '@prisma/client';
 import { OrderNotFoundException } from '../exceptions/order-not-found.exception';
 import { OrderValidationException } from '../exceptions/order-validation.exception';
 import { EOrderSituation } from '../enum/order.enum';
@@ -26,7 +26,7 @@ export class OrderRepository {
     try {
       return (await this.prisma.order.create({
         data,
-        include: includeUser ? { user: true, product: true } : undefined,
+        include: includeUser ? { product: true, orderGroup: true } : undefined,
       })) as OrderWithUser;
     } catch (error: any) {
       this.handlePrismaError(error);
@@ -46,14 +46,14 @@ export class OrderRepository {
       orderBy,
       skip,
       take,
-      include: includeUser ? { user: true, product: true } : undefined,
+      include: includeUser ? { product: true, orderGroup: true } : undefined,
     })) as OrderWithUser[];
   }
 
   async findById(id: string, includeUser = true): Promise<OrderWithUser | null> {
     return (await this.prisma.order.findUnique({
       where: { id },
-      include: includeUser ? { user: true, product: true } : undefined,
+      include: includeUser ? { product: true, orderGroup: true } : undefined,
     })) as OrderWithUser | null;
   }
 
@@ -66,7 +66,7 @@ export class OrderRepository {
       return (await this.prisma.order.update({
         where: { id },
         data,
-        include: includeUser ? { user: true, product: true } : undefined,
+        include: includeUser ? { product: true, orderGroup: true } : undefined,
       })) as OrderEntity;
     } catch (error: any) {
       this.handlePrismaError(error, id);
@@ -92,8 +92,12 @@ export class OrderRepository {
     return this.prisma.order.findMany({ where: { orderGroupNumber } });
   }
 
+  // Note: situation moved to OrderGroup, use orderGroupRepository.countBySituation instead
   async countByStatus(status: EOrderSituation): Promise<number> {
-    return this.prisma.order.count({ where: { situation: status } as any });
+    const orderGroups = await this.prisma.orderGroup.findMany({ where: { situation: status as OrderSituation } });
+    return this.prisma.order.count({ 
+      where: { orderGroupNumber: { in: orderGroups.map(og => og.orderGroupNumber) } } 
+    });
   }
 
   /**
@@ -146,10 +150,13 @@ export class OrderRepository {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     return !!user;
   }
-  // Get user order number
+  // Get user order number - now through orderGroup
   async getUserOrderNumber(userId: string): Promise<number> {
-    const order = await this.prisma.order.findMany({ where: { user: { id: userId } } });
-    return order.length ?? 0;
+    const orderGroups = await this.prisma.orderGroup.findMany({ where: { ordererId: userId } });
+    const orderCount = await this.prisma.order.count({ 
+      where: { orderGroupNumber: { in: orderGroups.map(og => og.orderGroupNumber) } } 
+    });
+    return orderCount ?? 0;
   }
 
   private handlePrismaError(error: any, id?: string): never {
@@ -166,8 +173,11 @@ export class OrderRepository {
     throw error;
   }
   async getOrderNumber(userId: string): Promise<number> {
-    const order = await this.prisma.order.findMany({ where: { user: { id: userId } } });
-    return order.length ?? 0;
+    const orderGroups = await this.prisma.orderGroup.findMany({ where: { ordererId: userId } });
+    const orderCount = await this.prisma.order.count({ 
+      where: { orderGroupNumber: { in: orderGroups.map(og => og.orderGroupNumber) } } 
+    });
+    return orderCount ?? 0;
   }
   
   async getLastOrderNumber(prefix?: string): Promise<string | null> {

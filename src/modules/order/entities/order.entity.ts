@@ -47,11 +47,18 @@ export class OrderGroupEntity {
   orderGroupName?: string | null;
   originalAmount?: number | null;
   discountAmount?: number | null;
+  ordererId?: string | null;
+  situation?: EOrderSituation | null;
   finalAmount?: number | null;
-  couponUsed?: string[] | null;
-  cartItemIds?: string[] | null;
   pointsUsed?: number | null;
+  cartItemIds?: string[] | null;
   deliveryFee?: number | null;
+  courierCompany?: string | null;
+  invoiceNumber?: string | null;
   createdAt?: Date | null;
   updatedAt?: Date | null;
+  
+  // Relations
+  user?: UserEntity | null;
+  orders?: OrderEntity[] | null;
 }

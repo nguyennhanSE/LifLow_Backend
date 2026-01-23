@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { Prisma, Order } from '@prisma/client';
+import { Prisma, Order, OrderSituation, OrderGroup } from '@prisma/client';
 import {
   CreateOrderDto,
   OrderFilterDto,
@@ -8,13 +8,28 @@ import {
   UpdateOrderDto,
   OrderGroupedListResponse,
   OrderGroupedByOrderGroup,
+  CreateOrderGroupDto,
+  UpdateOrderGroupDto,
+  OrderGroupResponseDto,
+  OrderGroupFilterDto,
+  OrderGroupListResponse,
 } from './dto/order.dto';
 import { OrderRepository } from './repositories/order.repository';
-import { toOrderResponseDto, toOrderEntity, toOrderEntityWithRelations } from './mapper/order.mapper';
+import { OrderGroupRepository } from './repositories/order-group.repository';
+import { 
+  toOrderResponseDto, 
+  toOrderEntity, 
+  toOrderEntityWithRelations,
+  toOrderGroupResponseDto,
+  toOrderGroupEntity,
+  toOrderGroupEntityWithRelations,
+} from './mapper/order.mapper';
 import { OrderNotFoundException } from './exceptions/order-not-found.exception';
 import { OrderValidationException } from './exceptions/order-validation.exception';
+import { OrderGroupNotFoundException } from './exceptions/order-group-not-found.exception';
+import { OrderGroupValidationException } from './exceptions/order-group-validation.exception';
 import { EOrderSituation } from './enum/order.enum';
-import { OrderEntity } from './entities/order.entity';
+import { OrderEntity, OrderGroupEntity } from './entities/order.entity';
 import { PointService } from '../point/point.service';
 import { PrismaService } from 'prisma/prisma.service';
 import { MembershipsService } from '../memberships/memberships.service';
@@ -26,6 +41,7 @@ type SalesByDayPoint = { date: string; totalPaymentAmount: number };
 export class OrdersService {
   constructor(
     private readonly orderRepository: OrderRepository,
+    private readonly orderGroupRepository: OrderGroupRepository,
     private readonly pointService: PointService,
     private readonly prisma: PrismaService,
     private readonly membershipService: MembershipsService,
@@ -36,6 +52,19 @@ export class OrdersService {
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
+  }
+
+  private parseDateString(dateStr: string): Date | null {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0] || '0', 10);
+      const m = parseInt(parts[1] || '1', 10);
+      const d = parseInt(parts[2] || '1', 10);
+      if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(d)) {
+        return new Date(y, m - 1, d);
+      }
+    }
+    return null;
   }
 
   /**
@@ -118,9 +147,6 @@ export class OrdersService {
             ordererMobilePhone: ordererMobilePhone || '',
             desiredDeliveryDate: createOrderDto.desiredDeliveryDate || '',
             membershipLevelAtOrderTime: membershipLevelAtOrderTime?.membershipName || '',
-            situation: (createOrderDto as any).situation,
-            courierCompany: (createOrderDto as any).courierCompany,
-            invoiceNumber: (createOrderDto as any).invoiceNumber,
             couponUsed: couponIds || [],
             discountAmount: (createOrderDto as any).discountAmount || 0,
             cart: {
@@ -133,7 +159,7 @@ export class OrdersService {
 
           // Add user relation if ordererId is provided
           if (userId) {
-            orderData.user = {
+            (orderData as any).user = {
               connect: { id: userId },
             };
           }
@@ -147,7 +173,7 @@ export class OrdersService {
 
           const created = await tx.order.create({
             data: orderData,
-            include: { user: true, product: true },
+            include: { product: true },
           });
 
           createdOrders.push(created as Order & { user?: any; product?: any });
@@ -406,7 +432,6 @@ export class OrdersService {
   async getDashboardStats(): Promise<Record<string, number>> {
     try {
       const statuses = {
-        newOrders: EOrderSituation.ORDER_NEW,
         paymentCompleted: EOrderSituation.ORDER_PAYMENT_COMPLETED,
         preparingProduct: EOrderSituation.ORDER_IN_PREPARE,
         inTransit: EOrderSituation.ORDER_BEING_SHIPPED,
@@ -543,9 +568,9 @@ export class OrdersService {
             주문자ID: order.ordererId || '',
             희망배송일: order.desiredDeliveryDate || '',
             주문시회원등급: order.membershipLevelAtOrderTime || '',
-            상황: (order as any).situation || '',
-            택배사: order.courierCompany || '',
-            송장번호: order.invoiceNumber || '',
+            상황: '',
+            택배사: '',
+            송장번호: '',
             사용쿠폰: Array.isArray((order as any).couponUsed) ? (order as any).couponUsed.join(', ') : '',
             할인금액: (order as any).discountAmount ?? 0,
             생성일: order.createdAt?.toISOString?.() || '',
@@ -602,11 +627,15 @@ export class OrdersService {
         }
       }
 
+      // Convert EOrderSituation to Prisma OrderSituation if situation is provided
+      const updateData: Prisma.OrderUpdateInput = { ...updateOrderDto };
+      if (updateOrderDto.situation !== undefined) {
+        (updateData as any).situation = updateOrderDto.situation as OrderSituation;
+      }
+
       const updated = await this.orderRepository.update(
         id,
-        {
-          ...updateOrderDto,
-        },
+        updateData,
         true,
       );
 
@@ -673,9 +702,12 @@ export class OrdersService {
       where.AND = searchTerms;
     }
 
-    // Order situation/status filter
+    // Order situation/status filter - filter through orderGroup relation
+    // Note: Order model doesn't have situation field directly, it's on OrderGroup
     if (filterDto.situation && filterDto.situation !== 'ALL') {
-      where.situation = filterDto.situation;
+      (where as any).orderGroup = {
+        situation: filterDto.situation as OrderSituation,
+      };
     }
 
     // User filter
@@ -778,7 +810,7 @@ export class OrdersService {
     const day = String(now.getDate()).padStart(2, '0');
     const datePrefix = `${year}${month}${day}`;
     
-    const lastOrderGroupNumber = await this.orderRepository.getLastOrderGroupNumber(datePrefix);
+    const lastOrderGroupNumber = await this.orderGroupRepository.getLastOrderGroupNumber(datePrefix);
     
     let nextNumber = 1;
     
@@ -801,7 +833,7 @@ export class OrdersService {
   ): Promise<string> {
     for (let i = 0; i < maxAttempts; i++) {
       const orderGroupNumber = await this.generateOrderGroupNumber();
-      const exists = await this.orderRepository.countByOrderGroupNumber(orderGroupNumber);
+      const exists = await this.orderGroupRepository.count({ orderGroupNumber });
       if (exists === 0) {
         return orderGroupNumber;
       }
@@ -972,6 +1004,572 @@ export class OrdersService {
       dateFrom,
       dateTo,
     };
+  }
+
+  // ============================================
+  // ORDER GROUP METHODS
+  // ============================================
+
+  /**
+   * Create a new order group
+   */
+  async createOrderGroup(
+    createOrderGroupDto: CreateOrderGroupDto,
+    userId?: string,
+  ): Promise<OrderGroupResponseDto> {
+    try {
+      // Generate orderGroupNumber if not provided
+      let orderGroupNumber = createOrderGroupDto.orderGroupNumber;
+      if (!orderGroupNumber) {
+        orderGroupNumber = await this.generateUniqueOrderGroupNumber();
+      }
+
+      // Validate user if ordererId is provided
+      if (createOrderGroupDto.ordererId || userId) {
+        const ordererId: string = createOrderGroupDto.ordererId || userId!;
+        if (typeof ordererId === 'string' && ordererId.length > 0) {
+          const userExists = await this.orderGroupRepository.userExists(ordererId);
+          if (!userExists) {
+            throw new OrderGroupValidationException(`User not found: ${ordererId}`);
+          }
+        }
+      }
+
+      const orderGroupData: Prisma.OrderGroupCreateInput = {
+        orderGroupNumber,
+        orderGroupName: createOrderGroupDto.orderGroupName,
+        originalAmount: createOrderGroupDto.originalAmount,
+        discountAmount: createOrderGroupDto.discountAmount ?? 0,
+        finalAmount: createOrderGroupDto.finalAmount,
+        pointsUsed: createOrderGroupDto.pointsUsed ?? 0,
+        cartItemIds: createOrderGroupDto.cartItemIds ?? [],
+        deliveryFee: createOrderGroupDto.deliveryFee ?? 0,
+        situation: (createOrderGroupDto.situation ?? EOrderSituation.ORDER_PAYMENT_PENDING) as OrderSituation,
+      };
+
+      if (createOrderGroupDto.ordererId || userId) {
+        orderGroupData.user = {
+          connect: { id: createOrderGroupDto.ordererId || userId! },
+        };
+      }
+
+      const created = await this.orderGroupRepository.create(orderGroupData, true);
+      const orderGroupEntity = toOrderGroupEntityWithRelations(created);
+      return toOrderGroupResponseDto(orderGroupEntity);
+    } catch (error) {
+      this.handleOrderGroupPrismaError(error, 'Failed to create order group');
+    }
+  }
+
+  /**
+   * Get all order groups with filtering, pagination, search, and sorting
+   */
+  async findAllOrderGroups(filterDto: OrderGroupFilterDto): Promise<OrderGroupListResponse> {
+    try {
+      const page = filterDto.page || 1;
+      const limit = filterDto.limit || 10;
+      const sortBy: string | undefined = filterDto.sortBy;
+      const sortOrder: 'asc' | 'desc' | undefined = filterDto.sortOrder;
+
+      const where = this.buildOrderGroupWhereClause(filterDto);
+      const orderBy = this.buildOrderGroupOrderByClause(sortBy, sortOrder);
+      const skip = (page - 1) * limit;
+
+      const [orderGroups, total] = await Promise.all([
+        this.orderGroupRepository.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          includeRelations: true,
+        }),
+        this.orderGroupRepository.count(where),
+      ]);
+
+      const totalPages = Math.ceil(total / limit) || 1;
+
+      return {
+        orderGroups: orderGroups.map(orderGroup => {
+          const orderGroupEntity = toOrderGroupEntityWithRelations(orderGroup);
+          return toOrderGroupResponseDto(orderGroupEntity);
+        }),
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      };
+    } catch (error) {
+      this.handleOrderGroupPrismaError(error, 'Failed to fetch order groups');
+    }
+  }
+
+  /**
+   * Get a single order group by orderGroupNumber
+   */
+  async findOneOrderGroup(orderGroupNumber: string): Promise<OrderGroupResponseDto> {
+    try {
+      const orderGroup = await this.orderGroupRepository.findByOrderGroupNumber(
+        orderGroupNumber,
+        true,
+      );
+
+      if (!orderGroup) {
+        throw new OrderGroupNotFoundException(
+          `OrderGroup with number ${orderGroupNumber} not found`,
+        );
+      }
+
+      const orderGroupEntity = toOrderGroupEntityWithRelations(orderGroup);
+      return toOrderGroupResponseDto(orderGroupEntity);
+    } catch (error) {
+      this.handleOrderGroupPrismaError(error, `Failed to fetch order group ${orderGroupNumber}`);
+    }
+  }
+
+  /**
+   * Get an order group by orderGroupNumber (alias for findOneOrderGroup)
+   */
+  async getOrderGroupByOrderGroupNumber(orderGroupNumber: string): Promise<OrderGroupResponseDto> {
+    return this.findOneOrderGroup(orderGroupNumber);
+  }
+
+  /**
+   * Update an existing order group
+   */
+  async updateOrderGroup(
+    orderGroupNumber: string,
+    updateOrderGroupDto: UpdateOrderGroupDto,
+  ): Promise<OrderGroupResponseDto> {
+    try {
+      // Ensure order group exists
+      const existing = await this.orderGroupRepository.findByOrderGroupNumber(
+        orderGroupNumber,
+        true,
+      );
+      if (!existing) {
+        throw new OrderGroupNotFoundException(
+          `OrderGroup with number ${orderGroupNumber} not found`,
+        );
+      }
+
+      // Validate user if changing ordererId
+      if (updateOrderGroupDto.ordererId) {
+        const ordererId: string = updateOrderGroupDto.ordererId;
+        if (typeof ordererId === 'string' && ordererId.length > 0) {
+          const userExists = await this.orderGroupRepository.userExists(ordererId);
+          if (!userExists) {
+            throw new OrderGroupValidationException('User not found');
+          }
+        }
+      }
+
+      // Convert EOrderSituation to Prisma OrderSituation if situation is provided
+      const updateData: Prisma.OrderGroupUpdateInput = {};
+      if (updateOrderGroupDto.orderGroupName !== undefined) {
+        updateData.orderGroupName = updateOrderGroupDto.orderGroupName;
+      }
+      if (updateOrderGroupDto.originalAmount !== undefined) {
+        updateData.originalAmount = updateOrderGroupDto.originalAmount;
+      }
+      if (updateOrderGroupDto.discountAmount !== undefined) {
+        updateData.discountAmount = updateOrderGroupDto.discountAmount;
+      }
+      if (updateOrderGroupDto.finalAmount !== undefined) {
+        updateData.finalAmount = updateOrderGroupDto.finalAmount;
+      }
+      if (updateOrderGroupDto.pointsUsed !== undefined) {
+        updateData.pointsUsed = updateOrderGroupDto.pointsUsed;
+      }
+      if (updateOrderGroupDto.cartItemIds !== undefined) {
+        updateData.cartItemIds = updateOrderGroupDto.cartItemIds;
+      }
+      if (updateOrderGroupDto.deliveryFee !== undefined) {
+        updateData.deliveryFee = updateOrderGroupDto.deliveryFee;
+      }
+      if (updateOrderGroupDto.ordererId !== undefined) {
+        updateData.user = {
+          connect: { id: updateOrderGroupDto.ordererId },
+        };
+      }
+      if (updateOrderGroupDto.courierCompany !== undefined) {
+        updateData.courierCompany = updateOrderGroupDto.courierCompany;
+      }
+      if (updateOrderGroupDto.invoiceNumber !== undefined) {
+        updateData.invoiceNumber = updateOrderGroupDto.invoiceNumber;
+      }
+      if (updateOrderGroupDto.invoiceNumber !== undefined && updateOrderGroupDto.courierCompany !== undefined) {
+        updateData.situation = EOrderSituation.ORDER_BEING_SHIPPED as OrderSituation;
+      }
+      if (updateOrderGroupDto.situation !== undefined) {
+        updateData.situation = updateOrderGroupDto.situation as OrderSituation;
+      }
+
+
+      const updated = await this.orderGroupRepository.update(
+        orderGroupNumber,
+        updateData,
+        true,
+      );
+
+      return updated;
+    } catch (error) {
+      this.handleOrderGroupPrismaError(error, `Failed to update order group ${orderGroupNumber}`);
+    }
+  }
+
+  /**
+   * Delete an order group (hard delete)
+   */
+  async removeOrderGroup(orderGroupNumber: string): Promise<{ message: string }> {
+    try {
+      const existing = await this.orderGroupRepository.findByOrderGroupNumber(
+        orderGroupNumber,
+        false,
+      );
+      if (!existing) {
+        throw new OrderGroupNotFoundException(
+          `OrderGroup with number ${orderGroupNumber} not found`,
+        );
+      }
+
+      await this.orderGroupRepository.delete(orderGroupNumber);
+
+      return { message: `OrderGroup ${orderGroupNumber} deleted successfully` };
+    } catch (error) {
+      this.handleOrderGroupPrismaError(error, `Failed to delete order group ${orderGroupNumber}`);
+    }
+  }
+
+  /**
+   * Dashboard statistics grouped by order status (for OrderGroups)
+   */
+  async getOrderGroupDashboardStats(): Promise<Record<string, number>> {
+    try {
+      const statuses = {
+        paymentPending: EOrderSituation.ORDER_PAYMENT_PENDING,
+        paymentCompleted: EOrderSituation.ORDER_PAYMENT_COMPLETED,
+        preparingProduct: EOrderSituation.ORDER_IN_PREPARE,
+        inTransit: EOrderSituation.ORDER_BEING_SHIPPED,
+        invoiceTransmitted: EOrderSituation.ORDER_SHIPPED,
+        cancelled: EOrderSituation.ORDER_CANCELLED,
+        returned: EOrderSituation.ORDER_RETURNED,
+      };
+
+      const results = await Promise.all(
+        Object.values(statuses).map((status) =>
+          this.orderGroupRepository.countBySituation(status),
+        ),
+      );
+
+      const entries = Object.keys(statuses).map((key, idx) => [
+        key,
+        results[idx],
+      ]);
+
+      return Object.fromEntries(entries);
+    } catch (error) {
+      this.handleOrderGroupPrismaError(error, 'Failed to fetch dashboard statistics');
+    }
+  }
+
+  /**
+   * Dashboard UI statistics for OrderGroups
+   */
+  async getOrderGroupDashboardUiStats(days = 7): Promise<{
+    dailySales: { date: string; finalAmount: number };
+    salesLastDays: SalesByDayPoint[];
+    orderStatus: Record<string, number>;
+  }> {
+    try {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const start = new Date(today);
+      start.setDate(today.getDate() - (Math.max(days, 1) - 1));
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+
+      const [orderStatus, dailySalesTotal, grouped] = await Promise.all([
+        this.getOrderGroupDashboardStats(),
+        this.orderGroupRepository.sumFinalAmountByDateRange(today, tomorrow),
+        this.orderGroupRepository.sumFinalAmountGroupByDayByDateRange(start, tomorrow),
+      ]);
+
+      const groupedMap = new Map(grouped.map((g) => [g.date, g.finalAmount]));
+      const series: SalesByDayPoint[] = [];
+      for (let i = 0; i < Math.max(days, 1); i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const ds = this.formatLocalYyyyMmDd(d);
+        series.push({ date: ds, totalPaymentAmount: groupedMap.get(ds) ?? 0 });
+      }
+
+      return {
+        dailySales: { date: this.formatLocalYyyyMmDd(today), finalAmount: dailySalesTotal },
+        salesLastDays: series,
+        orderStatus,
+      };
+    } catch (error) {
+      this.handleOrderGroupPrismaError(error, 'Failed to fetch dashboard UI statistics');
+    }
+  }
+
+  /**
+   * Export filtered order groups to CSV
+   */
+  async exportOrderGroupsToCSV(filterDto: OrderGroupFilterDto): Promise<string> {
+    try {
+      const withPeriod = this.applyPeriodToOrderGroupFilter(filterDto);
+      const where = this.buildOrderGroupWhereClause(withPeriod);
+      const sortByValue: string | undefined = withPeriod.sortBy;
+      const sortOrderValue: 'asc' | 'desc' | undefined = withPeriod.sortOrder;
+      const orderGroups = await this.orderGroupRepository.findMany({
+        where,
+        orderBy: this.buildOrderGroupOrderByClause(sortByValue, sortOrderValue),
+        includeRelations: true,
+      });
+
+      const { format } = await import('fast-csv');
+
+      return await new Promise((resolve, reject) => {
+        const chunks: string[] = [];
+        const stream = format({ headers: true });
+
+        stream.on('data', (chunk: Buffer) => chunks.push(chunk.toString()));
+        stream.on('error', (err: Error) => reject(err));
+        stream.on('end', () => resolve(chunks.join('')));
+
+        orderGroups.forEach((orderGroup) => {
+          stream.write({
+            주문그룹번호: orderGroup.orderGroupNumber || '',
+            주문그룹명: orderGroup.orderGroupName || '',
+            원래금액: orderGroup.originalAmount ?? 0,
+            할인금액: orderGroup.discountAmount ?? 0,
+            최종금액: orderGroup.finalAmount ?? 0,
+            사용포인트: orderGroup.pointsUsed ?? 0,
+            배송비: orderGroup.deliveryFee ?? 0,
+            주문자ID: orderGroup.ordererId || '',
+            상황: orderGroup.situation || '',
+            택배사: orderGroup.courierCompany || '',
+            송장번호: orderGroup.invoiceNumber || '',
+            생성일: orderGroup.createdAt?.toISOString?.() || '',
+            수정일: orderGroup.updatedAt?.toISOString?.() || '',
+          });
+        });
+
+        stream.end();
+      });
+    } catch (error) {
+      this.handleOrderGroupPrismaError(error, 'Failed to export order groups to CSV');
+    }
+  }
+
+  /**
+   * Build dynamic where clause for OrderGroup filtering and search
+   */
+  private buildOrderGroupWhereClause(
+    filterDto: OrderGroupFilterDto,
+  ): Prisma.OrderGroupWhereInput {
+    const where: Prisma.OrderGroupWhereInput = {};
+
+    const searchTerms: Prisma.OrderGroupWhereInput[] = [];
+
+    // Exact / partial field searches
+    if (filterDto.q) {
+      searchTerms.push({
+        OR: [
+          { orderGroupNumber: { contains: filterDto.q, mode: 'insensitive' } },
+          { orderGroupName: { contains: filterDto.q, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    if (searchTerms.length > 0) {
+      where.AND = searchTerms;
+    }
+
+    // Order situation/status filter
+    if (filterDto.situation && filterDto.situation !== 'ALL') {
+      where.situation = filterDto.situation as OrderSituation;
+    }
+
+    // User filter
+    if (filterDto.ordererId) {
+      where.ordererId = filterDto.ordererId;
+    }
+
+    // Handle period filter (convert to dateFrom/dateTo)
+    let dateFrom: Date | undefined = undefined;
+    let dateTo: Date | undefined = undefined;
+
+    if (filterDto.period) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      switch (filterDto.period) {
+        case 'today': {
+          dateFrom = today;
+          dateTo = new Date(today);
+          dateTo.setDate(dateTo.getDate() + 1);
+          break;
+        }
+        case '7d': {
+          const sevenDaysAgo = new Date(today);
+          sevenDaysAgo.setDate(today.getDate() - 7);
+          dateFrom = sevenDaysAgo;
+          dateTo = new Date(today);
+          dateTo.setDate(dateTo.getDate() + 1);
+          break;
+        }
+        case '1m': {
+          const oneMonthAgo = new Date(today);
+          oneMonthAgo.setMonth(today.getMonth() - 1);
+          dateFrom = oneMonthAgo;
+          dateTo = new Date(today);
+          dateTo.setDate(dateTo.getDate() + 1);
+          break;
+        }
+        case 'all': {
+          // No date filter
+          dateFrom = undefined;
+          dateTo = undefined;
+          break;
+        }
+      }
+    } else if (filterDto.dateFrom || filterDto.dateTo) {
+      // Convert string dates to Date objects
+      if (filterDto.dateFrom && typeof filterDto.dateFrom === 'string') {
+        const parsedDate = this.parseDateString(filterDto.dateFrom);
+        if (parsedDate) {
+          dateFrom = parsedDate;
+        }
+      }
+      if (filterDto.dateTo && typeof filterDto.dateTo === 'string') {
+        const parsedDate = this.parseDateString(filterDto.dateTo);
+        if (parsedDate) {
+          dateTo = parsedDate;
+          dateTo.setDate(dateTo.getDate() + 1); // Include the entire end date
+        }
+      }
+    }
+
+    // Date range (createdAt)
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        (where.createdAt as Prisma.DateTimeFilter).gte = dateFrom;
+      }
+      if (dateTo) {
+        (where.createdAt as Prisma.DateTimeFilter).lt = dateTo;
+      }
+    }
+
+    return where;
+  }
+
+  /**
+   * Build orderBy clause for OrderGroup with whitelisted fields
+   */
+  private buildOrderGroupOrderByClause(
+    sortBy?: string,
+    sortOrder?: 'asc' | 'desc',
+  ): Prisma.OrderGroupOrderByWithRelationInput {
+    const allowedFields: Array<keyof OrderGroup> = [
+      'createdAt',
+      'updatedAt',
+      'orderGroupNumber',
+      'finalAmount',
+      'originalAmount',
+      'situation',
+    ];
+
+    if (sortBy === undefined) {
+      sortBy = 'updatedAt';
+    }
+    if (sortOrder === undefined) {
+      sortOrder = 'desc';
+    }
+    const field: keyof OrderGroup = allowedFields.includes(
+      sortBy as keyof OrderGroup,
+    )
+      ? (sortBy as keyof OrderGroup)
+      : 'updatedAt'; // Fallback to updatedAt instead of createdAt
+
+    return { [field]: sortOrder };
+  }
+
+  /**
+   * Apply period presets to date range filters for OrderGroup
+   */
+  private applyPeriodToOrderGroupFilter(
+    filterDto: OrderGroupFilterDto,
+  ): OrderGroupFilterDto {
+    const period = filterDto.period;
+    if (!period || period === 'all') {
+      return filterDto;
+    }
+
+    const now = new Date();
+    const start = new Date(now);
+
+    if (period === 'today') {
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      return {
+        ...filterDto,
+        dateFrom: this.formatLocalYyyyMmDd(start),
+        dateTo: this.formatLocalYyyyMmDd(end),
+      };
+    }
+
+    if (period === '7d') {
+      start.setDate(now.getDate() - 6);
+    } else if (period === '1m') {
+      start.setMonth(now.getMonth() - 1);
+    }
+
+    const dateFrom = this.formatLocalYyyyMmDd(start);
+    const dateTo = this.formatLocalYyyyMmDd(now);
+
+    return {
+      ...filterDto,
+      dateFrom,
+      dateTo,
+    };
+  }
+
+  /**
+   * Normalize Prisma errors into meaningful HTTP exceptions for OrderGroup
+   */
+  private handleOrderGroupPrismaError(error: any, defaultMessage: string): never {
+    if (error instanceof OrderGroupNotFoundException) {
+      throw error;
+    }
+
+    if (error?.code === 'P2002') {
+      const field = error.meta?.target?.[0] || 'field';
+      throw new OrderGroupValidationException(
+        `OrderGroup with this ${field} already exists`,
+      );
+    }
+
+    if (error?.code === 'P2003') {
+      throw new OrderGroupValidationException('Invalid order group data');
+    }
+
+    if (error?.code === 'P2025') {
+      throw new OrderGroupNotFoundException('OrderGroup not found');
+    }
+
+    if (error?.code === 'P1001') {
+      throw new InternalServerErrorException('Database connection error');
+    }
+
+    throw new InternalServerErrorException(defaultMessage);
   }
 }
 

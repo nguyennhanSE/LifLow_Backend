@@ -8,7 +8,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus, PaymentType, Prisma, Coupon } from '@prisma/client';
+import { PaymentStatus, PaymentType, Prisma, Coupon, OrderSituation } from '@prisma/client';
 import { TossPaymentApiService } from './services/toss-payment-api.service';
 import { PaymentRepository } from './repositories/payment.repository';
 import {
@@ -230,7 +230,7 @@ export class PaymentService {
       await this.prisma.orderGroup.create({
         data: {
           orderGroupNumber,
-          situation: EOrderSituation.ORDER_PAYMENT_PENDING,
+          situation: EOrderSituation.ORDER_PAYMENT_PENDING as OrderSituation,
           orderGroupName,
           originalAmount,
           discountAmount: totalDiscountAmount,
@@ -561,7 +561,6 @@ export class PaymentService {
                 recipientMobilePhone: shippingAddress?.mobilePhone || user.phoneNumber || '',
                 recipientPhoneNumber: shippingAddress?.phoneNumber || '',
                 deliveryMessage: '',
-                situation: EOrderSituation.ORDER_PAYMENT_COMPLETED,
                 orderDate: today,
                 ordererName: user.name || '',
                 ordererMobilePhone: user.phoneNumber || '',
@@ -571,9 +570,6 @@ export class PaymentService {
                 },
                 product: {
                   connect: { id: cartItem.productId },
-                },
-                user: {
-                  connect: { id: userId },
                 },
               };
 
@@ -764,7 +760,7 @@ export class PaymentService {
         await tx.orderGroup.update({
           where: { orderGroupNumber: validatedDto.orderGroupNumber },
           data: {
-            situation: EOrderSituation.ORDER_PAYMENT_COMPLETED,
+            situation: EOrderSituation.ORDER_PAYMENT_COMPLETED as OrderSituation,
           },
         });
         this.logger.log(`OrderGroup ${validatedDto.orderGroupNumber} situation updated to ORDER_PAYMENT_COMPLETED`);

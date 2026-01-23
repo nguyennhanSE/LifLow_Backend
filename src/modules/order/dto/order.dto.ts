@@ -230,7 +230,7 @@ export class CreateOrderDto {
   @ApiPropertyOptional({
     description: 'Situation',
     enum: EOrderSituation,
-    example: EOrderSituation.ORDER_NEW,
+    example: EOrderSituation.ORDER_PAYMENT_PENDING,
   })
   @IsOptional()
   @IsString({ message: 'Situation must be a string' })
@@ -530,7 +530,7 @@ export class UpdateOrderDto {
   @ApiPropertyOptional({
     description: 'Situation',
     enum: EOrderSituation,
-    example: EOrderSituation.ORDER_NEW,
+    example: EOrderSituation.ORDER_PAYMENT_PENDING,
   })
   @IsOptional()
   @IsString({ message: 'Situation must be a string' })
@@ -788,7 +788,7 @@ export class OrderFilterDto {
   @ApiPropertyOptional({
     description: 'Order status filter',
     enum: [...Object.values(EOrderSituation), 'ALL'],
-    example: EOrderSituation.ORDER_NEW,
+    example: EOrderSituation.ORDER_PAYMENT_PENDING,
   })
   @IsOptional()
   @IsString({ message: 'Order status must be a string' })
@@ -855,5 +855,410 @@ export interface OrderStats {
   byPaymentType: Record<string, number>;
   byPaymentMethod: Record<string, number>;
   topProducts: Array<{ productName: string; totalQuantity: number; totalRevenue: number }>;
+}
+
+// ============================================
+// ORDER GROUP DTOs
+// ============================================
+
+// 1. CREATE ORDER GROUP DTO
+export class CreateOrderGroupDto {
+  @ApiPropertyOptional({
+    description: 'Order group number (auto-generated if not provided)',
+    example: '20250123-0000001',
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString({ message: 'Order group number must be a string' })
+  @MaxLength(255, { message: 'Order group number must not exceed 255 characters' })
+  orderGroupNumber?: string;
+
+  @ApiPropertyOptional({
+    description: 'Order group name',
+    example: 'Order Group 2025-01-23',
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString({ message: 'Order group name must be a string' })
+  @MaxLength(255, { message: 'Order group name must not exceed 255 characters' })
+  orderGroupName?: string;
+
+  @ApiProperty({
+    description: 'Original amount before discounts',
+    example: 150000,
+    minimum: 0,
+  })
+  @IsNotEmpty({ message: 'Original amount is required' })
+  @Type(() => Number)
+  @IsInt({ message: 'Original amount must be an integer' })
+  @Min(0, { message: 'Original amount must be at least 0' })
+  originalAmount!: number;
+
+  @ApiPropertyOptional({
+    description: 'Discount amount',
+    example: 5000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Discount amount must be an integer' })
+  @Min(0, { message: 'Discount amount must be at least 0' })
+  discountAmount?: number;
+
+  @ApiProperty({
+    description: 'Final amount after discounts',
+    example: 145000,
+    minimum: 0,
+  })
+  @IsNotEmpty({ message: 'Final amount is required' })
+  @Type(() => Number)
+  @IsInt({ message: 'Final amount must be an integer' })
+  @Min(0, { message: 'Final amount must be at least 0' })
+  finalAmount!: number;
+
+  @ApiPropertyOptional({
+    description: 'Points used',
+    example: 1000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Points used must be an integer' })
+  @Min(0, { message: 'Points used must be at least 0' })
+  pointsUsed?: number;
+
+  @ApiPropertyOptional({
+    description: 'Cart item IDs',
+    example: ['cart-item-id-1', 'cart-item-id-2'],
+    type: [String],
+  })
+  @IsOptional()
+  cartItemIds?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Delivery fee',
+    example: 3000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Delivery fee must be an integer' })
+  @Min(0, { message: 'Delivery fee must be at least 0' })
+  deliveryFee?: number;
+
+  @ApiPropertyOptional({
+    description: 'Orderer user ID (UUID)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'Orderer ID must be a valid UUID' })
+  ordererId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Situation',
+    enum: EOrderSituation,
+    example: EOrderSituation.ORDER_PAYMENT_PENDING,
+  })
+  @IsOptional()
+  @IsEnum(EOrderSituation, { message: 'Situation must be a valid order situation' })
+  situation?: EOrderSituation;
+}
+
+// 2. UPDATE ORDER GROUP DTO
+export class UpdateOrderGroupDto {
+  @ApiPropertyOptional({
+    description: 'Order group name',
+    example: 'Order Group 2025-01-23',
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString({ message: 'Order group name must be a string' })
+  @MaxLength(255, { message: 'Order group name must not exceed 255 characters' })
+  orderGroupName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Original amount before discounts',
+    example: 150000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Original amount must be an integer' })
+  @Min(0, { message: 'Original amount must be at least 0' })
+  originalAmount?: number;
+
+  @ApiPropertyOptional({
+    description: 'Discount amount',
+    example: 5000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Discount amount must be an integer' })
+  @Min(0, { message: 'Discount amount must be at least 0' })
+  discountAmount?: number;
+
+  @ApiPropertyOptional({
+    description: 'Final amount after discounts',
+    example: 145000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Final amount must be an integer' })
+  @Min(0, { message: 'Final amount must be at least 0' })
+  finalAmount?: number;
+
+  @ApiPropertyOptional({
+    description: 'Points used',
+    example: 1000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Points used must be an integer' })
+  @Min(0, { message: 'Points used must be at least 0' })
+  pointsUsed?: number;
+
+  @ApiPropertyOptional({
+    description: 'Cart item IDs',
+    example: ['cart-item-id-1', 'cart-item-id-2'],
+    type: [String],
+  })
+  @IsOptional()
+  cartItemIds?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Delivery fee',
+    example: 3000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Delivery fee must be an integer' })
+  @Min(0, { message: 'Delivery fee must be at least 0' })
+  deliveryFee?: number;
+
+  @ApiPropertyOptional({
+    description: 'Orderer user ID (UUID)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'Orderer ID must be a valid UUID' })
+  ordererId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Situation',
+    enum: EOrderSituation,
+    example: EOrderSituation.ORDER_PAYMENT_COMPLETED,
+  })
+  @IsOptional()
+  @IsEnum(EOrderSituation, { message: 'Situation must be a valid order situation' })
+  situation?: EOrderSituation;
+
+  @ApiPropertyOptional({
+    description: 'Courier company',
+    example: 'CJ대한통운',
+    maxLength: 50,
+  })
+  @IsOptional()
+  @IsString({ message: 'Courier company must be a string' })
+  @MaxLength(50, { message: 'Courier company must not exceed 50 characters' })
+  courierCompany?: string;
+
+  @ApiPropertyOptional({
+    description: 'Invoice number',
+    example: '1234567890',
+    maxLength: 50,
+  })
+  @IsOptional()
+  @IsString({ message: 'Invoice number must be a string' })
+  @MaxLength(50, { message: 'Invoice number must not exceed 50 characters' })
+  invoiceNumber?: string;
+}
+
+// 3. ORDER GROUP RESPONSE DTO
+export class OrderGroupResponseDto {
+  @ApiProperty({ description: 'Order group number', example: '20250123-0000001' })
+  orderGroupNumber!: string;
+
+  @ApiPropertyOptional({ description: 'Order group name', example: 'Order Group 2025-01-23' })
+  orderGroupName?: string | null;
+
+  @ApiPropertyOptional({ description: 'Original amount before discounts', example: 150000 })
+  originalAmount?: number | null;
+
+  @ApiPropertyOptional({ description: 'Discount amount', example: 5000 })
+  discountAmount?: number | null;
+
+  @ApiPropertyOptional({ description: 'Final amount after discounts', example: 145000 })
+  finalAmount?: number | null;
+
+  @ApiPropertyOptional({ description: 'Points used', example: 1000 })
+  pointsUsed?: number | null;
+
+  @ApiPropertyOptional({ description: 'Cart item IDs', example: ['cart-item-id-1'], type: [String] })
+  cartItemIds?: string[] | null;
+
+  @ApiPropertyOptional({ description: 'Delivery fee', example: 3000 })
+  deliveryFee?: number | null;
+
+  @ApiPropertyOptional({ description: 'Orderer user ID (UUID)', example: '123e4567-e89b-12d3-a456-426614174000' })
+  ordererId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Situation', enum: EOrderSituation, example: EOrderSituation.ORDER_PAYMENT_PENDING })
+  situation?: EOrderSituation | null;
+
+  @ApiPropertyOptional({ description: 'Courier company', example: 'CJ대한통운' })
+  courierCompany?: string | null;
+
+  @ApiPropertyOptional({ description: 'Invoice number', example: '1234567890' })
+  invoiceNumber?: string | null;
+
+  @ApiPropertyOptional({ description: 'Order group creation timestamp', example: '2025-01-23T10:30:00.000Z' })
+  createdAt?: Date | null;
+
+  @ApiPropertyOptional({ description: 'Order group last update timestamp', example: '2025-01-23T10:30:00.000Z' })
+  updatedAt?: Date | null;
+
+  @ApiPropertyOptional({ description: 'Associated user information' })
+  user?: any;
+
+  @ApiPropertyOptional({ description: 'Orders in this group', type: [OrderResponseDto] })
+  orders?: OrderResponseDto[] | null;
+}
+
+// 4. ORDER GROUP FILTER DTO
+export class OrderGroupFilterDto {
+  @ApiPropertyOptional({
+    description: 'Page number',
+    example: 1,
+    minimum: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Page must be an integer' })
+  @Min(1, { message: 'Page must be at least 1' })
+  page?: number;
+
+  @ApiPropertyOptional({
+    description: 'Items per page',
+    example: 20,
+    minimum: 1,
+    maximum: 100,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'Limit must be an integer' })
+  @Min(1, { message: 'Limit must be at least 1' })
+  @Max(100, { message: 'Limit must not exceed 100' })
+  limit?: number;
+
+  @ApiPropertyOptional({
+    description: 'Search by order group number, orderer name',
+    example: '20250123-0000001',
+  })
+  @IsOptional()
+  @IsString({ message: 'Search query must be a string' })
+  q?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by orderer user ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'Orderer ID must be a valid UUID' })
+  ordererId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Date range start (format: YYYY-MM-DD)',
+    example: '2025-01-01',
+    pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+  })
+  @IsOptional()
+  @IsString({ message: 'Date from must be a string' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'Date from must be in format YYYY-MM-DD',
+  })
+  dateFrom?: string;
+
+  @ApiPropertyOptional({
+    description: 'Date range end (format: YYYY-MM-DD)',
+    example: '2025-12-31',
+    pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+  })
+  @IsOptional()
+  @IsString({ message: 'Date to must be a string' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'Date to must be in format YYYY-MM-DD',
+  })
+  dateTo?: string;
+
+  @ApiPropertyOptional({
+    description: 'Sort field',
+    example: 'createdAt',
+    enum: [
+      'createdAt',
+      'updatedAt',
+      'orderGroupNumber',
+      'finalAmount',
+      'originalAmount',
+      'situation',
+    ],
+  })
+  @IsOptional()
+  @IsString({ message: 'Sort by must be a string' })
+  @IsIn(
+    [
+      'createdAt',
+      'updatedAt',
+      'orderGroupNumber',
+      'finalAmount',
+      'originalAmount',
+      'situation',
+    ],
+    { message: 'Invalid sort field' },
+  )
+  sortBy?: string;
+
+  @ApiPropertyOptional({
+    description: 'Sort order',
+    example: 'desc',
+    enum: ['asc', 'desc'],
+  })
+  @IsOptional()
+  @IsString({ message: 'Sort order must be a string' })
+  @IsIn(['asc', 'desc'], { message: 'Sort order must be either "asc" or "desc"' })
+  sortOrder?: 'asc' | 'desc';
+
+  @ApiPropertyOptional({
+    description: 'Order status filter',
+    enum: [...Object.values(EOrderSituation), 'ALL'],
+    example: EOrderSituation.ORDER_PAYMENT_PENDING,
+  })
+  @IsOptional()
+  @IsString({ message: 'Order status must be a string' })
+  @IsIn([...Object.values(EOrderSituation), 'ALL'], {
+    message: 'Order status must be a valid order status or ALL',
+  })
+  situation?: EOrderSituation | 'ALL';
+
+  @ApiPropertyOptional({
+    description: 'Predefined period filter',
+    example: '7d',
+    enum: ['today', '7d', '1m', 'all'],
+  })
+  @IsOptional()
+  @IsString({ message: 'Period must be a string' })
+  @IsIn(['today', '7d', '1m', 'all'], {
+    message: 'Period must be one of today, 7d, 1m, all',
+  })
+  period?: 'today' | '7d' | '1m' | 'all';
+}
+
+// 5. ORDER GROUP LIST RESPONSE
+export interface OrderGroupListResponse {
+  orderGroups: OrderGroupResponseDto[];
+  pagination: PaginationMeta;
 }
 

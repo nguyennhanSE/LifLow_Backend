@@ -1057,26 +1057,37 @@ async function seedOrders() {
       const existingProductIds = new Set(existingProducts.map(p => p.id));
       console.log(`📦 Found ${existingProductIds.size} products in database`);
 
+      // Get all existing user IDs to validate foreign keys
+      const existingUsers = await prisma.user.findMany({
+        select: { id: true }
+      });
+      const existingUserIds = new Set(existingUsers.map(u => u.id));
+      console.log(`👥 Found ${existingUserIds.size} users in database`);
+
       // ========================================
       // Step 1: Create OrderGroups from unique order group numbers
       // ========================================
       console.log('📦 Creating order groups...');
       
       // Group orders by orderGroupNumber to aggregate data
+      // Note: First column is orderGroupNumber, second column is orderNumber
       const orderGroupsMap = new Map<string, {
         orders: OrderCsvRecord[];
         totalOrderAmount: number;
         totalPaymentAmount: number;
+        ordererId: string | null;
       }>();
 
       for (const record of records) {
-        const orderGroupNumber = record['품목별 주문번호'];
+        // First column is orderGroupNumber (was order_number)
+        const orderGroupNumber = record.order_number;
         if (orderGroupNumber) {
           if (!orderGroupsMap.has(orderGroupNumber)) {
             orderGroupsMap.set(orderGroupNumber, {
               orders: [],
               totalOrderAmount: 0,
               totalPaymentAmount: 0,
+              ordererId: null,
             });
           }
           
@@ -1089,6 +1100,13 @@ async function seedOrders() {
           }
           if (record.total_payment_amount) {
             group.totalPaymentAmount += parseInt(record.total_payment_amount);
+          }
+          
+          // Set ordererId from the first order in the group (or use the one from record)
+          if (!group.ordererId && record.orderer_id) {
+            // Validate ordererId - set to null if not exists in DB
+            const ordererId = existingUserIds.has(record.orderer_id) ? record.orderer_id : null;
+            group.ordererId = ordererId;
           }
         }
       }
@@ -1105,6 +1123,7 @@ async function seedOrders() {
         pointsUsed: 0,
         cartItemIds: [],
         deliveryFee: 0,
+        ordererId: data.ordererId,
       }));
 
       // Insert OrderGroups in batches
@@ -1142,8 +1161,9 @@ async function seedOrders() {
           }
 
           ordersToInsert.push({
-            orderNumber: record.order_number || null,
-            orderGroupNumber: record['품목별 주문번호'] || null,
+            // First column is orderGroupNumber, second column is orderNumber
+            orderGroupNumber: record.order_number || null,
+            orderNumber: record['품목별 주문번호'] || null,
             totalOrderAmount: record.total_order_amount ? parseInt(record.total_order_amount) : null,
             totalPaymentAmount: record.total_payment_amount ? parseInt(record.total_payment_amount) : null,
             productId: productId,
@@ -2519,12 +2539,12 @@ async function main() {
   
   // await seedUsers();           // Import users and clear all data
   // await seedProducts();        // Import products from CSV
-  // await seedOrders();          // Import orders from CSV
+  await seedOrders();          // Import orders from CSV
   // await seedPoints();          // Import points from CSV
   // await seedCategories();      // Seed categories and update products
   // await seedMemberships();     // Seed memberships only
   // await seedUserMemberships(); // Seed memberships and user memberships
-  await seedBanners();         // Seed all 5 types of banners      
+  // await seedBanners();         // Seed all 5 types of banners      
   // await seedRecipes();          // Seed recipes from CSV
   // await seedCoupons();          // Seed coupons from CSV
   // await updateAdmin();          // Update admin membership level

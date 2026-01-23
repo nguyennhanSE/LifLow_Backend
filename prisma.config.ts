@@ -16,6 +16,6 @@ export default defineConfig({
   },
   datasource: {
     // Use DATABASE_URL from the selected env file
-    url: env('DATABASE_URL'),
+    url: 'postgresql://postgres:123456@3.36.75.72:5432/postgres?schema=public',
   },
 });

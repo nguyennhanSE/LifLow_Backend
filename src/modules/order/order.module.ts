@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { OrdersController } from './order.controller';
 import { OrdersService } from './order.service';
 import { OrderRepository } from './repositories/order.repository';
+import { OrderGroupRepository } from './repositories/order-group.repository';
 import { PrismaService } from 'prisma/prisma.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 import { OrderExceptionFilter } from './filters/order-exception.filter';
@@ -17,6 +18,7 @@ import { MembershipsModule } from '../memberships/memberships.module';
   providers: [
     OrdersService,
     OrderRepository,
+    OrderGroupRepository,
     PrismaService,
     PrismaExceptionFilter,
     OrderExceptionFilter,
