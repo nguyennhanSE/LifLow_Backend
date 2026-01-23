@@ -214,7 +214,6 @@ model RefreshTokenUsed {
 }
 
 enum OrderSituation {
-  ORDER_NEW // 신규
   ORDER_PAYMENT_PENDING // 결제대기
   ORDER_PAYMENT_COMPLETED // 결제완료
   ORDER_IN_PREPARE // 결제실패
@@ -280,6 +279,7 @@ model OrderGroup {
 
   originalAmount Int @map("original_amount")
   discountAmount Int @map("discount_amount")
+  situation OrderSituation @default(ORDER_PAYMENT_PENDING) @map("situation")
   finalAmount Int @map("final_amount")
   pointsUsed Int @map("points_used")
   cartItemIds String[] @map("cart_item_ids")

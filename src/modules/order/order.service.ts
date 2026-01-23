@@ -6,6 +6,8 @@ import {
   OrderListResponse,
   OrderResponseDto,
   UpdateOrderDto,
+  OrderGroupedListResponse,
+  OrderGroupedByOrderGroup,
 } from './dto/order.dto';
 import { OrderRepository } from './repositories/order.repository';
 import { toOrderResponseDto, toOrderEntity, toOrderEntityWithRelations } from './mapper/order.mapper';
@@ -313,6 +315,69 @@ export class OrdersService {
           const orderEntity = toOrderEntity(order);
           return toOrderResponseDto(orderEntity);
         }),
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      };
+    } catch (error) {
+      this.handlePrismaError(error, 'Failed to fetch orders');
+    }
+  }
+
+  /**
+   * Get all orders grouped by orderGroupNumber with filtering, pagination, search, and sorting
+   */
+  async findAllGrouped(filterDto: OrderFilterDto): Promise<OrderGroupedListResponse> {
+    try {
+      const page = filterDto.page || 1;
+      const limit = filterDto.limit || 10;
+      const sortBy = filterDto.sortBy || 'createdAt';
+      const sortOrder = filterDto.sortOrder || 'desc';
+
+      const where = this.buildWhereClause(filterDto);
+      const orderBy = this.buildOrderByClause(sortBy, sortOrder);
+      const skip = (page - 1) * limit;
+
+      const [orders, total] = await Promise.all([
+        this.orderRepository.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          includeUser: true,
+        }),
+        this.orderRepository.count(where),
+      ]);
+
+      const totalPages = Math.ceil(total / limit) || 1;
+
+      // Group orders by orderGroupNumber
+      const groupedMap = new Map<string, OrderResponseDto[]>();
+      
+      orders.forEach(order => {
+        const orderEntity = toOrderEntity(order);
+        const orderDto = toOrderResponseDto(orderEntity);
+        const orderGroupNumber = orderDto.orderGroupNumber || 'null';
+        
+        if (!groupedMap.has(orderGroupNumber)) {
+          groupedMap.set(orderGroupNumber, []);
+        }
+        groupedMap.get(orderGroupNumber)!.push(orderDto);
+      });
+
+      // Convert map to array
+      const orderGroups: OrderGroupedByOrderGroup[] = Array.from(groupedMap.entries()).map(([orderGroupNumber, orders]) => ({
+        orderGroupNumber: orderGroupNumber === 'null' ? null : orderGroupNumber,
+        orders,
+      }));
+
+      return {
+        orderGroups,
         pagination: {
           total,
           page,
@@ -759,6 +824,49 @@ export class OrdersService {
     // Get the last order number for this order group
     const lastOrderNumber = await this.orderRepository.getLastOrderNumber(prefix);
 
+    let nextNumber = 1;
+
+    if (lastOrderNumber) {
+      // Extract the incremental number from format "<orderGroupNumber>-NN"
+      if (lastOrderNumber.startsWith(prefix)) {
+        const suffix = lastOrderNumber.slice(prefix.length);
+        const parsed = parseInt(suffix, 10);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          nextNumber = parsed + 1;
+        }
+      }
+    }
+
+    // Format with zero-padding (e.g., 20260107-02-01, 20260107-02-02, ...)
+    return `${prefix}${nextNumber.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Generate order number within a transaction context
+   * This ensures the check happens within the same transaction to avoid race conditions
+   */
+  async generateOrderNumberInTransaction(
+    tx: Prisma.TransactionClient,
+    orderGroupNumber: string,
+  ): Promise<string> {
+    if (!orderGroupNumber) {
+      throw new InternalServerErrorException('orderGroupNumber is required to generate orderNumber');
+    }
+
+    const prefix = `${orderGroupNumber}-`;
+    
+    // Get the last order number for this order group within the transaction
+    const lastOrder = await tx.order.findFirst({
+      where: {
+        orderNumber: {
+          startsWith: prefix,
+        },
+      },
+      orderBy: { orderNumber: 'desc' },
+      select: { orderNumber: true },
+    });
+
+    const lastOrderNumber = lastOrder?.orderNumber || null;
     let nextNumber = 1;
 
     if (lastOrderNumber) {

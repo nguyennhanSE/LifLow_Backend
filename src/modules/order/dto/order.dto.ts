@@ -835,6 +835,16 @@ export interface OrderListResponse {
   pagination: PaginationMeta;
 }
 
+export interface OrderGroupedByOrderGroup {
+  orderGroupNumber: string | null;
+  orders: OrderResponseDto[];
+}
+
+export interface OrderGroupedListResponse {
+  orderGroups: OrderGroupedByOrderGroup[];
+  pagination: PaginationMeta;
+}
+
 // ============================================
 // ORDER STATISTICS RESPONSE
 // ============================================

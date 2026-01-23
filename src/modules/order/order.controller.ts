@@ -67,15 +67,15 @@ export class OrdersController {
 
   @Get('/list')
   @Roles(ERoleName.ADMIN)
-  @ApiOperation({ summary: 'Get paginated list of orders with filters' })
+  @ApiOperation({ summary: 'Get paginated list of orders grouped by orderGroupNumber with filters' })
   @ApiResponse({ status: 200, description: 'Orders retrieved successfully' })
   async findAll(@Query() filterDto: OrderFilterDto) {
     const responseModel = new ResponseModel();
 
     try {
-      const result = await this.ordersService.findAll(filterDto);
+      const result = await this.ordersService.findAllGrouped(filterDto);
       const data = paginationResponse(
-        result.orders,
+        result.orderGroups,
         result.pagination.total,
         result.pagination.page,
         result.pagination.limit,

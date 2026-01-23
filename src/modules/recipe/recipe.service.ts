@@ -569,18 +569,47 @@ export class RecipeService {
         throw new BadRequestException('Invalid recipe ID format');
       }
 
-      // Check if recipe exists
-      const existingRecipe = await this.recipeRepository.findById(id, false);
-      if (!existingRecipe) {
-        throw new NotFoundException(`Recipe with id ${id} not found`);
-      }
+      // Use transaction to update recipe status and add points to user atomically
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Find recipe with author
+        const existingRecipe = await tx.recipe.findUnique({
+          where: { id },
+          include: { author: true },
+        });
 
-      // Update status to approved (active)
-      const updatedRecipe = await this.recipeRepository.update(id, {
-        status: 'approved',
+        if (!existingRecipe) {
+          throw new NotFoundException(`Recipe with id ${id} not found`);
+        }
+
+        if (!existingRecipe.authorId) {
+          throw new BadRequestException(`Recipe with id ${id} has no author`);
+        }
+
+        // Update recipe status to approved
+        const updatedRecipe = await tx.recipe.update({
+          where: { id },
+          data: {
+            status: 'approved',
+          },
+          include: { author: true },
+        });
+
+        // Get current available points
+        const currentPoints = existingRecipe.author?.availablePoints || 0;
+        const newPoints = currentPoints + 500;
+
+        // Update user's available points
+        await tx.user.update({
+          where: { id: existingRecipe.authorId },
+          data: {
+            availablePoints: newPoints,
+          },
+        });
+
+        return updatedRecipe;
       });
 
-      return toRecipeEntityWithAuthor(updatedRecipe);
+      return toRecipeEntityWithAuthor(result);
     } catch (error: any) {
       this.handleError(error, `Failed to approve recipe ${id}`);
     }

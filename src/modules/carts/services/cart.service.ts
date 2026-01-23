@@ -420,6 +420,37 @@ export class CartService {
   }
 
   /**
+   * Get number of active cart items for a user
+   * @param userId - User ID
+   * @returns Number of active cart items
+   */
+  async getNumberOfItems(userId: string): Promise<number> {
+    try {
+      this.logger.log(`Getting number of cart items for user: ${userId}`);
+
+      // Find user's active cart
+      const cart = await this.cartRepository.findActiveCartByUserId(userId);
+
+      if (!cart) {
+        // Return 0 if user has no active cart
+        return 0;
+      }
+
+      // Count active cart items
+      const count = await this.cartItemRepository.count({
+        cartId: cart.id,
+        // status: ECartItemStatus.ACTIVE,
+      });
+
+      this.logger.log(`User ${userId} has ${count} active cart items`);
+      return count;
+    } catch (error: any) {
+      this.logger.error(`Failed to get number of cart items for user ${userId}: ${error.message}`);
+      this.handleError(error, 'Failed to get number of cart items');
+    }
+  }
+
+  /**
    * Handle errors and throw appropriate HTTP exceptions
    */
   private handleError(error: any, defaultMessage: string): never {

@@ -5,6 +5,7 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentStatus, PaymentType, Prisma, Coupon } from '@prisma/client';
@@ -199,6 +200,16 @@ export class PaymentService {
         );
       }
 
+      // Validate minimum payment amount for Toss Payment API
+      // Credit card: minimum 100원, Bank account: minimum 200원
+      // We validate with 200원 to support all payment methods
+      const MINIMUM_PAYMENT_AMOUNT = 200;
+      if (finalAmount < MINIMUM_PAYMENT_AMOUNT) {
+        throw new BadRequestException(
+          `Payment amount must be at least ${MINIMUM_PAYMENT_AMOUNT}원. Current amount: ${finalAmount}원`,
+        );
+      }
+
       // 8. Generate unique order group number
       const orderGroupNumber = await this.ordersService.generateUniqueOrderGroupNumber();
 
@@ -219,6 +230,7 @@ export class PaymentService {
       await this.prisma.orderGroup.create({
         data: {
           orderGroupNumber,
+          situation: EOrderSituation.ORDER_PAYMENT_PENDING,
           orderGroupName,
           originalAmount,
           discountAmount: totalDiscountAmount,
@@ -292,6 +304,16 @@ export class PaymentService {
     // Ensure userId is a string (TypeScript assertion after validation)
     const userId: string = String(dto.userId);
     const validatedDto = { ...dto, userId };
+
+    // Validate minimum payment amount for Toss Payment API
+    // Credit card: minimum 100원, Bank account: minimum 200원
+    // We validate with 200원 to support all payment methods
+    const MINIMUM_PAYMENT_AMOUNT = 200;
+    if (validatedDto.amount < MINIMUM_PAYMENT_AMOUNT) {
+      throw new BadRequestException(
+        `Payment amount must be at least ${MINIMUM_PAYMENT_AMOUNT}원. Current amount: ${validatedDto.amount}원`,
+      );
+    }
 
     this.logger.log(`Confirming payment: ${validatedDto.orderGroupNumber}`);
 
@@ -462,101 +484,133 @@ export class PaymentService {
         const createdOrders: CreatedOrder[] = [];
 
         for (const cartItem of cartItems) {
-          const orderNumber = await this.ordersService.generateUniqueOrderNumber(
-            validatedDto.orderGroupNumber,
-          );
-          const totalOrderAmount = cartItem.salePrice * cartItem.quantity;
-          let totalDiscount = 0;
-          const appliedCouponIds: string[] = [];
+          // Generate order number within transaction to avoid race conditions
+          let orderNumber: string = '';
+          let order: any;
+          const maxRetries = 5;
+          let retryCount = 0;
+          let orderCreated = false;
 
-          // Get coupons for this specific cart item
-          const cartItemCouponIds = cartItemCouponMap.get(cartItem.id) || [];
+          while (!orderCreated && retryCount < maxRetries) {
+            try {
+              // Generate order number within the transaction context
+              orderNumber = await this.ordersService.generateOrderNumberInTransaction(
+                tx,
+                validatedDto.orderGroupNumber,
+              );
 
-          // Calculate total discount from coupons for this cart item
-          for (const couponId of cartItemCouponIds) {
-            const coupon = couponMap.get(couponId);
-            
-            if (!coupon) {
-              this.logger.warn(`Coupon ${couponId} not found, skipping`);
-              continue;
-            }
+              const totalOrderAmount = cartItem.salePrice * cartItem.quantity;
+              let totalDiscount = 0;
+              const appliedCouponIds: string[] = [];
 
-            let discountAmount = 0;
+              // Get coupons for this specific cart item
+              const cartItemCouponIds = cartItemCouponMap.get(cartItem.id) || [];
 
-            // Calculate discount based on coupon type
-            if (coupon.type === 'PERCENT') {
-              // Apply percentage discount
-              const discountRate = coupon.discountRate || 0;
-              discountAmount = Math.floor((totalOrderAmount * discountRate) / 100);
+              // Calculate total discount from coupons for this cart item
+              for (const couponId of cartItemCouponIds) {
+                const coupon = couponMap.get(couponId);
+                
+                if (!coupon) {
+                  this.logger.warn(`Coupon ${couponId} not found, skipping`);
+                  continue;
+                }
 
-              // Apply max discount limit if specified
-              if (coupon.maxDiscountAmount && discountAmount > coupon.maxDiscountAmount) {
-                discountAmount = coupon.maxDiscountAmount;
+                let discountAmount = 0;
+
+                // Calculate discount based on coupon type
+                if (coupon.type === 'PERCENT') {
+                  // Apply percentage discount
+                  const discountRate = coupon.discountRate || 0;
+                  discountAmount = Math.floor((totalOrderAmount * discountRate) / 100);
+
+                  // Apply max discount limit if specified
+                  if (coupon.maxDiscountAmount && discountAmount > coupon.maxDiscountAmount) {
+                    discountAmount = coupon.maxDiscountAmount;
+                  }
+                } else if (coupon.type === 'AMOUNT') {
+                  // Apply fixed amount discount
+                  discountAmount = coupon.discountAmount || 0;
+                }
+
+                totalDiscount += discountAmount;
+                appliedCouponIds.push(coupon.id);
+                this.logger.log(`Coupon ${coupon.code} discount for cart item ${cartItem.id}: -${discountAmount} KRW`);
               }
-            } else if (coupon.type === 'AMOUNT') {
-              // Apply fixed amount discount
-              discountAmount = coupon.discountAmount || 0;
-            }
 
-            totalDiscount += discountAmount;
-            appliedCouponIds.push(coupon.id);
-            this.logger.log(`Coupon ${coupon.code} discount for cart item ${cartItem.id}: -${discountAmount} KRW`);
+              // Calculate final payment amount with discount
+              const totalPaymentAmount = Math.max(0, totalOrderAmount - totalDiscount);
+
+              // Create order with discounted amount
+              const orderData: Prisma.OrderCreateInput = {
+                orderNumber,
+                orderGroup: {
+                  connect: { orderGroupNumber: validatedDto.orderGroupNumber },
+                },
+                totalOrderAmount,
+                totalPaymentAmount,
+                productName: cartItem.product?.productName || '',
+                productNameWithOptions: cartItem.product?.productName || '',
+                quantity: cartItem.quantity,
+                salePrice: cartItem.salePrice,
+                couponUsed: appliedCouponIds, // Store applied coupon IDs for this order
+                discountAmount: totalDiscount,
+                // Use shipping address if available, otherwise fallback to user info
+                recipient: shippingAddress?.recipientName || user.name || '',
+                recipientAddressFull: shippingAddress?.addressFull || '',
+                recipientPostalCode: shippingAddress?.postalCode || 0,
+                recipientMobilePhone: shippingAddress?.mobilePhone || user.phoneNumber || '',
+                recipientPhoneNumber: shippingAddress?.phoneNumber || '',
+                deliveryMessage: '',
+                situation: EOrderSituation.ORDER_PAYMENT_COMPLETED,
+                orderDate: today,
+                ordererName: user.name || '',
+                ordererMobilePhone: user.phoneNumber || '',
+                membershipLevelAtOrderTime,
+                cart: {
+                  connect: { id: cart.id },
+                },
+                product: {
+                  connect: { id: cartItem.productId },
+                },
+                user: {
+                  connect: { id: userId },
+                },
+              };
+
+              order = await tx.order.create({
+                data: orderData,
+              });
+
+              createdOrders.push({ 
+                id: order.id,
+                orderNumber: order.orderNumber || orderNumber,
+                totalOrderAmount: order.totalOrderAmount || totalOrderAmount,
+                totalPaymentAmount: order.totalPaymentAmount || totalPaymentAmount,
+                appliedDiscount: totalDiscount,
+                appliedCouponIds,
+              });
+
+              this.logger.log(`Created order ${orderNumber}: ${totalOrderAmount} KRW -> ${totalPaymentAmount} KRW (discount: ${totalDiscount}, coupons: ${appliedCouponIds.length})`);
+              orderCreated = true;
+            } catch (error: any) {
+              // Handle duplicate key error (P2002) - retry with new order number
+              if (error?.code === 'P2002' && error?.meta?.target?.includes('order_number')) {
+                retryCount++;
+                this.logger.warn(`Duplicate order number ${orderNumber} detected, retrying (attempt ${retryCount}/${maxRetries})`);
+                // Wait a bit before retrying to allow other transactions to complete
+                await new Promise(resolve => setTimeout(resolve, 50 * retryCount));
+                continue;
+              }
+              // If it's not a duplicate key error, rethrow
+              throw error;
+            }
           }
 
-          // Calculate final payment amount with discount
-          const totalPaymentAmount = Math.max(0, totalOrderAmount - totalDiscount);
-
-          // Create order with discounted amount
-          const orderData: Prisma.OrderCreateInput = {
-            orderNumber,
-            orderGroup: {
-              connect: { orderGroupNumber: validatedDto.orderGroupNumber },
-            },
-            totalOrderAmount,
-            totalPaymentAmount,
-            productName: cartItem.product?.productName || '',
-            productNameWithOptions: cartItem.product?.productName || '',
-            quantity: cartItem.quantity,
-            salePrice: cartItem.salePrice,
-            couponUsed: appliedCouponIds, // Store applied coupon IDs for this order
-            discountAmount: totalDiscount,
-            // Use shipping address if available, otherwise fallback to user info
-            recipient: shippingAddress?.recipientName || user.name || '',
-            recipientAddressFull: shippingAddress?.addressFull || '',
-            recipientPostalCode: shippingAddress?.postalCode || 0,
-            recipientMobilePhone: shippingAddress?.mobilePhone || user.phoneNumber || '',
-            recipientPhoneNumber: shippingAddress?.phoneNumber || '',
-            deliveryMessage: '',
-            situation: EOrderSituation.ORDER_PAYMENT_COMPLETED,
-            orderDate: today,
-            ordererName: user.name || '',
-            ordererMobilePhone: user.phoneNumber || '',
-            membershipLevelAtOrderTime,
-            cart: {
-              connect: { id: cart.id },
-            },
-            product: {
-              connect: { id: cartItem.productId },
-            },
-            user: {
-              connect: { id: userId },
-            },
-          };
-
-          const order = await tx.order.create({
-            data: orderData,
-          });
-
-          createdOrders.push({ 
-            id: order.id,
-            orderNumber: order.orderNumber || orderNumber,
-            totalOrderAmount: order.totalOrderAmount || totalOrderAmount,
-            totalPaymentAmount: order.totalPaymentAmount || totalPaymentAmount,
-            appliedDiscount: totalDiscount,
-            appliedCouponIds,
-          });
-
-          this.logger.log(`Created order ${orderNumber}: ${totalOrderAmount} KRW -> ${totalPaymentAmount} KRW (discount: ${totalDiscount}, coupons: ${appliedCouponIds.length})`);
+          if (!orderCreated) {
+            throw new InternalServerErrorException(
+              `Failed to create order for cart item ${cartItem.id} after ${maxRetries} attempts due to duplicate order numbers`
+            );
+          }
         }
 
         this.logger.log(`Created ${createdOrders.length} orders`);
@@ -704,6 +758,16 @@ export class PaymentService {
             metadata: tossPayment.metadata,
           },
         });
+
+        // 2.11.1. Update OrderGroup situation to ORDER_PAYMENT_COMPLETED
+        this.logger.log('Updating OrderGroup situation to ORDER_PAYMENT_COMPLETED');
+        await tx.orderGroup.update({
+          where: { orderGroupNumber: validatedDto.orderGroupNumber },
+          data: {
+            situation: EOrderSituation.ORDER_PAYMENT_COMPLETED,
+          },
+        });
+        this.logger.log(`OrderGroup ${validatedDto.orderGroupNumber} situation updated to ORDER_PAYMENT_COMPLETED`);
 
         // 2.12. Delete cart items from cart
         this.logger.log('Deleting cart items');

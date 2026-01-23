@@ -136,9 +136,37 @@ export class CartController {
   }
 
   /**
+   * Get number of active cart items for current user
+   * GET /carts/number-of-items
+   */
+  @Get('/number-of-items')
+  @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiOperation({
+    summary: 'Get number of active cart items',
+    description: 'Get the number of active cart items in the current user\'s cart.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Number of items retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        numberOfItems: { type: 'number', example: 5 },
+      },
+    },
+  })
+  async getNumberOfItems(@Req() req: Request & { user: { id: string } }) {
+    const responseModel = new ResponseModel();
+    const numberOfItems = await this.cartService.getNumberOfItems(req.user.id);
+    responseModel.setData(numberOfItems);
+    return responseModel;
+  }
+
+  /**
    * Get cart by ID
    * GET /carts/:id
    */
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get cart by ID',
@@ -286,5 +314,7 @@ export class CartController {
     responseModel.setData({ total });
     return responseModel;
   }
+
+  
 }
 
