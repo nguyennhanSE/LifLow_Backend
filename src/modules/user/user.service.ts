@@ -207,10 +207,10 @@ export class UserService {
   }
 
   /**
-   * Get user orders with pagination and product details
+   * Get user order groups with pagination and product details (grouped by orderGroupNumber)
    */
   async getUserOrders(userId: string, pagination: { offset: number; limit: number }): Promise<{
-    orders: any[];
+    orderGroups: any[];
     total: number;
     offset: number;
     limit: number;

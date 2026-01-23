@@ -238,6 +238,7 @@ export class PaymentService {
           cartItemIds,
           pointsUsed: points || 0,
           deliveryFee: deliveryFee || 0,
+          ordererId : userId
         },
       });
 

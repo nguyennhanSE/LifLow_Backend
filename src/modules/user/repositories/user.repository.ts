@@ -8,6 +8,8 @@ import { Prisma, User } from "@prisma/client";
 import { ERoleName } from "../../roles/enums/role.enum";
 import { BadRequestException } from "@nestjs/common";
 import { OrderRepository } from "../../order/repositories/order.repository";
+import { toOrderGroupResponseDto, toOrderGroupEntityWithRelations } from "../../order/mapper/order.mapper";
+import { OrderGroupResponseDto } from "../../order/dto/order.dto";
 
 @Injectable()
 export class UserRepository {
@@ -766,10 +768,10 @@ export class UserRepository {
   }
 
   /**
-   * Get user orders with pagination and product details
+   * Get user order groups with pagination and product details (grouped by orderGroupNumber)
    */
   async getUserOrders(userId: string, pagination: { offset: number; limit: number }): Promise<{
-    orders: any[];
+    orderGroups: OrderGroupResponseDto[];
     total: number;
     offset: number;
     limit: number;
@@ -784,25 +786,36 @@ export class UserRepository {
         throw new NotFoundException(`User with id ${userId} not found`);
       }
 
-      // Get orders with product details
-      const [orders, total] = await Promise.all([
-        this.prisma.order.findMany({
+      // Get order groups with orders and product details, grouped by orderGroupNumber
+      const [orderGroups, total] = await Promise.all([
+        this.prisma.orderGroup.findMany({
           where: { ordererId: userId },
           include: {
-            product: true,
-            orderGroup: true,
+            user: true,
+            orders: {
+              include: {
+                product: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            },
           },
           orderBy: { createdAt: 'desc' },
           skip: pagination.offset,
           take: pagination.limit,
         }),
-        this.prisma.order.count({
+        this.prisma.orderGroup.count({
           where: { ordererId: userId },
         }),
       ]);
 
+      // Map to response DTOs
+      const orderGroupDtos = orderGroups.map(orderGroup => {
+        const orderGroupEntity = toOrderGroupEntityWithRelations(orderGroup);
+        return toOrderGroupResponseDto(orderGroupEntity);
+      });
+
       return {
-        orders,
+        orderGroups: orderGroupDtos,
         total,
         offset: pagination.offset,
         limit: pagination.limit,

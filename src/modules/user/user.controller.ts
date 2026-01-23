@@ -555,8 +555,8 @@ export class UserController {
 
   @Get('/me/orders')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
-  @ApiOperation({ summary: 'Get user orders with pagination' })
-  @ApiResponse({ status: 200, description: 'User orders retrieved successfully' })
+  @ApiOperation({ summary: 'Get user order groups with pagination (grouped by orderGroupNumber)' })
+  @ApiResponse({ status: 200, description: 'User order groups retrieved successfully' })
   @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Offset for pagination', example: 0 })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Limit for pagination', example: 10 })
   async getUserOrders(
@@ -585,13 +585,13 @@ export class UserController {
         throw new BadRequestException('Invalid limit parameter (must be between 1 and 100)');
       }
 
-      // Get user orders with product details
-      const orders = await this.userService.getUserOrders(requestingUserId, {
+      // Get user order groups with product details (grouped by orderGroupNumber)
+      const result = await this.userService.getUserOrders(requestingUserId, {
         offset: parsedOffset,
         limit: parsedLimit,
       });
 
-      responseModel.setData(orders);
+      responseModel.setData(result);
     } catch (error) {
       console.error('Error in getUserOrders:', error);
       throw error;

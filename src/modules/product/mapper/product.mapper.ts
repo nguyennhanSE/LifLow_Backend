@@ -33,7 +33,7 @@ export function toProductEntitySummary(product: ProductEntity): any {
         salePrice: product.salePrice,
         consumerPrice: product.consumerPrice,
         supplyPrice: product.supplyPrice,
-        modelName: product.modelName
+        imageRegistrationThumbnail: product.imageRegistrationThumbnail,
     }
 }
 
