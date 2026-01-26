@@ -366,11 +366,11 @@ export class BannerService {
       await this.validateProductExists(updateBannerDto.productId);
       
       // Validate that category is also provided when productId is provided
-      if (!updateBannerDto.category) {
-        throw new BadRequestException(
-          'category is required when productId is provided',
-        );
-      }
+      // if (!updateBannerDto.category) {
+      //   throw new BadRequestException(
+      //     'category is required when productId is provided',
+      //   );
+      // }
     }
 
     // If type is being changed to non-MAIN_PRODUCTS and productId exists, clear productId

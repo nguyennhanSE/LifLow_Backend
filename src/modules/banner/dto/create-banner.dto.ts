@@ -129,7 +129,7 @@ export class CreateBannerDto {
     example: 'https://example.com/banners/holiday-sale.jpg',
   })
   @IsNotEmpty()
-  @IsUrl({}, { message: 'imageUrl must be a valid URL' })
+  @IsString()
   imageUrl: string;
 
   @ApiPropertyOptional({

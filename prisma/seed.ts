@@ -12,7 +12,7 @@ import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 
 // Load environment variables
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const NODE_ENV = process.env.NODE_ENV || 'production';
 console.log('NODE_ENV', NODE_ENV);
 const envFileName = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 const envFilePath = path.resolve(__dirname, '..', envFileName);
