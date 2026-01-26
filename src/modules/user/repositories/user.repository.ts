@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "prisma/prisma.service";
 import { UserEntity } from "../entities/user.entity";
-import { CreateUserDto, UserFilterDto } from "../dto/user.dto";
+import { CreateUserDto, UpdateShippingAddressDto, UserFilterDto } from "../dto/user.dto";
 import { toUserEntity, toPrismaUserCreateInput, toUserEntityWithRelations } from "../mapper/user.mapper";
 import { IPaginate, PaginateOptions } from "../../../libs/models/paginate/pagimate.model";
 import { Prisma, User } from "@prisma/client";
@@ -964,6 +964,99 @@ export class UserRepository {
       });
     } catch (error) {
       console.error('Prisma error in createUserShippingAddress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete user shipping address by id (scoped to user)
+   */
+  async deleteUserShippingAddress(userId: string, addressId: string): Promise<{ message: string }> {
+    try {
+      const existing = await this.prisma.userShippingAddress.findFirst({
+        where: {
+          id: addressId,
+          userId,
+        },
+      });
+
+      if (!existing) {
+        throw new NotFoundException('Shipping address not found');
+      }
+
+      await this.prisma.userShippingAddress.delete({
+        where: { id: addressId },
+      });
+
+      // If the deleted address was default, set another address as default (latest created)
+      if (existing.setAsDefault) {
+        const nextDefault = await this.prisma.userShippingAddress.findFirst({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (nextDefault) {
+          await this.prisma.userShippingAddress.update({
+            where: { id: nextDefault.id },
+            data: { setAsDefault: true },
+          });
+        }
+      }
+
+      return { message: 'Shipping address deleted successfully' };
+    } catch (error) {
+      console.error('Prisma error in deleteUserShippingAddress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update user shipping address by id (scoped to user)
+   */
+  async updateUserShippingAddress(
+    userId: string,
+    addressId: string,
+    updateData: UpdateShippingAddressDto
+  ): Promise<any> {
+    try {
+      const existing = await this.prisma.userShippingAddress.findFirst({
+        where: {
+          id: addressId,
+          userId,
+        },
+      });
+
+      if (!existing) {
+        throw new NotFoundException('Shipping address not found');
+      }
+
+      // If setting as default, unset other defaults first
+      if (updateData.setAsDefault === true) {
+        await this.prisma.userShippingAddress.updateMany({
+          where: {
+            userId,
+            setAsDefault: true,
+            NOT: { id: addressId },
+          },
+          data: { setAsDefault: false },
+        });
+      }
+
+      return await this.prisma.userShippingAddress.update({
+        where: { id: addressId },
+        data: {
+          ...(updateData.deliveryAddress !== undefined ? { deliveryAddress: updateData.deliveryAddress } : {}),
+          ...(updateData.recipientName !== undefined ? { recipientName: updateData.recipientName } : {}),
+          ...(updateData.mobilePhone !== undefined ? { mobilePhone: updateData.mobilePhone } : {}),
+          ...(updateData.phoneNumber !== undefined ? { phoneNumber: updateData.phoneNumber } : {}),
+          ...(updateData.postalCode !== undefined ? { postalCode: updateData.postalCode } : {}),
+          ...(updateData.address !== undefined ? { address: updateData.address } : {}),
+          ...(updateData.addressFull !== undefined ? { addressFull: updateData.addressFull } : {}),
+          ...(updateData.setAsDefault !== undefined ? { setAsDefault: updateData.setAsDefault } : {}),
+        },
+      });
+    } catch (error) {
+      console.error('Prisma error in updateUserShippingAddress:', error);
       throw error;
     }
   }

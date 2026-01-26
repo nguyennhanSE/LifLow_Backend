@@ -414,6 +414,7 @@ export class BannerRepository {
       const banners = await this.prisma.banner.findMany({
         where: {
           category: null,
+          type : EBannerType.CATEGORY
         },
         include: {
           product: true,

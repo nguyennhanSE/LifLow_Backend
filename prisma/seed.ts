@@ -1,3 +1,5 @@
+import { CategoriesController } from './../src/modules/categories/categories.controller';
+import { catchError } from 'rxjs';
 import { PrismaClient, CouponType } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -10,7 +12,7 @@ import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 
 // Load environment variables
-const NODE_ENV = process.env.NODE_ENV || 'production';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 console.log('NODE_ENV', NODE_ENV);
 const envFileName = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 const envFilePath = path.resolve(__dirname, '..', envFileName);
@@ -1634,6 +1636,15 @@ async function seedUserMemberships() {
 // ========================================
 async function seedBanners() {
   // drop all banners
+  const categories = await prisma.category.findMany({
+    select: {
+      productCategoryNumber: true,
+      name: true,
+    },
+  });
+  const categoryMap = new Map(categories.map(c => [c.name, c.productCategoryNumber]));
+  console.log(`📊 Found ${categories.length} categories in database`);
+
   await prisma.banner.deleteMany();
   console.log('🌱 Starting banner seed...');
   
@@ -1683,7 +1694,7 @@ async function seedBanners() {
       badgeText: 'Fresh Daily',
       mainText: 'High-quality meat products delivered fresh',
       ctaButtonText: 'Browse Livestock',
-      ctaButtonUrl: '/category/livestock',
+      ctaButtonUrl: '/market?page=1&limit=24&displayStatus=Y&sortBy=createdAt&sortOrder=desc' + '&category=' + (categoryMap.get('LIVESTOCK') ?? ''),
       imageUrl: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=1200&h=800&fit=crop',
       mobileImageUrl: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=800&h=800&fit=crop',
       displayOrder: 2,
@@ -1699,7 +1710,7 @@ async function seedBanners() {
       badgeText: 'Quick & Easy',
       mainText: 'Delicious meals ready in minutes',
       ctaButtonText: 'View Convenience Food',
-      ctaButtonUrl: '/category/convenience-food',
+      ctaButtonUrl: '/market?page=1&limit=24&displayStatus=Y&sortBy=createdAt&sortOrder=desc' + '&category=' + (categoryMap.get('CONVENIENCE_FOOD') ?? ''),
       imageUrl: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=1200&h=800&fit=crop',
       mobileImageUrl: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=800&h=800&fit=crop',
       displayOrder: 3,
@@ -1715,7 +1726,7 @@ async function seedBanners() {
       badgeText: 'Ocean Fresh',
       mainText: 'Premium seafood from trusted suppliers',
       ctaButtonText: 'Explore Seafood',
-      ctaButtonUrl: '/category/fisheries',
+      ctaButtonUrl: '/market?page=1&limit=24&displayStatus=Y&sortBy=createdAt&sortOrder=desc' + '&category=' + (categoryMap.get('FISHERIES') ?? ''),
       imageUrl: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=1200&h=800&fit=crop',
       mobileImageUrl: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=800&h=800&fit=crop',
       displayOrder: 4,
@@ -1731,7 +1742,7 @@ async function seedBanners() {
       badgeText: 'Homemade Style',
       mainText: 'Traditional Korean side dishes',
       ctaButtonText: 'View Side Dishes',
-      ctaButtonUrl: '/category/side-dish',
+      ctaButtonUrl: '/market?page=1&limit=24&displayStatus=Y&sortBy=createdAt&sortOrder=desc' + '&category=' + (categoryMap.get('SIDE_DISH') ?? ''),
       imageUrl: 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?w=1200&h=800&fit=crop',
       mobileImageUrl: 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?w=800&h=800&fit=crop',
       displayOrder: 5,
@@ -1747,7 +1758,7 @@ async function seedBanners() {
       badgeText: 'Explore All',
       mainText: 'Browse our complete collection',
       ctaButtonText: 'See All',
-      ctaButtonUrl: '/categories',
+      ctaButtonUrl: '/market?page=1&limit=24&displayStatus=Y&sortBy=createdAt&sortOrder=desc',
       imageUrl: 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?w=1200&h=800&fit=crop',
       mobileImageUrl: 'https://images.unsplash.com/photo-1495195134817-aeb325a55b65?w=800&h=800&fit=crop',
       displayOrder: 6,
@@ -2539,12 +2550,12 @@ async function main() {
   
   // await seedUsers();           // Import users and clear all data
   // await seedProducts();        // Import products from CSV
-  await seedOrders();          // Import orders from CSV
+  // await seedOrders();          // Import orders from CSV
   // await seedPoints();          // Import points from CSV
   // await seedCategories();      // Seed categories and update products
   // await seedMemberships();     // Seed memberships only
   // await seedUserMemberships(); // Seed memberships and user memberships
-  // await seedBanners();         // Seed all 5 types of banners      
+  await seedBanners();         // Seed all 5 types of banners      
   // await seedRecipes();          // Seed recipes from CSV
   // await seedCoupons();          // Seed coupons from CSV
   // await updateAdmin();          // Update admin membership level

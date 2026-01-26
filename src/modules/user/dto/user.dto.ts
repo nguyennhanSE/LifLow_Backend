@@ -733,6 +733,9 @@ export class CreateShippingAddressDto {
     setAsDefault?: boolean;
 }
 
+export class UpdateShippingAddressDto extends CreateShippingAddressDto {
+}
+
 export class FindUserIdDto {
     @ApiProperty({
         description: 'User full name',

@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { UserEntity } from './entities/user.entity';
-import { CreateUserDto, UpdateUserDto, UserFilterDto } from './dto/user.dto';
+import { CreateUserDto, UpdateShippingAddressDto, UpdateUserDto, UserFilterDto } from './dto/user.dto';
 import { UserRepository } from './repositories/user.repository';
 import { IPaginate, PaginateOptions } from '../../libs/models/paginate/pagimate.model';
 import { ERoleName } from '../roles/enums/role.enum';
@@ -300,6 +300,46 @@ export class UserService {
       return await this.userRepository.createUserShippingAddress(userId, addressData);
     } catch (error) {
       console.error('Error in createUserShippingAddress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete user shipping address
+   */
+  async deleteUserShippingAddress(userId: string, addressId: string): Promise<{ message: string }> {
+    try {
+      // Check if user exists
+      await this.findOne(userId);
+
+      return await this.userRepository.deleteUserShippingAddress(userId, addressId);
+    } catch (error) {
+      console.error('Error in deleteUserShippingAddress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update user shipping address
+   */
+  async updateUserShippingAddress(
+    userId: string,
+    addressId: string,
+    updateData: UpdateShippingAddressDto
+  ): Promise<any> {
+    try {
+      // Check if user exists
+      await this.findOne(userId);
+
+      // Require at least one field to update
+      const hasAnyUpdate = Object.values(updateData).some(v => v !== undefined);
+      if (!hasAnyUpdate) {
+        throw new BadRequestException('No fields provided to update');
+      }
+
+      return await this.userRepository.updateUserShippingAddress(userId, addressId, updateData);
+    } catch (error) {
+      console.error('Error in updateUserShippingAddress:', error);
       throw error;
     }
   }

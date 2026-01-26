@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException, NotFoundException, BadRequestException, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto, UpdateUserProfileDto, CreateShippingAddressDto, FindUserIdDto, FindPasswordDto } from './dto/user.dto';
+import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto, UpdateUserProfileDto, CreateShippingAddressDto, UpdateShippingAddressDto, FindUserIdDto, FindPasswordDto } from './dto/user.dto';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { toResponse } from './mapper/user.mapper';
@@ -762,6 +762,61 @@ export class UserController {
       }
       responseModel.setData({ message: 'Password has been reset. Please check your email for the new password.' });
     } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  } 
+  
+  @Patch('/me/shipping-address/:addressId')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Update user shipping address' })
+  @ApiParam({ name: 'addressId', description: 'Shipping address ID' })
+  @ApiResponse({ status: 200, description: 'Shipping address updated successfully' })
+  async updateUserShippingAddress(
+    @Req() req: Request & { user?: TokenPayload },
+    @Param('addressId') addressId: string,
+    @Body() updateAddressDto: UpdateShippingAddressDto,
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+
+      if (!requestingUserId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+
+      const address = await this.userService.updateUserShippingAddress(requestingUserId, addressId, updateAddressDto);
+      responseModel.setData(address);
+    } catch (error) {
+      console.error('Error in updateUserShippingAddress:', error);
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  @Delete('/me/shipping-address/:addressId')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Delete user shipping address' })
+  @ApiParam({ name: 'addressId', description: 'Shipping address ID' })
+  @ApiResponse({ status: 200, description: 'Shipping address deleted successfully' })
+  async deleteUserShippingAddress(
+    @Req() req: Request & { user?: TokenPayload },
+    @Param('addressId') addressId: string,
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+
+      if (!requestingUserId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+
+      const result = await this.userService.deleteUserShippingAddress(requestingUserId, addressId);
+      responseModel.setData(result);
+    } catch (error) {
+      console.error('Error in deleteUserShippingAddress:', error);
       throw error;
     }
 
