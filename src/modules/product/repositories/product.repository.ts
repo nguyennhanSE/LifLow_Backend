@@ -19,6 +19,7 @@ export interface ProductPagination {
   limit: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  includeProductReview?: boolean;
 }
 
 @Injectable()
@@ -47,8 +48,10 @@ export class ProductRepository {
         productDiscount: true,
         banner: true,
         productBadges: true,
+        productReviews: pagination.includeProductReview ?? true,
       },
     });
+    console.log('products', products);
 
     const productsWithCategory = await Promise.all(
       products.map(async (product) => {
@@ -84,6 +87,7 @@ export class ProductRepository {
         productDiscount: true,
         banner: true,
         productBadges: true,
+        productReviews: true,
       },
     });
 
@@ -624,6 +628,7 @@ export class ProductRepository {
         productDiscount: true,
         banner: true,
         productBadges: true,
+        productReviews: pagination.includeProductReview ? true : false,
       },
     });
 

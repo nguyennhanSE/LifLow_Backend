@@ -109,6 +109,7 @@ export class ProductEntity {
   productDiscount?: ProductDiscountEntity | null;
   banner?: BannerEntity[] | null;
   productBadges?: ProductBadgeResponseDto | null;
+  productReviews?: ProductReviewsEntityList | null;
   category?: {
     productCategoryNumber: number;
     name: string;
@@ -124,4 +125,21 @@ export type ProductSpecialOfferEntity = {
   specialPriceApplied: number;
   startDate?: Date | null;
   endDate?: Date | null;
+}
+
+export type ProductReviewsEntity = {
+    id: string;
+    productId: string;
+    authorId: string;
+    review: string;
+    rating: number;
+    imageUrl: string | null;
+    createdAt: Date | null;
+    updatedAt: Date | null;
+}
+
+export type ProductReviewsEntityList = {
+  data: ProductReviewsEntity[];
+  averageRating: number;
+  total: number;
 }

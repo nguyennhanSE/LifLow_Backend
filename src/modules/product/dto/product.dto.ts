@@ -410,6 +410,16 @@ export class ProductListQueryDto {
   @IsOptional()
   @IsString()
   sortOrder?: 'asc' | 'desc';
+
+  @ApiPropertyOptional({ 
+    description: 'Include product reviews in response', 
+    example: false,
+    default: false
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  includeProductReview?: boolean;
 }
 
 export interface PaginationMeta {

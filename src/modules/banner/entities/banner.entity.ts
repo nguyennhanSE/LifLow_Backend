@@ -1,6 +1,6 @@
 import { Expose, Type } from 'class-transformer';
 import { EBannerType, EBannerStatus } from '../enums/banner.enum';
-import { ProductEntity } from '../../product/entities/product.entity';
+import { ProductEntity, ProductReviewsEntityList } from '../../product/entities/product.entity';
 
 export class BannerEntity {
   @Expose()
@@ -58,4 +58,5 @@ export class BannerEntity {
   @Expose()
   @Type(() => ProductEntity)
   product?: ProductEntity | null;
+
 }

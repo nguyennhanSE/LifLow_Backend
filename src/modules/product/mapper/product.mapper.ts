@@ -1,4 +1,4 @@
-import { Product, Prisma, ProductSpecialOffer, Banner, productBadges } from "@prisma/client";
+import { Product, Prisma, ProductSpecialOffer, Banner, productBadges, ProductReviews } from "@prisma/client";
 import { ProductEntity, ProductSpecialOfferEntity } from "../entities/product.entity";
 import { BannerMapper } from "src/modules/banner/mappers/banner.mapper";
 import { ProductBadgeMapper } from "src/modules/product-badges/mappers/product-badge.mapper";
@@ -8,7 +8,8 @@ type ProductWithRelations = Prisma.ProductGetPayload<{
     productSpecialOffer: true,
     productDiscount: true,
     banner: true,
-    productBadges: true
+    productBadges: true,
+    productReviews?: true
   }
 }>
 
@@ -142,7 +143,12 @@ export function toProductEntity(product: Product): ProductEntity {
   };
 }
 
-export function toProductEntityWithRelations(product: ProductWithRelations): ProductEntity {
+export function toProductEntityWithRelations(product: ProductWithRelations | (ProductWithRelations & { productReviews?: ProductReviews[] })): ProductEntity {
+  // Check if productReviews exists in the product object
+  // Use type assertion to access productReviews since it may not be in the type definition
+  const productAny = product as any;
+  const productReviews: ProductReviews[] | undefined | null = productAny.productReviews;
+
   return {
     ...toProductEntity(product),
     productSpecialOffer: product.productSpecialOffer ? toProductSpecialOfferEntity(product.productSpecialOffer) : null,
@@ -160,5 +166,36 @@ export function toProductEntityWithRelations(product: ProductWithRelations): Pro
     productBadges: product.productBadges && product.productBadges.length > 0 
       ? ProductBadgeMapper.toResponseDto(product.productBadges[0]) 
       : null,
+    productReviews: productReviews !== undefined && productReviews !== null
+      ? toProductReviewsEntityListOrEmpty(productReviews)
+      : null,
   }
+}
+
+export function toProductReviewsEntity(productReviews: ProductReviews): any {
+  return {
+    id: productReviews.id,
+    review: productReviews.review,
+    rating: productReviews.rating,
+    imageUrl: productReviews.imageUrl ?? null,
+  }
+}
+
+export function toProductReviewsEntityList(productReviews: ProductReviews[]): any {
+  return {
+    data: productReviews.map(toProductReviewsEntity),
+    averageRating: productReviews.length > 0 ? productReviews.reduce((acc, review) => acc + review.rating, 0) / productReviews.length : 0,
+    total: productReviews.length,
+  }
+}
+
+export function toProductReviewsEntityListOrEmpty(productReviews: ProductReviews[] | undefined | null): any {
+  if (!productReviews || !Array.isArray(productReviews)) {
+    return {
+      data: [],
+      averageRating: 0,
+      total: 0,
+    };
+  }
+  return toProductReviewsEntityList(productReviews);
 }

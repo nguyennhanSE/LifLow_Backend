@@ -12,7 +12,7 @@ import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 
 // Load environment variables
-const NODE_ENV = process.env.NODE_ENV || 'production';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 console.log('NODE_ENV', NODE_ENV);
 const envFileName = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 const envFilePath = path.resolve(__dirname, '..', envFileName);
@@ -2542,6 +2542,20 @@ async function updateAdmin () {
     });
   }
 }
+
+async function updateBanner() {
+  const mainProductBanner = await prisma.banner.findFirst({
+    where: {
+      type: 'MAIN_PRODUCTS',
+    },
+  });
+  if (mainProductBanner) {
+    await prisma.banner.update({
+      where: { id: mainProductBanner.id },
+      data: { mobileImageUrl: 'https://liflow-bucket.s3.ap-northeast-2.amazonaws.com/Section.jpg' },
+    });
+  }
+}
 async function main() {
   console.log('🚀 Starting complete database seeding process...\n');
   // return Promise.resolve().then(() => {
@@ -2555,11 +2569,11 @@ async function main() {
   // await seedCategories();      // Seed categories and update products
   // await seedMemberships();     // Seed memberships only
   // await seedUserMemberships(); // Seed memberships and user memberships
-  await seedBanners();         // Seed all 5 types of banners      
+  // await seedBanners();         // Seed all 5 types of banners      
   // await seedRecipes();          // Seed recipes from CSV
   // await seedCoupons();          // Seed coupons from CSV
   // await updateAdmin();          // Update admin membership level
-
+  await updateBanner();          // Update banner
   
   console.log('\n✨ All seed functions completed successfully!');
 }

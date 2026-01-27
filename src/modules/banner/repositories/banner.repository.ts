@@ -343,6 +343,7 @@ export class BannerRepository {
    * Useful for frontend display
    */
   async findActiveByType(type: EBannerType): Promise<BannerEntity[]> {
+
     const banners = await this.prisma.banner.findMany({
       where: {
         type,
@@ -352,7 +353,11 @@ export class BannerRepository {
         displayOrder: 'asc',
       },
       include: {
-        product: true,
+        product: {
+          include: {
+            productReviews: true,
+          },
+        },
       },
     });
     

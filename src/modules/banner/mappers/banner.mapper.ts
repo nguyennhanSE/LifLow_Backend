@@ -1,11 +1,21 @@
-import { Banner, Prisma } from '@prisma/client';
+import { Banner, Prisma, ProductReviews } from '@prisma/client';
 import { BannerEntity } from '../entities/banner.entity';
 import { EBannerType, EBannerStatus } from '../enums/banner.enum';
-import { toProductEntity } from '../../product/mapper/product.mapper';
+import { toProductEntity, toProductEntityWithRelations, toProductReviewsEntityList } from '../../product/mapper/product.mapper';
 
 type BannerWithRelations = Prisma.BannerGetPayload<{
   include: {
     product: true;
+  };
+}>;
+
+type BannerWithProductAndReviews = Prisma.BannerGetPayload<{
+  include: {
+    product: {
+      include: {
+        productReviews: true;
+      };
+    };
   };
 }>;
 
@@ -46,16 +56,25 @@ export class BannerMapper {
    * @param prismaBanner - Prisma Banner model with optional Product relation
    * @returns BannerEntity instance with nested product
    */
-  static toEntityWithProduct(prismaBanner: BannerWithRelations): BannerEntity {
+  static toEntityWithProduct(prismaBanner: BannerWithRelations | BannerWithProductAndReviews): BannerEntity {
     const entity = this.toEntity(prismaBanner);
     
     // Map product if included
     if (prismaBanner.product) {
+      // Map base product
       entity.product = toProductEntity(prismaBanner.product);
+      
+      // Check if product has productReviews and add them
+      const productAny = prismaBanner.product as any;
+      const productReviews: ProductReviews[] | undefined | null = productAny.productReviews;
+      
+      if (productReviews !== undefined && productReviews !== null && Array.isArray(productReviews)) {
+        entity.product.productReviews = toProductReviewsEntityList(productReviews);
+      }
     } else {
       entity.product = null;
     }
-    
+
     return entity;
   }
 
