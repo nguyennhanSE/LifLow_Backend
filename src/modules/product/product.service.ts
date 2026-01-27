@@ -585,6 +585,7 @@ export class ProductService {
               await tx.productSpecialOffer.update({
                 where: { productId: id },
                 data: {
+                  status: false,
                   discountAmount: discountAmountToKeep,
                   specialPriceApplied: newSpecialPriceApplied,
                 },

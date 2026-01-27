@@ -2582,13 +2582,13 @@ async function main() {
   // await seedPoints();          // Import points from CSV
   // await seedCategories();      // Seed categories and update products
   // await seedMemberships();     // Seed memberships only
-  // await seedUserMemberships(); // Seed memberships and user memberships
+  await seedUserMemberships(); // Seed memberships and user memberships
   // await seedBanners();         // Seed all 5 types of banners      
   // await seedRecipes();          // Seed recipes from CSV
   // await seedCoupons();          // Seed coupons from CSV
   // await updateAdmin();          // Update admin membership level
   // await updateBanner();          // Update banner
-  await updateOrderGroup();          // Update order group
+  // await updateOrderGroup();          // Update order group
   
   
   console.log('\n✨ All seed functions completed successfully!');
