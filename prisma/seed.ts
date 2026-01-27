@@ -1,6 +1,6 @@
 import { CategoriesController } from './../src/modules/categories/categories.controller';
 import { catchError } from 'rxjs';
-import { PrismaClient, CouponType } from '@prisma/client';
+import { PrismaClient, CouponType, OrderSituation } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
@@ -2556,6 +2556,20 @@ async function updateBanner() {
     });
   }
 }
+
+async function updateOrderGroup () {
+  const orderGroups = await prisma.orderGroup.findMany({
+    where: {
+      situation: OrderSituation.ORDER_PAYMENT_PENDING,
+    },
+  });
+  for (const orderGroup of orderGroups) {
+    await prisma.orderGroup.update({
+      where: { orderGroupNumber: orderGroup.orderGroupNumber },
+      data: { situation: OrderSituation.ORDER_PAYMENT_COMPLETED },
+    });
+  }
+}
 async function main() {
   console.log('🚀 Starting complete database seeding process...\n');
   // return Promise.resolve().then(() => {
@@ -2573,7 +2587,9 @@ async function main() {
   // await seedRecipes();          // Seed recipes from CSV
   // await seedCoupons();          // Seed coupons from CSV
   // await updateAdmin();          // Update admin membership level
-  await updateBanner();          // Update banner
+  // await updateBanner();          // Update banner
+  await updateOrderGroup();          // Update order group
+  
   
   console.log('\n✨ All seed functions completed successfully!');
 }

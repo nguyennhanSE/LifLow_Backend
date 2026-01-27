@@ -1057,7 +1057,7 @@ export class ProductService {
       limit,
       sortBy,
       sortOrder,
-      includeProductReview: query.includeProductReview,
+      includeProductReview: query.includeProductReview ?? true,
     };
 
     // Get products and count

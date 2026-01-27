@@ -433,7 +433,6 @@ export class OrdersService {
     try {
       const statuses = {
         paymentCompleted: EOrderSituation.ORDER_PAYMENT_COMPLETED,
-        preparingProduct: EOrderSituation.ORDER_IN_PREPARE,
         inTransit: EOrderSituation.ORDER_BEING_SHIPPED,
         invoiceTransmitted: EOrderSituation.ORDER_SHIPPED,
         cancelled: EOrderSituation.ORDER_CANCELLED,
@@ -1252,7 +1251,6 @@ export class OrdersService {
       const statuses = {
         paymentPending: EOrderSituation.ORDER_PAYMENT_PENDING,
         paymentCompleted: EOrderSituation.ORDER_PAYMENT_COMPLETED,
-        preparingProduct: EOrderSituation.ORDER_IN_PREPARE,
         inTransit: EOrderSituation.ORDER_BEING_SHIPPED,
         invoiceTransmitted: EOrderSituation.ORDER_SHIPPED,
         cancelled: EOrderSituation.ORDER_CANCELLED,
