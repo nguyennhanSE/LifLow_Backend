@@ -565,32 +565,14 @@ export class ProductService {
             });
           }
         } else {
-          // If no hasSpecialOfferData
+          // If no hasSpecialOfferData — user effectively turns off special offer
           if (existingSpecialOffer) {
-            // If salePrice is updated but specialOffer payload is omitted,
-            // keep existing discount delta and recompute specialPriceApplied.
-            const incomingSalePrice = (productData as any).salePrice as number | undefined | null;
-            const salePriceWasUpdated = incomingSalePrice !== undefined && incomingSalePrice !== null;
-            if (salePriceWasUpdated) {
-              const inferredExistingDiscountAmount =
-                existingSpecialOffer.discountAmount ??
-                (existingProduct.salePrice !== undefined &&
-                existingProduct.salePrice !== null &&
-                existingSpecialOffer.specialPriceApplied !== undefined &&
-                existingSpecialOffer.specialPriceApplied !== null
-                  ? Math.max(0, existingProduct.salePrice - existingSpecialOffer.specialPriceApplied)
-                  : null);
-              const discountAmountToKeep = inferredExistingDiscountAmount ?? 0;
-              const newSpecialPriceApplied = Math.max(0, incomingSalePrice - discountAmountToKeep);
-              await tx.productSpecialOffer.update({
-                where: { productId: id },
-                data: {
-                  status: false,
-                  discountAmount: discountAmountToKeep,
-                  specialPriceApplied: newSpecialPriceApplied,
-                },
-              });
-            }
+            // Only set status to false; keep specialPriceApplied and discountAmount unchanged.
+            // product.salePrice will be set to origin (specialPriceApplied + discountAmount) in sync below.
+            await tx.productSpecialOffer.update({
+              where: { productId: id },
+              data: { status: false },
+            });
           } else {
             // If no existing special offer and no data, create with status = false
             await tx.productSpecialOffer.create({
@@ -604,6 +586,22 @@ export class ProductService {
               },
             });
           }
+        }
+
+        // Đồng bộ product.salePrice với special offer:
+        // - Khi status = true: salePrice = specialPriceApplied (giá khuyến mãi).
+        // - Khi status = false: salePrice = origin = specialPriceApplied + discountAmount (giá gốc).
+        const currentOffer = await tx.productSpecialOffer.findUnique({
+          where: { productId: id },
+        });
+        if (currentOffer) {
+          const salePriceToSet = currentOffer.status
+            ? currentOffer.specialPriceApplied
+            : (currentOffer.specialPriceApplied ?? 0) + (currentOffer.discountAmount ?? 0);
+          await tx.product.update({
+            where: { id },
+            data: { salePrice: salePriceToSet },
+          });
         }
 
         // Upload image registration thumbnail if provided
