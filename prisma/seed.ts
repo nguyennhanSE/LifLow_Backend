@@ -2557,19 +2557,19 @@ async function updateBanner() {
   }
 }
 
-async function updateOrderGroup () {
-  const orderGroups = await prisma.orderGroup.findMany({
-    where: {
-      situation: OrderSituation.ORDER_IN_PREPARE,
-    },
-  });
-  for (const orderGroup of orderGroups) {
-    await prisma.orderGroup.update({
-      where: { orderGroupNumber: orderGroup.orderGroupNumber },
-      data: { situation: OrderSituation.ORDER_PAYMENT_COMPLETED },
-    });
-  }
-}
+// async function updateOrderGroup () {
+//   const orderGroups = await prisma.orderGroup.findMany({
+//     where: {
+//       situation: OrderSituation.ORDER_IN_PREPARE,
+//     },
+//   });
+//   for (const orderGroup of orderGroups) {
+//     await prisma.orderGroup.update({
+//       where: { orderGroupNumber: orderGroup.orderGroupNumber },
+//       data: { situation: OrderSituation.ORDER_PAYMENT_COMPLETED },
+//     });
+//   }
+// }
 async function main() {
   console.log('🚀 Starting complete database seeding process...\n');
   return Promise.resolve().then(() => {
