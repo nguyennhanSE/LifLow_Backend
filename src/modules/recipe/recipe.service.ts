@@ -594,9 +594,24 @@ export class RecipeService {
           include: { author: true },
         });
 
-        // Get current available points
+        // Get current available points and compute new balance
         const currentPoints = existingRecipe.author?.availablePoints || 0;
-        const newPoints = currentPoints + 500;
+        const pointsIncrease = 500;
+        const newPoints = currentPoints + pointsIncrease;
+
+        // Create point record for recipe approval reward
+        const d = new Date();
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        await tx.point.create({
+          data: {
+            date: today,
+            userId: existingRecipe.authorId,
+            pointsType: 'REWARD',
+            availablePointsIncrease: pointsIncrease,
+            availablePointsBalance: newPoints,
+            content: 'Recipe approval reward for recipe' + existingRecipe.title, // VarChar(50)
+          },
+        });
 
         // Update user's available points
         await tx.user.update({
