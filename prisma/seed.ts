@@ -2572,9 +2572,9 @@ async function updateOrderGroup () {
 }
 async function main() {
   console.log('🚀 Starting complete database seeding process...\n');
-  // return Promise.resolve().then(() => {
-  //   console.log('Promise resolved');
-  // })
+  return Promise.resolve().then(() => {
+    console.log('Promise resolved');
+  })
   
   // await seedUsers();           // Import users and clear all data
   // await seedProducts();        // Import products from CSV
@@ -2588,7 +2588,7 @@ async function main() {
   // await seedCoupons();          // Seed coupons from CSV
   // await updateAdmin();          // Update admin membership level
   // await updateBanner();          // Update banner
-  await updateOrderGroup();          // Update order group
+  // await updateOrderGroup();          // Update order group
   
   
   console.log('\n✨ All seed functions completed successfully!');
