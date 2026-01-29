@@ -14,7 +14,7 @@ export class CouponHistoryCronjobService {
    * Cron: phát hành coupon tự động theo targetGrades (hasBeenIssued = false, isAutoIssue = true).
    * startDate/endDate chỉ là thời hạn sử dụng coupon, không dùng để deactivate.
    */
-  @Cron(CronExpression.EVERY_MINUTE, {
+  @Cron(CronExpression.EVERY_10_SECONDS, {
     name: 'auto-issue-coupon-histories',
     timeZone: 'Asia/Seoul',
   })
@@ -39,27 +39,35 @@ export class CouponHistoryCronjobService {
 
     let couponsProcessed = 0;
     let historiesCreated = 0;
-    let errors = 0;
+    const errors = 0;
 
     try {
-      const autoIssueCoupons = await this.prisma.coupon.findMany({
-        where: {
-          canAutoIssue: true,
-          hasBeenIssued: false,
-          isAutoIssue: true,
-        },
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          targetGrades: true,
-        },
-      });
+      await this.prisma.$transaction(async (tx) => {
+        // Lock coupon rows first so concurrent cron runs don't process the same coupons (avoid duplicate coupon-history)
+        await tx.$queryRaw`
+          SELECT id FROM coupons
+          WHERE is_active = true AND can_auto_issue = true AND has_been_issued = false AND is_auto_issue = true
+          FOR UPDATE
+        `;
 
-      this.logger.log(`Found ${autoIssueCoupons.length} auto-issue coupon(s) to process`);
+        const autoIssueCoupons = await tx.coupon.findMany({
+          where: {
+            isActive: true,
+            canAutoIssue: true,
+            hasBeenIssued: false,
+            isAutoIssue: true,
+          },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            targetGrades: true,
+          },
+        });
 
-      for (const coupon of autoIssueCoupons) {
-        try {
+        this.logger.log(`Found ${autoIssueCoupons.length} auto-issue coupon(s) to process`);
+
+        for (const coupon of autoIssueCoupons) {
           const targetGrades = coupon.targetGrades;
           const validGrades: string[] = Object.values(EMembershipLevel);
           const gradesToMatch =
@@ -74,7 +82,7 @@ export class CouponHistoryCronjobService {
             continue;
           }
 
-          const users = await this.prisma.user.findMany({
+          const users = await tx.user.findMany({
             where:
               gradesToMatch.length > 0
                 ? { membershipLevel: { in: gradesToMatch, not: null } }
@@ -88,7 +96,7 @@ export class CouponHistoryCronjobService {
             continue;
           }
 
-          const existingHistories = await this.prisma.couponHistory.findMany({
+          const existingHistories = await tx.couponHistory.findMany({
             where: {
               couponId: coupon.id,
               status: CouponHistoryStatus.ISSUED,
@@ -103,16 +111,18 @@ export class CouponHistoryCronjobService {
             if (!userIdToHistoryId.has(h.userId)) userIdToHistoryId.set(h.userId, h.id);
           }
           const existingIdsToUpdate = Array.from(userIdToHistoryId.values());
-          const userIdsToCreate = users.map((u) => u.id).filter((id) => !userIdToHistoryId.has(id));
+          // Deduplicate: mỗi userId chỉ tạo tối đa 1 CouponHistory (tránh trùng do race hoặc data)
+          const uniqueUserIds = [...new Set(users.map((u) => u.id))];
+          const userIdsToCreate = uniqueUserIds.filter((id) => !userIdToHistoryId.has(id));
 
           if (existingIdsToUpdate.length > 0) {
-            await this.prisma.couponHistory.updateMany({
+            await tx.couponHistory.updateMany({
               where: { id: { in: existingIdsToUpdate } },
               data: { quantity: { increment: 1 } },
             });
           }
           if (userIdsToCreate.length > 0) {
-            await this.prisma.couponHistory.createMany({
+            await tx.couponHistory.createMany({
               data: userIdsToCreate.map((userId) => ({
                 couponId: coupon.id,
                 userId,
@@ -122,7 +132,7 @@ export class CouponHistoryCronjobService {
             });
           }
 
-          await this.prisma.coupon.update({
+          await tx.coupon.update({
             where: { id: coupon.id },
             data: { hasBeenIssued: true },
           });
@@ -132,14 +142,8 @@ export class CouponHistoryCronjobService {
           this.logger.debug(
             `Coupon ${coupon.code} (${coupon.name}): ${userIdsToCreate.length} new, ${existingIdsToUpdate.length} quantity+1`,
           );
-        } catch (error) {
-          this.logger.error(
-            `Error issuing coupon ${coupon.id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            error instanceof Error ? error.stack : undefined,
-          );
-          errors++;
         }
-      }
+      });
 
       this.logger.log(
         `Auto-issue completed. Coupons: ${couponsProcessed}, Histories created: ${historiesCreated}, Errors: ${errors}`,

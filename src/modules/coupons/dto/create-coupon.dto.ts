@@ -15,8 +15,9 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CouponType, CouponTargetGrade } from '../enums/coupon.enum';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { IsBeforeEndDate } from '../validators/date-range.validator';
+import { IsAutoIssueDayOfMonth } from '../validators/auto-issue-day.validator';
 
 export class CreateCouponDto {
   @ApiProperty({
@@ -133,24 +134,39 @@ export class CreateCouponDto {
   isAutoIssue?: boolean;
 
   @ApiPropertyOptional({
-    // Date()
-    description: 'Day of month to auto-issue (1-31). Required if isAutoIssue is true',
-    example: new Date('2025-12-18').toISOString(),
+    description:
+      'Day of month to auto-issue: ISO 8601 date string, or number/string 1-31 (e.g. 15, "01", "15"). Required if isAutoIssue is true',
+    example: new Date('2025-01-15').toISOString(),
   })
-  @ValidateIf((o) => o.isAutoIssue === true)
-  @IsDateString()
-  @IsNotEmpty({ message: 'autoIssueDayOfMonth is required when isAutoIssue is true' })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value == null || value === '') return value;
+    let day: number | undefined;
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 31) {
+      day = value;
+    } else if (typeof value === 'string') {
+      const parsed = parseInt(value, 10);
+      if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 31) {
+        day = parsed;
+      }
+    }
+    if (day !== undefined) {
+      return new Date(2020, 0, day).toISOString();
+    }
+    return value;
+  })
+  @IsAutoIssueDayOfMonth()
   autoIssueDayOfMonth?: string;
 
   @ApiPropertyOptional({
     description: 'Target membership grades for auto-issue. Required if isAutoIssue is true',
     enum: CouponTargetGrade,
     isArray: true,
-    example: [CouponTargetGrade.VIP, CouponTargetGrade.VVIP],
+    example: [CouponTargetGrade.LV1, CouponTargetGrade.LV2, CouponTargetGrade.LV3, CouponTargetGrade.LV4, CouponTargetGrade.LV5],
   })
   @ValidateIf((o) => o.isAutoIssue === true)
   @IsArray()
-  @ArrayNotEmpty({ message: 'targetGrades is required when isAutoIssue is true' })
+  @IsOptional()
   @IsEnum(CouponTargetGrade, { each: true })
-  targetGrades?: CouponTargetGrade[];
+  targetGrades?: CouponTargetGrade[] | null;
 }

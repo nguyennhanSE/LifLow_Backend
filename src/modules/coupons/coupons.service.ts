@@ -163,15 +163,15 @@ export class CouponsService {
       : existingCoupon.isAutoIssue;
 
     if (isAutoIssue) {
-      const autoIssueDayOfMonth = updateCouponDto.autoIssueDayOfMonth || existingCoupon.autoIssueDayOfMonth;
-      const targetGrades = updateCouponDto.targetGrades || existingCoupon.targetGrades;
+      if (!existingCoupon.canAutoIssue) {
+        throw new BadRequestException('This coupon is already auto-issued');
+      }
+      const targetGrades = updateCouponDto.targetGrades ?? existingCoupon.targetGrades;
 
-      if (!autoIssueDayOfMonth) {
-        throw new BadRequestException('autoIssueDayOfMonth is required when isAutoIssue is true');
-      }
-      if (!targetGrades || targetGrades.length === 0) {
-        throw new BadRequestException('targetGrades is required when isAutoIssue is true');
-      }
+      // if (!autoIssueDayOfMonth) {
+      //   throw new BadRequestException('autoIssueDayOfMonth is required when isAutoIssue is true');
+      // }
+      await this.couponHistoryService.issueCouponToUsersByTargetGrades(id, targetGrades);
     }
 
     return this.couponRepository.update(id, updateCouponDto);

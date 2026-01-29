@@ -67,13 +67,22 @@ export class CouponHistoryService {
           histories: [],
         };
       }
+      if (coupon && coupon.isActive){
       const histories = await this.couponHistoryRepository.createBulk(couponId, userIds, undefined);
       return {
         message: `Successfully issued ${histories.length} coupon(s) to all users`,
         count: histories.length,
         coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
         histories,
-      };
+      };}
+      else {
+        return {
+          message: 'Coupon is not active',
+          count: 0,
+          coupon: null,
+          histories: [],
+        };
+      }
     }
 
     const coupon = await this.validateCouponForIssuance(couponId);

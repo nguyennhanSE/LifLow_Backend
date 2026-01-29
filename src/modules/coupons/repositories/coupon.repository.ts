@@ -207,7 +207,7 @@ export class CouponRepository {
       data.autoIssueDayOfMonth = updateCouponDto.autoIssueDayOfMonth;
     }
     if (updateCouponDto.targetGrades !== undefined) {
-      data.targetGrades = updateCouponDto.targetGrades;
+      data.targetGrades = updateCouponDto.targetGrades || [];
     }
 
     const coupon = await this.prisma.coupon.update({
