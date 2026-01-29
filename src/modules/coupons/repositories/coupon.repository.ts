@@ -27,6 +27,7 @@ export class CouponRepository {
       startDate: new Date(createCouponDto.startDate),
       endDate: new Date(createCouponDto.endDate),
       isActive: createCouponDto.isActive !== undefined ? createCouponDto.isActive : true,
+      canAutoIssue: true,
       isAutoIssue: createCouponDto.isAutoIssue || false,
       autoIssueDayOfMonth: createCouponDto.autoIssueDayOfMonth,
       targetGrades: createCouponDto.targetGrades || [],

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
 import { QueryCouponDto } from './dto/query-coupon.dto';
@@ -6,11 +6,17 @@ import { CouponRepository } from './repositories/coupon.repository';
 import { CouponHistoryStatus, CouponType } from './enums/coupon.enum';
 import { CouponEntity } from './entities/coupon.entity';
 import { AppLogger } from 'src/libs/logger/logger.service';
-import { getFirstDateOfThisMonth } from './helpers/coupon.helper';
+import { getFirstDateOfNextMonth, getFirstDateOfThisMonth } from './helpers/coupon.helper';
+import { CouponHistoryService } from '../coupon-history/coupon-history.service';
 
 @Injectable()
 export class CouponsService {
-  constructor(private readonly couponRepository: CouponRepository, private readonly logger: AppLogger) {}
+  constructor(
+    private readonly couponRepository: CouponRepository,
+    private readonly logger: AppLogger,
+    @Inject(forwardRef(() => CouponHistoryService))
+    private readonly couponHistoryService: CouponHistoryService,
+  ) {}
 
   /**
    * Create a new coupon
@@ -50,7 +56,7 @@ export class CouponsService {
     if (createCouponDto.isAutoIssue) {
       if (!createCouponDto.autoIssueDayOfMonth) {
         this.logger.warn('autoIssueDayOfMonth is required when isAutoIssue is true');
-        const autoIssueDayOfMonth = getFirstDateOfThisMonth();
+        const autoIssueDayOfMonth = getFirstDateOfNextMonth();
         createCouponDto.autoIssueDayOfMonth = autoIssueDayOfMonth.toISOString();
       }
       if (!createCouponDto.targetGrades || createCouponDto.targetGrades.length === 0) {
@@ -58,7 +64,17 @@ export class CouponsService {
       }
     }
 
-    return this.couponRepository.create(createCouponDto);
+    const created = await this.couponRepository.create(createCouponDto);
+
+    // Khi không isAutoIssue: dùng targetGrades để tạo couponHistory cho user có membershipLevel trong targetGrades; targetGrades rỗng thì issue cho tất cả user
+    if (!created.isAutoIssue) {
+      await this.couponHistoryService.issueCouponToUsersByTargetGrades(
+        created.id,
+        created.targetGrades?.length ? (created.targetGrades as string[]) : undefined,
+      );
+    }
+
+    return created;
   }
 
   /**

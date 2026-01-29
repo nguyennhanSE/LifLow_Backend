@@ -345,7 +345,7 @@ export class UserRepository {
     } else {
       orderBy = { createdAt: sort };
     }
-
+    orderBy = { totalPurchaseAmount: 'desc' };
     // Calculate skip
     const skip = (page - 1) * limit;
 
@@ -822,80 +822,6 @@ export class UserRepository {
       };
     } catch (error) {
       console.error('Prisma error in getUserOrders:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get user coupons (available and used)
-   */
-  async getUserCoupons(userId: string): Promise<{
-    availableCoupons: any[];
-    usedCoupons: any[];
-  }> {
-    try {
-      // Get user's membership to check target grades
-      const userMembership = await this.prisma.userMembership.findFirst({
-        where: {
-          userId,
-          // startDate: { lte: new Date() },
-          // endDate: { gte: new Date() },
-        },
-        include: {
-          membership: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      const membershipName = userMembership?.membershipName || '';
-
-      // Get available coupons (active, not expired, and target grades match)
-      const now = new Date();
-      
-      // First, let's get ALL active coupons to debug
-      const allActiveCoupons = await this.prisma.coupon.findMany({
-        where: { isActive: true },
-      });
-      console.log('🔍 Debug - All active coupons:', JSON.stringify(allActiveCoupons, null, 2));
-      
-      const availableCoupons = await this.prisma.coupon.findMany({
-        where: {
-          isActive: true,
-          // startDate: { lte: now },
-          // endDate: { gte: now },
-          OR: [
-            { targetGrades: { isEmpty: true } }, // No target grade restriction
-            { targetGrades: { has: membershipName } }, // Matches user's membership
-          ],
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      console.log('🔍 Debug - Available coupons after filter:', JSON.stringify(availableCoupons, null, 2));
-
-      // Get used coupons from coupon history
-      const usedCouponHistories = await this.prisma.couponHistory.findMany({
-        where: {
-          userId,
-          status: 'USED',
-        },
-        include: {
-          coupon: true,
-        },
-        orderBy: { usedAt: 'desc' },
-      });
-
-      const usedCoupons = usedCouponHistories.map(history => ({
-        ...history.coupon,
-        usedAt: history.usedAt,
-        discountAppliedAmount: history.discountAppliedAmount,
-      }));
-
-      return {
-        availableCoupons,
-        usedCoupons,
-      };
-    } catch (error) {
-      console.error('Prisma error in getUserCoupons:', error);
       throw error;
     }
   }

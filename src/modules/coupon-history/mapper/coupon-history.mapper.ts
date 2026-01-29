@@ -21,6 +21,7 @@ export function toCouponHistoryEntity(history: CouponHistory): CouponHistoryEnti
     couponId: history.couponId,
     userId: history.userId,
     orderId: history.orderId,
+    quantity: history.quantity,
     status: history.status as CouponHistoryStatus,
     issuedAt: history.issuedAt,
     usedAt: history.usedAt,

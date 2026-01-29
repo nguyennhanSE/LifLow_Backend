@@ -13,6 +13,7 @@ export class CouponEntity {
   startDate!: Date;
   endDate!: Date;
   isActive!: boolean;
+  canAutoIssue!: boolean;
   isAutoIssue!: boolean;
   autoIssueDayOfMonth?: Date | null;
   targetGrades!: CouponTargetGrade[];

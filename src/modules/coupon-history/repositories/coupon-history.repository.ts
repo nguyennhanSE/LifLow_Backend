@@ -22,7 +22,6 @@ export class CouponHistoryRepository {
     expirationDate?: Date,
   ): Promise<CouponHistoryEntity[]> {
     const now = new Date();
-    
     const data: Prisma.CouponHistoryCreateManyInput[] = userIds.map((userId) => ({
       couponId,
       userId,
@@ -175,7 +174,7 @@ export class CouponHistoryRepository {
     }
 
     if (status) {
-      where.status = status;
+      where.status = status as CouponHistoryStatus;
     }
 
     if (issuedAtFrom || issuedAtTo) {
@@ -243,15 +242,18 @@ export class CouponHistoryRepository {
   }
 
   /**
-   * Check if coupon history exists and is in ISSUED status
+   * Get user IDs by membership levels for coupon issuance.
+   * @param membershipLevels - If null or empty, returns all user IDs; otherwise users whose membershipLevel is in this array.
    */
-  async isIssued(id: string): Promise<boolean> {
-    const history = await this.prisma.couponHistory.findUnique({
-      where: { id },
-      select: { status: true },
+  async findUserIdsByMembershipLevels(membershipLevels: string[] | null): Promise<string[]> {
+    const users = await this.prisma.user.findMany({
+      where:
+        membershipLevels && membershipLevels.length > 0
+          ? { membershipLevel: { in: membershipLevels, not: null } }
+          : {},
+      select: { id: true },
     });
-
-    return history?.status === CouponHistoryStatus.ISSUED;
+    return users.map((u) => u.id);
   }
 
   /**

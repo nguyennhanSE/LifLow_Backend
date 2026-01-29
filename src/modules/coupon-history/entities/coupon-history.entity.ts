@@ -5,6 +5,7 @@ export class CouponHistoryEntity {
   couponId!: string;
   userId!: string;
   orderId?: string | null;
+  quantity!: number;
   status!: CouponHistoryStatus;
   issuedAt!: Date;
   usedAt?: Date | null;

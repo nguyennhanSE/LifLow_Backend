@@ -658,18 +658,15 @@ model RecipeComments {
 enum CouponType {
   PERCENT // 정률 할인 (Discount rate %)
   AMOUNT  // 정액 할인 (Discount amount)
+  FREE_SHIPPING // 무료 배송 (Free shipping)
 }
 
-// enum CouponTargetGrade {
-//   VIP  // VIP
-//   VVIP // VVIP
-// }
 
 enum CouponHistoryStatus {
-  ISSUED    // 발급됨
-  USED      // 사용됨
-  EXPIRED   // 만료됨
-  CANCELLED // 취소됨
+  ISSUED     // 발급됨
+  USED       // 사용됨
+  EXPIRED    // 만료됨
+  CANCELLED  // 취소됨
 }
 
 model Coupon {
@@ -678,7 +675,7 @@ model Coupon {
   name String @db.VarChar(255) @map("name") // 쿠폰명
   code String @unique @db.VarChar(100) @map("code") // 쿠폰코드
 
-  type CouponType @map("type") // 쿠폰 타입
+  type CouponType @map("type") // 쿠폰 타입'
 
   // 할인 정보 (type에 따라 하나만 사용)
   discountRate Int? @map("discount_rate") // 할인율(%) - 정률
@@ -695,8 +692,10 @@ model Coupon {
   isActive Boolean @default(true) @map("is_active") // 활성화 여부
 
   // 자동 발급 설정 (등급별, 매월 특정일)
+  canAutoIssue Boolean @default(false) @map("can_auto_issue") // 자동 발급 가능 여부
   isAutoIssue Boolean @default(false) @map("is_auto_issue") // 자동 발급 여부
-  autoIssueDayOfMonth DateTime? @map("auto_issue_day_of_month") // 매월 n일 (default: 1)
+  autoIssueDayOfMonth DateTime?  @map("auto_issue_day_of_month") // 매월 n일 (default: 1)
+  hasBeenIssued Boolean @default(false) @map("has_been_issued") // 발급 여부
   targetGrades String[] @default([]) @map("target_grades") // 발급 대상 등급 (VIP, VVIP)
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -717,6 +716,7 @@ model CouponHistory {
 
   couponId String @map("coupon_id")
   userId String @map("user_id")
+  quantity Int @default(1) @map("quantity") // 발급 수량
 
   // Optional link to an order when used
   orderId String? @map("order_id")
@@ -747,6 +747,7 @@ model CouponHistory {
   @@index([issuedAt])
   @@map("coupon_histories")
 }
+
 // Banner
 enum BannerType {
   MAIN_PRODUCTS      // Main Products (메인 상품)

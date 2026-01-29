@@ -1,6 +1,7 @@
 export enum CouponType {
     PERCENT = 'PERCENT', // 정률 할인 (Discount rate %)
     AMOUNT = 'AMOUNT',  // 정액 할인 (Discount amount)
+    FREE_SHIPPING = 'FREE_SHIPPING', // 무료 배송 (Free shipping)
   }
   
 export enum CouponTargetGrade {

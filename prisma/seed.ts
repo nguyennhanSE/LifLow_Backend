@@ -12,7 +12,7 @@ import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 
 // Load environment variables
-const NODE_ENV = process.env.NODE_ENV || 'production';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 console.log('NODE_ENV', NODE_ENV);
 const envFileName = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 const envFilePath = path.resolve(__dirname, '..', envFileName);
@@ -2383,7 +2383,9 @@ async function seedTestUser() {
 
 async function seedCoupons() {
   console.log('🌱 Starting coupon seed...');
-  
+
+  await prisma.coupon.deleteMany();
+  return;
   const now = new Date();
   const oneMonthLater = new Date(now);
   oneMonthLater.setMonth(now.getMonth() + 1);
@@ -2571,10 +2573,10 @@ async function updateBanner() {
 //   }
 // }
 async function main() {
-  console.log('🚀 Starting complete database seeding process...\n');
-  return Promise.resolve().then(() => {
-    console.log('Promise resolved');
-  })
+  // console.log('🚀 Starting complete database seeding process...\n');
+  // return Promise.resolve().then(() => {
+  //   console.log('Promise resolved');
+  // })
   
   // await seedUsers();           // Import users and clear all data
   // await seedProducts();        // Import products from CSV
@@ -2585,7 +2587,7 @@ async function main() {
   // await seedUserMemberships(); // Seed memberships and user memberships
   // await seedBanners();         // Seed all 5 types of banners      
   // await seedRecipes();          // Seed recipes from CSV
-  // await seedCoupons();          // Seed coupons from CSV
+  await seedCoupons();          // Seed coupons from CSV
   // await updateAdmin();          // Update admin membership level
   // await updateBanner();          // Update banner
   // await updateOrderGroup();          // Update order group

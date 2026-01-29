@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { CouponHistoryRepository } from './repositories/coupon-history.repository';
 import { CouponsService } from '../coupons/coupons.service';
 import { IssueCouponDto } from './dto/issue-coupon.dto';
@@ -22,8 +22,74 @@ import { CouponInfo } from './entities/coupon-history.entity';
 export class CouponHistoryService {
   constructor(
     private readonly couponHistoryRepository: CouponHistoryRepository,
+    @Inject(forwardRef(() => CouponsService))
     private readonly couponsService: CouponsService,
   ) {}
+
+  /**
+   * Issue coupon to users by target grades (membership levels).
+   * - targetGrades null or empty → issue to all users, bỏ validate và expirationDateTime.
+   * - targetGrades có giá trị → issue to users whose membershipLevel in targetGrades; có validate và dùng coupon.endDate.
+   */
+  async issueCouponToUsersByTargetGrades(
+    couponId: string,
+    targetGrades?: string[] | null,
+  ): Promise<{
+    message: string;
+    count: number;
+    coupon: { id: string; name: string; code: string; type: string } | null;
+    histories: any[];
+  }> {
+    const isIssueToAll = !targetGrades || targetGrades.length === 0;
+    const userIds = await this.couponHistoryRepository.findUserIdsByMembershipLevels(
+      isIssueToAll ? null : targetGrades,
+    );
+
+    if (userIds.length === 0) {
+      const coupon = await this.couponsService.findOne(couponId).catch(() => null);
+      return {
+        message: 'No users matching target grades; no coupon histories created',
+        count: 0,
+        coupon: coupon
+          ? { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type }
+          : null,
+        histories: [],
+      };
+    }
+
+    if (isIssueToAll) {
+      const coupon = await this.couponsService.findOne(couponId).catch(() => null);
+      if (!coupon) {
+        return {
+          message: 'Coupon not found',
+          count: 0,
+          coupon: null,
+          histories: [],
+        };
+      }
+      const histories = await this.couponHistoryRepository.createBulk(couponId, userIds, undefined);
+      return {
+        message: `Successfully issued ${histories.length} coupon(s) to all users`,
+        count: histories.length,
+        coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
+        histories,
+      };
+    }
+
+    const coupon = await this.validateCouponForIssuance(couponId);
+    // await this.checkDuplicateIssuance(couponId, userIds);
+    const histories = await this.couponHistoryRepository.createBulk(
+      couponId,
+      userIds,
+      undefined,
+    );
+    return {
+      message: `Successfully issued ${histories.length} coupon(s)`,
+      count: histories.length,
+      coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
+      histories,
+    };
+  }
 
   /**
    * Issue coupon to multiple users
@@ -160,12 +226,6 @@ export class CouponHistoryService {
     // Validate coupon is active
     if (!coupon.isActive) {
       throw new CouponInactiveException(coupon.code);
-    }
-
-    // Validate current date is within coupon validity period
-    const now = new Date();
-    if (now < coupon.startDate || now > coupon.endDate) {
-      throw new CouponExpiredException(coupon.code);
     }
 
     return coupon;

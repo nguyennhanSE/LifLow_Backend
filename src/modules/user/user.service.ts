@@ -7,12 +7,14 @@ import { ERoleName } from '../roles/enums/role.enum';
 import * as bcrypt from 'bcrypt';
 import { UserEmailService } from '../email/email.service';
 import { SendEmailDto } from '../email/dto/email.dto';
+import { CouponHistoryService } from '../coupon-history/coupon-history.service';
 
 @Injectable()
 export class UserService {
   constructor(
     private readonly userRepository: UserRepository,
-    private readonly emailService: UserEmailService
+    private readonly emailService: UserEmailService,
+    private readonly couponHistoryService: CouponHistoryService,
   ) {}
 
   async countNewSignupsToday(): Promise<{ date: string; count: number }> {
@@ -224,18 +226,22 @@ export class UserService {
   }
 
   /**
-   * Get user coupons (available and used)
+   * Get user coupons from CouponHistory: available (issued, not expired) and used.
    */
   async getUserCoupons(userId: string): Promise<{
     availableCoupons: any[];
     usedCoupons: any[];
+    statistics?: { totalUsed: number; totalSavings: number };
   }> {
-    try {
-      return await this.userRepository.getUserCoupons(userId);
-    } catch (error) {
-      console.error('Error in getUserCoupons:', error);
-      throw error;
-    }
+    const [availableCoupons, usedResult] = await Promise.all([
+      this.couponHistoryService.getUserAvailableCoupons(userId),
+      this.couponHistoryService.getUserUsedCoupons(userId),
+    ]);
+    return {
+      availableCoupons,
+      usedCoupons: usedResult.coupons,
+      statistics: usedResult.statistics,
+    };
   }
 
   /**
