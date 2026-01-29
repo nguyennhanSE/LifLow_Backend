@@ -14,7 +14,7 @@ export class CouponHistoryCronjobService {
    * Cron: phát hành coupon tự động theo targetGrades (hasBeenIssued = false, isAutoIssue = true).
    * startDate/endDate chỉ là thời hạn sử dụng coupon, không dùng để deactivate.
    */
-  @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT, {
+  @Cron(CronExpression.EVERY_MINUTE, {
     name: 'auto-issue-coupon-histories',
     timeZone: 'Asia/Seoul',
   })
