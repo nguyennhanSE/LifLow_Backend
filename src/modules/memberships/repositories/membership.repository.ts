@@ -377,6 +377,56 @@ export class MembershipRepository {
     }
   }
 
+  /**
+   * Upsert UserMembership by userId (for syncing when User.membershipLevel is updated).
+   * Creates or updates the single UserMembership record for the user.
+   */
+  async upsertUserMembership(
+    userId: string,
+    data: {
+      membershipId: string;
+      membershipName: string;
+      membershipDescription: string;
+      startDate: Date;
+      endDate: Date;
+      status?: string;
+    },
+  ): Promise<UserMembershipEntity> {
+    const now = new Date();
+    const userMembership = await this.prisma.userMembership.upsert({
+      where: { userId },
+      create: {
+        userId,
+        membershipId: data.membershipId,
+        membershipName: data.membershipName,
+        membershipDescription: data.membershipDescription,
+        status: data.status ?? 'normal',
+        startDate: data.startDate,
+        endDate: data.endDate,
+      },
+      update: {
+        membershipId: data.membershipId,
+        membershipName: data.membershipName,
+        membershipDescription: data.membershipDescription,
+        status: data.status ?? 'normal',
+        startDate: data.startDate,
+        endDate: data.endDate,
+        updatedAt: now,
+      },
+      include: {
+        membership: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+    return toUserMembershipEntity(userMembership);
+  }
+
   async updateUserMembership(
     userId: string,
     data: Prisma.UserMembershipUpdateInput

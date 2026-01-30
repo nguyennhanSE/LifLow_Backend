@@ -10,12 +10,9 @@ export class CouponEntity {
   minPurchaseAmount!: number;
   maxDiscountAmount?: number | null;
   imageUrl?: string | null;
-  startDate!: Date;
-  endDate!: Date;
+  isPermanent!: boolean;
   isActive!: boolean;
-  canAutoIssue!: boolean;
   isAutoIssue!: boolean;
-  hasBeenIssued!: boolean;
   autoIssueDayOfMonth?: Date | null;
   targetGrades!: CouponTargetGrade[];
   createdAt!: Date;

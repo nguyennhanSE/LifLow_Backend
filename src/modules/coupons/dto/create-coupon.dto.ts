@@ -100,20 +100,22 @@ export class CreateCouponDto {
   @IsString()
   imageUrl?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Coupon start date (ISO 8601 format)',
     example: '2024-01-01T00:00:00Z',
   })
+  @IsOptional()
   @IsDateString()
   @IsBeforeEndDate()
-  startDate: string;
+  startDate?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Coupon end date (ISO 8601 format). Must be after startDate',
     example: '2024-12-31T23:59:59Z',
   })
+  @IsOptional()
   @IsDateString()
-  endDate: string;
+  endDate?: string;
 
   @ApiPropertyOptional({
     description: 'Whether the coupon is active',

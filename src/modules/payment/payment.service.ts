@@ -139,7 +139,6 @@ export class PaymentService {
           where: {
             id: { in: couponIdsFromDto },
             isActive: true,
-            startDate: { lte: new Date() },
           },
         });
 
@@ -737,12 +736,12 @@ export class PaymentService {
         });
 
         // 2.13. Issue
-        await this.couponHistoryService.issueAfterPayment(userId);
         await this.pointService.issueAfterPayment(
           userId,
           savedPayment.totalAmount ?? 0,
           validatedDto.orderGroupNumber,
         );
+
 
         this.logger.log(`Deleted ${orderGroup.cartItemIds.length} cart items`);
         this.logger.log('Transaction completed successfully');

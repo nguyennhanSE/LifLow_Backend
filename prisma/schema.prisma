@@ -686,16 +686,14 @@ model Coupon {
 
   imageUrl String? @map("image_url") // 쿠폰 이미지 URL (optional)
 
-  startDate DateTime @map("start_date") // 시작일
-  endDate DateTime @map("end_date") // 종료일
+  isPermanent Boolean @default(false) @map("is_permanent") // 영구 쿠폰 여부
 
   isActive Boolean @default(true) @map("is_active") // 활성화 여부
 
   // 자동 발급 설정 (등급별, 매월 특정일)
-  canAutoIssue Boolean @default(false) @map("can_auto_issue") // 자동 발급 가능 여부
   isAutoIssue Boolean @default(false) @map("is_auto_issue") // 자동 발급 여부
   autoIssueDayOfMonth DateTime?  @map("auto_issue_day_of_month") // 매월 n일 (default: 1)
-  hasBeenIssued Boolean @default(false) @map("has_been_issued") // 발급 여부
+
   targetGrades String[] @default([]) @map("target_grades") // 발급 대상 등급 (VIP, VVIP)
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -706,7 +704,6 @@ model Coupon {
 
   @@index([code])
   @@index([isActive])
-  @@index([startDate, endDate])
   @@map("coupons")
 }
 
@@ -722,6 +719,9 @@ model CouponHistory {
   orderId String? @map("order_id")
 
   status CouponHistoryStatus @default(ISSUED) @map("status") // 상태
+
+  startDate DateTime? @map("start_date") // 시작일
+  endDate DateTime? @map("end_date") // 종료일
 
   issuedAt DateTime @default(now()) @map("issued_at") // 발급일
   usedAt DateTime? @map("used_at") // 사용일

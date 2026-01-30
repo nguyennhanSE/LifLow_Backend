@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { UserEmailService } from '../email/email.service';
 import { SendEmailDto } from '../email/dto/email.dto';
 import { CouponHistoryService } from '../coupon-history/coupon-history.service';
+import { MembershipsService } from '../memberships/memberships.service';
 
 @Injectable()
 export class UserService {
@@ -16,6 +17,7 @@ export class UserService {
     private readonly userRepository: UserRepository,
     private readonly emailService: UserEmailService,
     private readonly couponHistoryService: CouponHistoryService,
+    private readonly membershipsService: MembershipsService,
   ) {}
 
   async countNewSignupsToday(): Promise<{ date: string; count: number }> {
@@ -71,6 +73,13 @@ export class UserService {
       avatarImageUrl,
       membershipLevel: EMembershipLevel.LV1, // New users always start at LV1. 씨앗
     });
+
+    // Issue birthday coupon to new user (non-blocking; log and continue if it fails)
+    try {
+      await this.couponHistoryService.issueBirthdayCoupon(createdUser.id);
+    } catch (error) {
+      console.error('Error issuing birthday coupon to new user:', error);
+    }
 
     // Send welcome email
     try {
@@ -161,7 +170,14 @@ export class UserService {
       ...(hashedPassword && { password: hashedPassword }),
     };
 
-    return this.userRepository.updateUser(id, updateData);
+    const updatedUser = await this.userRepository.updateUser(id, updateData);
+
+    // When membershipLevel is updated, sync UserMembership table
+    if (updateUserDto.membershipLevel) {
+      await this.membershipsService.syncUserMembershipByLevel(id, updateUserDto.membershipLevel);
+    }
+
+    return updatedUser;
   }
 
   /**

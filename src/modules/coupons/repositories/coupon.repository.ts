@@ -24,10 +24,8 @@ export class CouponRepository {
       minPurchaseAmount: createCouponDto.minPurchaseAmount || 0,
       maxDiscountAmount: createCouponDto.maxDiscountAmount,
       imageUrl: createCouponDto.imageUrl,
-      startDate: new Date(createCouponDto.startDate),
-      endDate: new Date(createCouponDto.endDate),
+      isPermanent: false,
       isActive: createCouponDto.isActive !== undefined ? createCouponDto.isActive : true,
-      canAutoIssue: true,
       isAutoIssue: createCouponDto.isAutoIssue || false,
       autoIssueDayOfMonth: createCouponDto.autoIssueDayOfMonth,
       targetGrades: createCouponDto.targetGrades || [],
@@ -190,12 +188,6 @@ export class CouponRepository {
     }
     if (updateCouponDto.imageUrl !== undefined) {
       data.imageUrl = updateCouponDto.imageUrl;
-    }
-    if (updateCouponDto.startDate !== undefined) {
-      data.startDate = new Date(updateCouponDto.startDate);
-    }
-    if (updateCouponDto.endDate !== undefined) {
-      data.endDate = new Date(updateCouponDto.endDate);
     }
     if (updateCouponDto.isActive !== undefined) {
       data.isActive = updateCouponDto.isActive;

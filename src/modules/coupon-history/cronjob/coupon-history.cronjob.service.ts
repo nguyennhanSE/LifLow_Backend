@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { CouponHistoryStatus } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { EMembershipLevel } from '../../memberships/enums/membership.enum';
-import { getNextMonthDateRange } from '../../coupons/helpers/coupon.helper';
+import { getCurrentMonthDateRange } from '../../coupons/helpers/coupon.helper';
 
 @Injectable()
 export class CouponHistoryCronjobService {
@@ -15,7 +15,7 @@ export class CouponHistoryCronjobService {
    * Cron: phát hành coupon tự động theo targetGrades (hasBeenIssued = false, isAutoIssue = true).
    * startDate/endDate chỉ là thời hạn sử dụng coupon, không dùng để deactivate.
    */
-  @Cron(CronExpression.EVERY_HOUR, {
+  @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT, {
     name: 'auto-issue-coupon-histories',
     timeZone: 'Asia/Seoul',
   })
@@ -47,15 +47,16 @@ export class CouponHistoryCronjobService {
         // Lock coupon rows first so concurrent cron runs don't process the same coupons (avoid duplicate coupon-history)
         await tx.$queryRaw`
           SELECT id FROM coupons
-          WHERE is_active = true AND can_auto_issue = true AND has_been_issued = false AND is_auto_issue = true
+          WHERE (is_active = true AND is_auto_issue = true) OR (is_permanent = true AND is_active = true)
           FOR UPDATE
         `;
 
         const autoIssueCoupons = await tx.coupon.findMany({
           where: {
-            isActive: true,
-            canAutoIssue: true,
-            isAutoIssue: true,
+            OR: [
+              { isActive: true, isAutoIssue: true },
+              { isPermanent: true, isActive: true },
+            ],
           },
           select: {
             id: true,
@@ -115,7 +116,8 @@ export class CouponHistoryCronjobService {
           const uniqueUserIds = [...new Set(users.map((u) => u.id))];
           const userIdsToCreate = uniqueUserIds.filter((id) => !userIdToHistoryId.has(id));
 
-          const { startDate: nextStart, endDate: nextEnd } = getNextMonthDateRange();
+          // startDate = start of the month, endDate = end of the month (current month)
+          const { startDate: monthStart, endDate: monthEnd } = getCurrentMonthDateRange();
 
           if (existingIdsToUpdate.length > 0) {
             await tx.couponHistory.updateMany({
@@ -130,18 +132,11 @@ export class CouponHistoryCronjobService {
                 userId,
                 status: CouponHistoryStatus.ISSUED,
                 quantity: 1,
+                startDate: monthStart,
+                endDate: monthEnd,
               })),
             });
           }
-
-          await tx.coupon.update({
-            where: { id: coupon.id },
-            data: {
-              hasBeenIssued: true,
-              startDate: nextStart,
-              endDate: nextEnd,
-            },
-          });
 
           historiesCreated += userIdsToCreate.length;
           couponsProcessed++;

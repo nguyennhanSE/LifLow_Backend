@@ -27,8 +27,10 @@ export function toCouponReturnEntity(history: CouponHistoryWithRelations): Coupo
     discountAmount: history.coupon?.discountAmount ?? null,
     maxDiscountAmount: history.coupon?.maxDiscountAmount ?? null,
     minPurchaseAmount: history.coupon?.minPurchaseAmount ?? null,
-    startDate: history.coupon?.startDate ?? null,
-    endDate: history.coupon?.endDate ?? null,
+    startDate: history.startDate ?? null,
+    endDate: history.endDate ?? null,
+    couponType: history.coupon?.type ?? null,
+    discountRate: history.coupon?.discountRate ?? null,
   };
 }
 

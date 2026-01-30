@@ -225,11 +225,7 @@ export class OrdersService {
               throw new OrderValidationException(`Coupon is not active: ${couponId}`);
             }
 
-            // Validate coupon date range
             const now = new Date();
-            if (now < coupon.startDate || now > coupon.endDate) {
-              throw new OrderValidationException(`Coupon is not valid at this time: ${couponId}`);
-            }
 
             // Validate minimum purchase amount
             if (totalPurchaseAmount < coupon.minPurchaseAmount) {
@@ -267,7 +263,6 @@ export class OrdersService {
                   userId: userId,
                   status: 'ISSUED',
                   issuedAt: now,
-                  expiredAt: coupon.endDate,
                 },
               });
             }

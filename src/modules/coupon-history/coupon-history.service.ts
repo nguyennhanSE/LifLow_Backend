@@ -29,12 +29,14 @@ export class CouponHistoryService {
 
   /**
    * Issue coupon to users by target grades (membership levels).
-   * - targetGrades null or empty → issue to all users, bỏ validate và expirationDateTime.
-   * - targetGrades có giá trị → issue to users whose membershipLevel in targetGrades; có validate và dùng coupon.endDate.
+   * - targetGrades null or empty → issue to all users (no date validation).
+   * - targetGrades có giá trị → issue to users whose membershipLevel in targetGrades.
    */
   async issueCouponToUsersByTargetGrades(
     couponId: string,
-    targetGrades?: string[] | null,
+    targetGrades?: string[] | null, 
+    startDate?: Date | null,
+    endDate?: Date | null,
   ): Promise<{
     message: string;
     count: number;
@@ -68,31 +70,26 @@ export class CouponHistoryService {
           histories: [],
         };
       }
-      if (coupon && coupon.isActive){
-      const histories = await this.couponHistoryRepository.createBulk(couponId, userIds, undefined);
-      return {
-        message: `Successfully issued ${histories.length} coupon(s) to all users`,
-        count: histories.length,
-        coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
-        histories,
-      };}
-      else {
+      if (coupon && coupon.isActive) {
+        const histories = await this.couponHistoryRepository.createBulk(couponId, userIds, startDate, endDate);
         return {
-          message: 'Coupon is not active',
-          count: 0,
-          coupon: null,
-          histories: [],
+          message: `Successfully issued ${histories.length} coupon(s) to all users`,
+          count: histories.length,
+          coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
+          histories,
         };
       }
+      return {
+        message: 'Coupon is not active',
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
     }
 
     const coupon = await this.validateCouponForIssuance(couponId);
     // await this.checkDuplicateIssuance(couponId, userIds);
-    const histories = await this.couponHistoryRepository.createBulk(
-      couponId,
-      userIds,
-      undefined,
-    );
+    const histories = await this.couponHistoryRepository.createBulk(couponId, userIds, startDate, endDate);
     return {
       message: `Successfully issued ${histories.length} coupon(s)`,
       count: histories.length,
@@ -102,11 +99,11 @@ export class CouponHistoryService {
   }
 
   /**
-   * Issue coupon to multiple users
-   * Validates coupon exists, is active, and is within valid date range
+   * Issue coupon to multiple users.
+   * Validates coupon exists and is active.
    */
   async issueCoupon(dto: IssueCouponDto) {
-    const { couponId, userIds, expirationDate } = dto;
+    const { couponId, userIds } = dto;
 
     // Validate coupon exists and is eligible for issuance
     const coupon = await this.validateCouponForIssuance(couponId);
@@ -114,22 +111,8 @@ export class CouponHistoryService {
     // Check for duplicate issuance
     await this.checkDuplicateIssuance(couponId, userIds);
 
-    // Determine expiration date
-    const expirationDateTime = expirationDate 
-      ? new Date(expirationDate) 
-      : coupon.endDate;
-
-    // Validate expiration date is in the future
-    if (expirationDateTime <= new Date()) {
-      throw new BadRequestException('Expiration date must be in the future');
-    }
-
     // Create coupon history records in bulk
-    const histories = await this.couponHistoryRepository.createBulk(
-      couponId,
-      userIds,
-      expirationDateTime,
-    );
+    const histories = await this.couponHistoryRepository.createBulk(couponId, userIds);
 
     return {
       message: `Successfully issued ${histories.length} coupon(s)`,
@@ -444,12 +427,10 @@ export class CouponHistoryService {
         histories: [],
       };
     }
-    const expirationDate = coupon.endDate;
     const histories = await this.couponHistoryRepository.createWithQuantity(
       coupon.id,
       userId,
       1,
-      expirationDate,
     );
     return {
       message: `Successfully issued 1 birthday coupon to user`,
@@ -504,7 +485,6 @@ export class CouponHistoryService {
       coupon.id,
       userId,
       count,
-      coupon.endDate,
     );
     return {
       message: `Successfully issued ${histories.length} free shipping coupon(s)`,
@@ -565,9 +545,8 @@ export class CouponHistoryService {
     }
     const histories = await this.couponHistoryRepository.createWithQuantity(
       coupon.id,
-      userId, 
+      userId,
       count,
-      coupon.endDate,
     );
     return {
       message: `Successfully issued ${histories.length} shopping support coupon(s)`,
@@ -581,31 +560,28 @@ export class CouponHistoryService {
    * Issue coupons to user after payment: birthday, free shipping, and shopping support.
    * Calls issueBirthdayCoupon, issueFreeShipping, and issueShoppingSupport in parallel.
    */
-  async issueAfterPayment(userId: string): Promise<{
+  async issueAfterUpdate(userId: string): Promise<{
     message: string;
     totalCount: number;
-    birthday: { message: string; count: number; coupon: { id: string; name: string; code: string; type: string } | null; histories: any[] };
     freeShipping: { message: string; count: number; coupon: { id: string; name: string; code: string; type: string } | null; histories: any[] };
     shoppingSupport: { message: string; count: number; coupon: { id: string; name: string; code: string; type: string } | null; histories: any[] };
     allHistories: any[];
   }> {
-    const [birthday, freeShipping, shoppingSupport] = await Promise.all([
-      this.issueBirthdayCoupon(userId),
+    
+    const [freeShipping, shoppingSupport] = await Promise.all([
       this.issueFreeShipping(userId),
       this.issueShoppingSupport(userId),
     ]);
 
-    const totalCount = birthday.count + freeShipping.count + shoppingSupport.count;
+    const totalCount = freeShipping.count + shoppingSupport.count;
     const allHistories = [
-      ...birthday.histories,
       ...freeShipping.histories,
       ...shoppingSupport.histories,
     ];
 
     return {
-      message: `After payment: issued ${totalCount} coupon(s) (birthday: ${birthday.count}, free shipping: ${freeShipping.count}, shopping support: ${shoppingSupport.count})`,
+      message: `After payment: issued ${totalCount} coupon(s) (free shipping: ${freeShipping.count}, shopping support: ${shoppingSupport.count})`,
       totalCount,
-      birthday,
       freeShipping,
       shoppingSupport,
       allHistories,

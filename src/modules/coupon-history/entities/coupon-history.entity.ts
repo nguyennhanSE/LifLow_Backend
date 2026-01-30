@@ -7,6 +7,8 @@ export class CouponHistoryEntity {
   orderId?: string | null;
   quantity!: number;
   status!: CouponHistoryStatus;
+  startDate?: Date | null;
+  endDate?: Date | null;
   issuedAt!: Date;
   usedAt?: Date | null;
   expiredAt?: Date | null;
@@ -35,6 +37,10 @@ export class CouponReturnEntity {
   discountAmount?: number | null;
   maxDiscountAmount?: number | null;
   minPurchaseAmount?: number | null;
+  /** Coupon type (PERCENT, AMOUNT, FREE_SHIPPING, etc.) */
+  couponType?: string | null;
+  /** Discount rate in % (for PERCENT type) */
+  discountRate?: number | null;
 }
 
 export class CouponInfo {

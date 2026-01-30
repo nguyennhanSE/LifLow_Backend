@@ -20,7 +20,8 @@ export class CouponHistoryRepository {
   async createBulk(
     couponId: string,
     userIds: string[],
-    expirationDate?: Date,
+    startDate?: Date | null,
+    endDate?: Date | null,
   ): Promise<CouponHistoryEntity[]> {
     const now = new Date();
     const data: Prisma.CouponHistoryCreateManyInput[] = userIds.map((userId) => ({
@@ -28,7 +29,8 @@ export class CouponHistoryRepository {
       userId,
       status: CouponHistoryStatus.ISSUED,
       issuedAt: now,
-      expiredAt: expirationDate,
+      startDate,
+      endDate,
     }));
 
     const histories = await this.prisma.$transaction(async (tx) => {
@@ -60,15 +62,18 @@ export class CouponHistoryRepository {
   }
 
   /**
-   * Create a single coupon history record with optional expiration.
+   * Create a single coupon history record (or multiple when quantity > 1 via repeated calls).
    */
   async createWithQuantity(
     couponId: string,
     userId: string,
-    _quantity: number,
-    expirationDate?: Date,
+    quantity: number,
+    startDate?: Date | null,
+    endDate?: Date | null,
   ): Promise<CouponHistoryEntity[]> {
     const now = new Date();
+    startDate = startDate ?? now;
+    endDate = endDate ?? new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000); // 30days later
     const history = await this.prisma.$transaction(async (tx) => {
       const created = await tx.couponHistory.create({
         data: {
@@ -76,8 +81,9 @@ export class CouponHistoryRepository {
           userId,
           status: CouponHistoryStatus.ISSUED,
           issuedAt: now,
-          expiredAt: expirationDate,
-          quantity: 1,
+          quantity,
+          startDate,
+          endDate,
         },
         include: {
           coupon: true,

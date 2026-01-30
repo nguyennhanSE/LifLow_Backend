@@ -12,7 +12,7 @@ import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 
 // Load environment variables
-const NODE_ENV = process.env.NODE_ENV || 'production';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 console.log('NODE_ENV', NODE_ENV);
 const envFileName = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 const envFilePath = path.resolve(__dirname, '..', envFileName);
@@ -2403,12 +2403,9 @@ async function seedCoupons() {
       minPurchaseAmount: 30000,
       maxDiscountAmount: null,
       imageUrl: null,
-      startDate: now,
-      endDate: oneMonthLater,
+      isPermanent: true,
       isActive: true,
       isAutoIssue: false,
-      canAutoIssue: false,
-      hasBeenIssued: false,
       autoIssueDayOfMonth: null,
       targetGrades: ['LV1. 씨앗', 'LV2. 새싹', 'LV3. 열매', 'LV4. 나무', 'LV5. 정원'],
     },
@@ -2421,15 +2418,82 @@ async function seedCoupons() {
       minPurchaseAmount: 0,
       maxDiscountAmount: null,
       imageUrl: null,
-      startDate: now,
-      endDate: threeMonthsLater,
+      isPermanent: true,
       isActive: true,
-      isAutoIssue: false,
-      canAutoIssue: false,
-      hasBeenIssued: false,
-      autoIssueDayOfMonth: null,
+      isAutoIssue: true,
       targetGrades: [],
     },
+    {
+      name: '구매 지원 할인 쿠폰',
+      code: 'SHOPPING_SUPPORT_LV2',
+      type: CouponType.PERCENT,
+      discountRate: 10,
+      discountAmount: null,
+      minPurchaseAmount: null,
+      maxDiscountAmount: 10000,
+      imageUrl: null,
+      isPermanent: true,
+      isActive: true,
+      isAutoIssue: true,
+      targetGrades: ['LV2. 새싹'],
+    },
+    {
+      name: '구매 지원 할인 쿠폰',
+      code: 'SHOPPING_SUPPORT_LV3',
+      type: CouponType.PERCENT,
+      discountRate: 10,
+      discountAmount: null,
+      minPurchaseAmount: null,
+      maxDiscountAmount: 20000,
+      imageUrl: null,
+      isPermanent: true,
+      isActive: true,
+      isAutoIssue: true,
+      targetGrades: ['LV3. 열매'],
+    },
+    {
+      name: '구매 지원 할인 쿠폰',
+      code: 'SHOPPING_SUPPORT_LV4',
+      type: CouponType.PERCENT,
+      discountRate: 15,
+      discountAmount: null,
+      minPurchaseAmount: null,
+      maxDiscountAmount: 30000,
+      imageUrl: null,
+      isPermanent: true,
+      isActive: true,
+      isAutoIssue: true,
+      targetGrades: ['LV4. 나무'],
+    },
+    {
+      name: '구매 지원 할인 쿠폰',
+      code: 'SHOPPING_SUPPORT_LV5',
+      type: CouponType.PERCENT,
+      discountRate: 20,
+      discountAmount: null,
+      minPurchaseAmount: null,
+      maxDiscountAmount: 50000,
+      imageUrl: null,
+      isPermanent: true,
+      isActive: true,
+      isAutoIssue: true,
+      targetGrades: ['LV5. 정원'],
+    },
+    {
+      name: '스페셜 혜택',
+      code: 'SPECIAL_BENEFIT',
+      type: CouponType.AMOUNT,
+      discountRate: null,
+      discountAmount: 10000,
+      minPurchaseAmount: 30000,
+      maxDiscountAmount: null,
+      imageUrl: null,
+      isPermanent: true,
+      isActive: true,
+      isAutoIssue: false,
+      autoIssueDayOfMonth: null,
+      targetGrades: ['LV1. 씨앗', 'LV2. 새싹', 'LV3. 열매', 'LV4. 나무', 'LV5. 정원'],
+    }
     // {
     //   name: 'Shopping Support Discount Coupons',
     //   code: 'SHOPPING_SUPPORT',
@@ -2515,10 +2579,25 @@ async function seedCoupons() {
   
   try {
     for (const coupon of coupons) {
+      const data = {
+        name: coupon.name,
+        code: coupon.code,
+        type: coupon.type,
+        discountRate: coupon.discountRate ?? null,
+        discountAmount: coupon.discountAmount ?? null,
+        minPurchaseAmount: coupon.minPurchaseAmount ?? 0,
+        maxDiscountAmount: coupon.maxDiscountAmount ?? null,
+        imageUrl: coupon.imageUrl ?? null,
+        isActive: coupon.isActive ?? true,
+        isAutoIssue: coupon.isAutoIssue ?? false,
+        isPermanent: coupon.isPermanent ?? false,
+        autoIssueDayOfMonth: coupon.autoIssueDayOfMonth ?? null,
+        targetGrades: coupon.targetGrades ?? [],
+      };
       await prisma.coupon.upsert({
         where: { code: coupon.code },
-        update: coupon,
-        create: coupon,
+        update: data,
+        create: data,
       });
       console.log(`✅ Created/Updated coupon: ${coupon.name} (${coupon.code})`);
     }

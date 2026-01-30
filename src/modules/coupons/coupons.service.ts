@@ -57,9 +57,9 @@ export class CouponsService {
     }
 
     // Validate date range
-    const startDate = new Date(createCouponDto.startDate);
-    const endDate = new Date(createCouponDto.endDate);
-    if (startDate >= endDate) {
+    const startDate = createCouponDto.startDate ? new Date(createCouponDto.startDate) : null;
+    const endDate = createCouponDto.endDate ? new Date(createCouponDto.endDate) : null;
+    if (startDate && endDate && startDate >= endDate) {
       throw new BadRequestException('startDate must be before endDate');
     }
 
@@ -70,6 +70,8 @@ export class CouponsService {
       await this.couponHistoryService.issueCouponToUsersByTargetGrades(
         created.id,
         created.targetGrades?.length ? (created.targetGrades as string[]) : undefined,
+        startDate,
+        endDate,
       );
     }
 
@@ -147,12 +149,12 @@ export class CouponsService {
     // Validate date range if dates are being updated
     const startDate = updateCouponDto.startDate 
       ? new Date(updateCouponDto.startDate) 
-      : existingCoupon.startDate;
+      : null;
     const endDate = updateCouponDto.endDate 
       ? new Date(updateCouponDto.endDate) 
-      : existingCoupon.endDate;
+      : null;
 
-    if (startDate >= endDate) {
+    if (startDate && endDate && startDate >= endDate && !existingCoupon.isPermanent) {
       throw new BadRequestException('startDate must be before endDate');
     }
 
@@ -162,9 +164,6 @@ export class CouponsService {
       : existingCoupon.isAutoIssue;
 
     if (isAutoIssue) {
-      if (!existingCoupon.canAutoIssue) {
-        throw new BadRequestException('This coupon is already auto-issued');
-      }
       const targetGrades = updateCouponDto.targetGrades ?? existingCoupon.targetGrades;
 
       // if (!autoIssueDayOfMonth) {
@@ -209,7 +208,7 @@ export class CouponsService {
     const totalAutoIssueCoupons = await this.couponRepository.count({ isAutoIssue: true });
     const totalActiveCoupons = await this.couponRepository.count({ isActive: true });
     const totalInactiveCoupons = await this.couponRepository.count({ isActive: false });
-    const totalExpiredCoupons = await this.couponRepository.count({ endDate: { lt: new Date() } });
+    const totalExpiredCoupons = await this.couponRepository.count({ isPermanent: false, isActive: true });
     return { totalCoupons, totalAutoIssueCoupons, totalActiveCoupons, totalInactiveCoupons, totalExpiredCoupons };
   }
 }

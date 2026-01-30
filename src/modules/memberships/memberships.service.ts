@@ -196,6 +196,28 @@ export class MembershipsService {
     });
   }
 
+  /**
+   * Sync UserMembership when User.membershipLevel is updated (e.g. from user update).
+   * Looks up membership by name and upserts UserMembership for the user.
+   */
+  async syncUserMembershipByLevel(userId: string, membershipLevel: string): Promise<UserMembershipEntity> {
+    const membership = await this.membershipRepository.getMembershipByName(membershipLevel);
+    if (!membership) {
+      throw new NotFoundException(`Membership with name "${membershipLevel}" not found`);
+    }
+    const now = new Date();
+    const oneYearFromNow = new Date(now);
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    return this.membershipRepository.upsertUserMembership(userId, {
+      membershipId: membership.id,
+      membershipName: membership.name ?? membershipLevel,
+      membershipDescription: membership.description ?? '',
+      startDate: now,
+      endDate: oneYearFromNow,
+      status: 'normal',
+    });
+  }
+
   async updateUserMembership(
     userId: string,
     updateDto: UpdateUserMembershipDto

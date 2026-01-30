@@ -21,12 +21,5 @@ export class IssueCouponDto {
   @IsString({ each: true })
   userIds: string[];
 
-  @ApiPropertyOptional({
-    description: 'Optional custom expiration date for the issued coupons (ISO 8601 format)',
-    example: '2024-12-31T23:59:59Z',
-  })
-  @IsOptional()
-  @IsDateString()
-  expirationDate?: string;
 }
 
