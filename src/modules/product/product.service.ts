@@ -588,20 +588,29 @@ export class ProductService {
           }
         }
 
-        // Đồng bộ product.salePrice với special offer:
+        // Đồng bộ product.salePrice với special offer chỉ khi request có gửi specialOffer.
+        // Khi không gửi specialOffer, giữ nguyên salePrice từ payload (tránh ghi đè thành 0 khi
+        // bản ghi special offer có specialPriceApplied/discountAmount null hoặc 0).
         // - Khi status = true: salePrice = specialPriceApplied (giá khuyến mãi).
         // - Khi status = false: salePrice = origin = specialPriceApplied + discountAmount (giá gốc).
-        const currentOffer = await tx.productSpecialOffer.findUnique({
-          where: { productId: id },
-        });
-        if (currentOffer) {
-          const salePriceToSet = currentOffer.status
-            ? currentOffer.specialPriceApplied
-            : (currentOffer.specialPriceApplied ?? 0) + (currentOffer.discountAmount ?? 0);
-          await tx.product.update({
-            where: { id },
-            data: { salePrice: salePriceToSet },
+        if (hasSpecialOfferData) {
+          const currentOffer = await tx.productSpecialOffer.findUnique({
+            where: { productId: id },
           });
+          if (currentOffer) {
+            const salePriceToSet = currentOffer.status
+              ? currentOffer.specialPriceApplied
+              : (currentOffer.specialPriceApplied ?? 0) + (currentOffer.discountAmount ?? 0);
+            // Chỉ ghi đè khi có giá trị hợp lệ; nếu 0 do null+0 thì giữ salePrice hiện tại (từ payload)
+            const effectiveSalePrice =
+              salePriceToSet !== undefined && salePriceToSet !== null && salePriceToSet > 0
+                ? salePriceToSet
+                : product.salePrice;
+            await tx.product.update({
+              where: { id },
+              data: { salePrice: effectiveSalePrice },
+            });
+          }
         }
 
         // Upload image registration thumbnail if provided
