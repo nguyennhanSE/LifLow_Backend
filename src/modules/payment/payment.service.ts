@@ -309,7 +309,7 @@ export class PaymentService {
       this.logger.log('Payment confirmed with Toss successfully');
 
       // 2. Execute single database transaction (long timeout: many orders + coupon history + points + payment)
-      const payment = await this.prisma.$transaction(
+      const result = await this.prisma.$transaction(
         async (tx) => {
         this.logger.log('Starting database transaction');
 
@@ -332,8 +332,10 @@ export class PaymentService {
             name: true,
             phoneNumber: true,
             availablePoints: true,
+            membershipLevel: true,
           },
         });
+        const membershipLevelBeforePayment = user?.membershipLevel;
 
         if (!user) {
           throw new NotFoundException(`User with ID ${userId} not found`);
@@ -739,10 +741,12 @@ export class PaymentService {
         this.logger.log(`Deleted ${orderGroup.cartItemIds.length} cart items`);
         this.logger.log('Transaction completed successfully');
 
-        return savedPayment;
+        return { payment: savedPayment, membershipLevelBeforePayment };
         },
         { timeout: 30_000, maxWait: 10_000 },
       );
+
+      const { payment, membershipLevelBeforePayment } = result;
 
       // 2.13. Issue reward points AFTER transaction (avoids deadlock: pointService uses its own connection)
       try {
@@ -750,6 +754,7 @@ export class PaymentService {
           userId,
           payment.totalAmount ?? 0,
           validatedDto.orderGroupNumber,
+          membershipLevelBeforePayment ?? undefined,
         );
       } catch (pointError) {
         this.logger.error(

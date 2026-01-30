@@ -339,6 +339,7 @@ export class PointService {
     userId: string,
     totalPurchaseAmount: number,
     orderGroupNumber?: string,
+    membershipLevelBeforePayment?: string,
   ): Promise<{
     message: string;
     count: number;
@@ -349,8 +350,8 @@ export class PointService {
       const { membershipLevel, availablePoints: currentAvailable } =
         await this.pointRepository.getUserMembershipAndPoints(userId);
 
-      const rate = membershipLevel
-        ? PointService.REWARD_RATE_BY_LEVEL[membershipLevel] ?? 0
+      const rate = membershipLevelBeforePayment
+        ? PointService.REWARD_RATE_BY_LEVEL[membershipLevelBeforePayment] ?? 0
         : 0;
       const pointsIncrease = Math.floor((totalPurchaseAmount * rate) / 100);
 
