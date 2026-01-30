@@ -377,6 +377,9 @@ export class CouponHistoryService {
   private static readonly BIRTHDAY_COUPON_CODE = 'BIRTHDAY';
   /** Coupon code for free shipping (issued 1/2/3/5 per level) */
   private static readonly FREE_SHIPPING_COUPON_CODE = 'FREE_SHIPPING';
+
+  private static readonly SPECIAL_BENEFIT_COUPON_CODE = 'SPECIAL_BENEFIT';
+
   /** Coupon codes for shopping support by level (10% max 10k, 10% max 20k, 15% max 30k, 20% max 50k) */
   private static readonly SHOPPING_SUPPORT_CODES: Record<string, string> = {
     [EMembershipLevel.LV2]: 'SHOPPING_SUPPORT_LV2', // 10% max 10,000 KRW, 1 coupon
@@ -557,6 +560,58 @@ export class CouponHistoryService {
   }
 
   /**
+   * Issue SPECIAL_BENEFIT coupon to user if membership level is LV5.
+   */
+  async issueSpecialBenefit(userId: string): Promise<{
+    message: string;
+    count: number;
+    coupon: { id: string; name: string; code: string; type: string } | null;
+    histories: any[];
+  }> {
+    const membershipLevel = await this.couponHistoryRepository.getMembershipLevelByUserId(userId);
+    if (membershipLevel !== EMembershipLevel.LV5) {
+      return {
+        message: 'User is not LV5; SPECIAL_BENEFIT coupon is only for LV5 members',
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    let coupon: CouponEntity;
+    try {
+      coupon = await this.couponsService.findByCode(
+        CouponHistoryService.SPECIAL_BENEFIT_COUPON_CODE,
+      );
+    } catch {
+      return {
+        message: `Coupon with code ${CouponHistoryService.SPECIAL_BENEFIT_COUPON_CODE} not found`,
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    if (!coupon.isActive) {
+      return {
+        message: `Coupon ${coupon.code} is not active`,
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    const histories = await this.couponHistoryRepository.createWithQuantity(
+      coupon.id,
+      userId,
+      1,
+    );
+    return {
+      message: 'Successfully issued 1 SPECIAL_BENEFIT coupon to user',
+      count: histories.length,
+      coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
+      histories,
+    };
+  }
+
+  /**
    * Issue coupons to user after payment: birthday, free shipping, and shopping support.
    * Calls issueBirthdayCoupon, issueFreeShipping, and issueShoppingSupport in parallel.
    */
@@ -567,16 +622,18 @@ export class CouponHistoryService {
     shoppingSupport: { message: string; count: number; coupon: { id: string; name: string; code: string; type: string } | null; histories: any[] };
     allHistories: any[];
   }> {
-    
-    const [freeShipping, shoppingSupport] = await Promise.all([
+
+    const [freeShipping, shoppingSupport, specialBenefit] = await Promise.all([
       this.issueFreeShipping(userId),
       this.issueShoppingSupport(userId),
+      this.issueSpecialBenefit(userId),
     ]);
 
-    const totalCount = freeShipping.count + shoppingSupport.count;
+    const totalCount = freeShipping.count + shoppingSupport.count + specialBenefit.count;
     const allHistories = [
       ...freeShipping.histories,
       ...shoppingSupport.histories,
+      ...specialBenefit.histories,
     ];
 
     return {
