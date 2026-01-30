@@ -714,7 +714,7 @@ model Coupon {
 model CouponHistory {
   id String @id @default(uuid())
 
-  couponId String @map("coupon_id")
+  couponId String? @map("coupon_id")
   userId String @map("user_id")
   quantity Int @default(1) @map("quantity") // 발급 수량
 
@@ -736,7 +736,7 @@ model CouponHistory {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  coupon Coupon? @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  coupon Coupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
   order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
 

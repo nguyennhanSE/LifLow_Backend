@@ -92,7 +92,7 @@ export class UserRepository {
   /**
    * Create a new user
    */
-  async createUser(createUserDto: CreateUserDto & {password?: string; phoneNumber?: string; avatarImageUrl?: string }): Promise<UserEntity> {
+  async createUser(createUserDto: CreateUserDto & {password?: string; phoneNumber?: string; avatarImageUrl?: string; membershipLevel?: string }): Promise<UserEntity> {
     // Default role to USER if not provided
     const roleName = ERoleName.USER;
 
@@ -133,6 +133,34 @@ export class UserRepository {
             mobilePhone: createUserDto.mobilePhoneNumber || undefined,
             phoneNumber: createUserDto.phoneNumber || '',
             setAsDefault: true, // Set as default address for new user
+          },
+        });
+      }
+
+      // Create user membership (e.g. LV1. 씨앗) when membershipLevel is provided
+      if (createUserDto.membershipLevel) {
+        const membership = await tx.membership.findFirst({
+          where: { name: createUserDto.membershipLevel },
+        });
+        if (!membership) {
+          throw new BadRequestException(
+            `Membership "${createUserDto.membershipLevel}" not found. Please run membership seed first.`,
+          );
+        }
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setFullYear(
+          endDate.getFullYear() + (membership.basePeriod ? Math.floor(membership.basePeriod / 365) : 1),
+        );
+        await tx.userMembership.create({
+          data: {
+            userId: createdUser.id,
+            membershipId: membership.id,
+            membershipName: membership.name ?? '',
+            membershipDescription: membership.description ?? '',
+            status: 'normal',
+            startDate,
+            endDate,
           },
         });
       }

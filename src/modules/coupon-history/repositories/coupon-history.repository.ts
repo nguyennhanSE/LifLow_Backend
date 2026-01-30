@@ -6,8 +6,9 @@ import { CouponHistoryNotFoundException } from '../exceptions/coupon-history.exc
 import {
   toCouponHistoryEntityWithRelations,
   toCouponHistoryEntityWithRelationsArray,
+  toCouponReturnEntityArray,
 } from '../mapper/coupon-history.mapper';
-import { CouponHistoryEntity } from '../entities/coupon-history.entity';
+import { CouponHistoryEntity, CouponReturnEntity } from '../entities/coupon-history.entity';
 
 @Injectable()
 export class CouponHistoryRepository {
@@ -58,6 +59,41 @@ export class CouponHistoryRepository {
     return toCouponHistoryEntityWithRelationsArray(histories);
   }
 
+  /**
+   * Create a single coupon history record with optional expiration.
+   */
+  async createWithQuantity(
+    couponId: string,
+    userId: string,
+    _quantity: number,
+    expirationDate?: Date,
+  ): Promise<CouponHistoryEntity[]> {
+    const now = new Date();
+    const history = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.couponHistory.create({
+        data: {
+          couponId,
+          userId,
+          status: CouponHistoryStatus.ISSUED,
+          issuedAt: now,
+          expiredAt: expirationDate,
+          quantity: 1,
+        },
+        include: {
+          coupon: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+      return created;
+    });
+    return toCouponHistoryEntityWithRelationsArray([history]);
+  }
   /**
    * Find coupon history by ID with relations
    */
@@ -257,6 +293,17 @@ export class CouponHistoryRepository {
   }
 
   /**
+   * Get user's membership level by user ID.
+   */
+  async getMembershipLevelByUserId(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { membershipLevel: true },
+    });
+    return user?.membershipLevel ?? null;
+  }
+
+  /**
    * Find active (ISSUED) coupon histories for specific users and coupon
    * Used to check for duplicate issuance
    */
@@ -288,44 +335,37 @@ export class CouponHistoryRepository {
   /**
    * Find user's available coupons (issued and not expired)
    */
-  async findUserAvailableCoupons(userId: string): Promise<CouponHistoryEntity[]> {
+  async findUserAvailableCoupons(userId: string): Promise<CouponReturnEntity[]> {
     const now = new Date();
 
     const histories = await this.prisma.couponHistory.findMany({
       where: {
         userId,
         status: CouponHistoryStatus.ISSUED,
-        OR: [
-          { expiredAt: { gt: now } },
-          { expiredAt: null },
-        ],
+        // OR: [
+        //   { expiredAt: { gt: now } },
+        //   { expiredAt: null },
+        // ],
         coupon: {
           isActive: true,
-          endDate: { gt: now },
+          // endDate: { gt: now },
         },
       },
       include: {
-        coupon: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        coupon: true
       },
       orderBy: {
         issuedAt: 'desc',
       },
     });
 
-    return toCouponHistoryEntityWithRelationsArray(histories);
+    return toCouponReturnEntityArray(histories);
   }
 
   /**
    * Find user's used coupons
    */
-  async findUserUsedCoupons(userId: string): Promise<CouponHistoryEntity[]> {
+  async findUserUsedCoupons(userId: string): Promise<CouponReturnEntity[]> {
     const histories = await this.prisma.couponHistory.findMany({
       where: {
         userId,
@@ -333,27 +373,13 @@ export class CouponHistoryRepository {
       },
       include: {
         coupon: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        order: {
-          select: {
-            id: true,
-            orderNumber: true,
-            totalPaymentAmount: true,
-          },
-        },
       },
       orderBy: {
         usedAt: 'desc',
       },
     });
 
-    return toCouponHistoryEntityWithRelationsArray(histories);
+    return toCouponReturnEntityArray(histories);
   }
 
   /**
@@ -437,6 +463,23 @@ export class CouponHistoryRepository {
       totalRevenueImpacted,
       averageDiscountAmount: totalUsed > 0 ? totalDiscountGiven / totalUsed : 0,
     };
+  }
+
+  /**
+   * Expire all CouponHistory (status ISSUED) for a given coupon (e.g. when coupon is deactivated).
+   * Returns the number of records updated.
+   */
+  async expireAllByCouponId(couponId: string): Promise<number> {
+    const result = await this.prisma.couponHistory.updateMany({
+      where: {
+        couponId,
+        status: CouponHistoryStatus.ISSUED,
+      },
+      data: {
+        status: CouponHistoryStatus.EXPIRED,
+      },
+    });
+    return result.count;
   }
 
   /**

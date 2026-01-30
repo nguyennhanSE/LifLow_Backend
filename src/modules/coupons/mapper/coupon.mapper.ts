@@ -24,6 +24,7 @@ export function toCouponEntity(coupon: Coupon): CouponEntity {
     isActive: coupon.isActive,
     canAutoIssue: coupon.canAutoIssue,
     isAutoIssue: coupon.isAutoIssue,
+    hasBeenIssued: coupon.hasBeenIssued,
     autoIssueDayOfMonth: coupon.autoIssueDayOfMonth,
     targetGrades: coupon.targetGrades as CouponTargetGrade[],
     createdAt: coupon.createdAt,
@@ -39,7 +40,7 @@ export function toCouponWithHistories(coupon: CouponWithHistoriesType): CouponWi
     ...toCouponEntity(coupon),
     histories: coupon.histories.map((history) => ({
       id: history.id,
-      couponId: history.couponId,
+      couponId: history.couponId ?? null,
       userId: history.userId,
       status: history.status as CouponHistoryStatus,
       issuedAt: history.issuedAt,

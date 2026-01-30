@@ -12,6 +12,7 @@ import { toPointResponseDto, toPointEntity, toPointEntityWithRelations } from '.
 import { PointNotFoundException } from './exceptions/point-not-found.exception';
 import { PointValidationException } from './exceptions/point-validation.exception';
 import { PointEntity } from './entities/point.entity';
+import { EMembershipLevel } from '../memberships/enums/membership.enum';
 
 @Injectable()
 export class PointService {
@@ -320,5 +321,88 @@ export class PointService {
     }
 
     throw new InternalServerErrorException(defaultMessage);
+  }
+
+  /**
+   * Reward rate (% of purchase amount) by membership level:
+   * 씨앗 (Lv.1) 1%, 새싹 (Lv.2) 2%, 열매 (Lv.3) 2.5%, 나무/정원 (Lv.4/Lv.5) 3%
+   */
+  private static readonly REWARD_RATE_BY_LEVEL: Record<string, number> = {
+    [EMembershipLevel.LV1]: 1,
+    [EMembershipLevel.LV2]: 2,
+    [EMembershipLevel.LV3]: 2.5,
+    [EMembershipLevel.LV4]: 3,
+    [EMembershipLevel.LV5]: 3,
+  };
+
+  async issueAfterPayment(
+    userId: string,
+    totalPurchaseAmount: number,
+    orderGroupNumber?: string,
+  ): Promise<{
+    message: string;
+    count: number;
+    point: { id: string; name: string; code: string; type: string } | null;
+    histories: any[];
+  }> {
+    try {
+      const { membershipLevel, availablePoints: currentAvailable } =
+        await this.pointRepository.getUserMembershipAndPoints(userId);
+
+      const rate = membershipLevel
+        ? PointService.REWARD_RATE_BY_LEVEL[membershipLevel] ?? 0
+        : 0;
+      const pointsIncrease = Math.floor((totalPurchaseAmount * rate) / 100);
+
+      if (pointsIncrease <= 0) {
+        return {
+          message: 'Point successfully issued',
+          count: 0,
+          point: null,
+          histories: [],
+        };
+      }
+
+      const newBalance = currentAvailable + pointsIncrease;
+      const today = this.formatLocalYyyyMmDd(new Date());
+
+      const created = await this.pointRepository.create({
+        date: today,
+        user: { connect: { id: userId } },
+        membershipLevel: membershipLevel ?? undefined,
+        content: 'Purchase reward',
+        orderGroup: orderGroupNumber
+          ? { connect: { orderGroupNumber } }
+          : undefined,
+        pointsType: 'REWARD',
+        availablePointsIncrease: pointsIncrease,
+        availablePointsBalance: newBalance,
+      });
+
+      await this.pointRepository.updateUserAvailablePoints(userId, newBalance);
+
+      const pointSummary = {
+        id: created.id,
+        name: created.content ?? 'Purchase reward',
+        code: created.pointsType ?? 'REWARD',
+        type: created.pointsType ?? 'REWARD',
+      };
+
+      return {
+        message: 'Point successfully issued',
+        count: pointsIncrease,
+        point: pointSummary,
+        histories: [created],
+      };
+    } catch (error) {
+      this.handlePrismaError(error, 'Failed to issue point after payment');
+    }
+  }
+
+  private formatLocalYyyyMmDd(d: Date): string {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   }
 }

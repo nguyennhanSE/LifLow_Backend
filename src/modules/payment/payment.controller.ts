@@ -83,7 +83,8 @@ export class PaymentController {
       const userId = req.user.sub;
       const payment = await this.paymentService.initiatePayment(
         userId, 
-        initiatePaymentDto.cartItems, 
+        initiatePaymentDto.cartItemIds, 
+        initiatePaymentDto.coupons ?? [], 
         initiatePaymentDto.userShippingAddressId,
         initiatePaymentDto.points,
         initiatePaymentDto.deliveryFee

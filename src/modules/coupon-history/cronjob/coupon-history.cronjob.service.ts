@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { CouponHistoryStatus } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { EMembershipLevel } from '../../memberships/enums/membership.enum';
+import { getNextMonthDateRange } from '../../coupons/helpers/coupon.helper';
 
 @Injectable()
 export class CouponHistoryCronjobService {
@@ -14,7 +15,7 @@ export class CouponHistoryCronjobService {
    * Cron: phát hành coupon tự động theo targetGrades (hasBeenIssued = false, isAutoIssue = true).
    * startDate/endDate chỉ là thời hạn sử dụng coupon, không dùng để deactivate.
    */
-  @Cron(CronExpression.EVERY_10_SECONDS, {
+  @Cron(CronExpression.EVERY_HOUR, {
     name: 'auto-issue-coupon-histories',
     timeZone: 'Asia/Seoul',
   })
@@ -54,7 +55,6 @@ export class CouponHistoryCronjobService {
           where: {
             isActive: true,
             canAutoIssue: true,
-            hasBeenIssued: false,
             isAutoIssue: true,
           },
           select: {
@@ -115,6 +115,8 @@ export class CouponHistoryCronjobService {
           const uniqueUserIds = [...new Set(users.map((u) => u.id))];
           const userIdsToCreate = uniqueUserIds.filter((id) => !userIdToHistoryId.has(id));
 
+          const { startDate: nextStart, endDate: nextEnd } = getNextMonthDateRange();
+
           if (existingIdsToUpdate.length > 0) {
             await tx.couponHistory.updateMany({
               where: { id: { in: existingIdsToUpdate } },
@@ -134,7 +136,11 @@ export class CouponHistoryCronjobService {
 
           await tx.coupon.update({
             where: { id: coupon.id },
-            data: { hasBeenIssued: true },
+            data: {
+              hasBeenIssued: true,
+              startDate: nextStart,
+              endDate: nextEnd,
+            },
           });
 
           historiesCreated += userIdsToCreate.length;

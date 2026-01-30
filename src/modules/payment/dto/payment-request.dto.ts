@@ -123,21 +123,39 @@ export class CreatePaymentDto {
   metadata?: any;
 }
 
+export class CouponIdQuantityDto {
+  @ApiProperty({ description: '쿠폰 ID' })
+  @IsString()
+  couponId: string;
+
+  @ApiProperty({ description: '쿠폰 사용 수량' })
+  @IsNumber()
+  quantity: number;
+}
+
 /**
  * Cart item with associated coupons
  */
-export class CartItemCouponDto {
-  @ApiProperty({ description: '장바구니 아이템 ID', example: '123e4567-e89b-12d3-a456-426614174000' })
-  @IsNotEmpty({ message: 'Cart item ID is required' })
-  @IsString({ message: 'Cart item ID must be a string' })
-  cartItemId!: string;
+// export class CartItemCouponDto {
+//   @ApiProperty({ description: '장바구니 아이템 ID', example: '123e4567-e89b-12d3-a456-426614174000' })
+//   @IsNotEmpty({ message: 'Cart item ID is required' })
+//   @IsString({ message: 'Cart item ID must be a string' })
+//   cartItemId!: string;
 
-  @ApiPropertyOptional({ description: '해당 장바구니 아이템에 사용할 쿠폰 ID 배열', type: [String], example: [] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  couponIds?: string[];
-}
+//   @ApiPropertyOptional({ description: '해당 장바구니 아이템에 사용할 쿠폰 ID 배열', type: [String], example: [] })
+//   @IsOptional()
+//   @IsArray()
+//   @IsString({ each: true })
+//   couponIds?: string[] | null;
+
+//   @ApiPropertyOptional({ description: '쿠폰 사용 수량', example: 1, minimum: 1, maximum: 10000 })
+//   @IsOptional()
+//   @Type(() => Number)
+//   @IsInt({ message: 'Coupon quantity must be an integer' })
+//   @Min(1, { message: 'Coupon quantity must be at least 1' })
+//   @Max(10000, { message: 'Coupon quantity must not exceed 10000' })
+//   quantity?: number;
+// }
 
 export class ConfirmPaymentRequestDto {
   @ApiProperty({ description: '결제 키 (Toss에서 전달)' })
@@ -166,12 +184,17 @@ export class ConfirmPaymentRequestDto {
   @IsString()
   userShippingAddressId?: string;
 
-  @ApiPropertyOptional({ description: '장바구니 아이템과 쿠폰 매핑', type: [CartItemCouponDto] })
+  @ApiPropertyOptional({ description: '장바구니 아이템과 쿠폰 매핑'})
+  @IsOptional()
+  @IsArray()
+  cartItems: string[];
+
+  @ApiPropertyOptional({ description: '쿠폰 정보 배열', type: [CouponIdQuantityDto], example: [{ couponId: '123e4567-e89b-12d3-a456-426614174000', quantity: 1 }] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CartItemCouponDto)
-  cartItemCoupons?: CartItemCouponDto[];
+  @Type(() => CouponIdQuantityDto)
+  coupons?: CouponIdQuantityDto[];
 }
 
 export class CancelPaymentRequestDto {
@@ -233,11 +256,18 @@ export class PreparePaymentRequestDto {
 }
 
 export class InitiatePaymentRequestDto {
-  @ApiProperty({ description: '장바구니 아이템과 쿠폰 정보 배열', type: [CartItemCouponDto] })
+  @ApiProperty({ description: '장바구니 아이템 ID 배열', example: ['123e4567-e89b-12d3-a456-426614174000', '123e4567-e89b-12d3-a456-426614174001'] })
+  @IsArray()
+  @IsString({ each: true })
+  cartItemIds!: string[];
+
+  @ApiProperty({ description: '쿠폰 정보 배열', type: [CouponIdQuantityDto], example: [{ couponId: '123e4567-e89b-12d3-a456-426614174000', quantity: 1 }] })
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CartItemCouponDto)
-  cartItems!: CartItemCouponDto[];
+  @Type(() => CouponIdQuantityDto)
+  coupons?: CouponIdQuantityDto[];
+
 
   @ApiPropertyOptional({ description: '사용할 포인트' })
   @IsOptional()

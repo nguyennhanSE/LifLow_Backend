@@ -17,6 +17,7 @@ import {
 import { CouponHistoryStatus } from '@prisma/client';
 import { CouponEntity } from '../coupons/entities/coupon.entity';
 import { CouponInfo } from './entities/coupon-history.entity';
+import { EMembershipLevel } from '../memberships/enums/membership.enum';
 
 @Injectable()
 export class CouponHistoryService {
@@ -155,7 +156,7 @@ export class CouponHistoryService {
 
     // Validate coupon relation exists
     if (!history.coupon) {
-      throw new CouponNotFoundException(history.couponId);
+      throw new CouponNotFoundException(history.couponId ?? '');
     }
 
     // Validate coupon can be used
@@ -333,7 +334,7 @@ export class CouponHistoryService {
     const usedCoupons = await this.couponHistoryRepository.findUserUsedCoupons(userId);
     
     const totalSavings = usedCoupons.reduce(
-      (sum, history) => sum + (history.discountAppliedAmount || 0),
+      (sum, item) => sum + (item.discountAmount ?? 0),
       0,
     );
 
@@ -374,10 +375,241 @@ export class CouponHistoryService {
   }
 
   /**
+   * Expire all CouponHistory (status ISSUED) for a coupon (e.g. when coupon is deactivated).
+   */
+  async expireAllByCouponId(couponId: string): Promise<number> {
+    return await this.couponHistoryRepository.expireAllByCouponId(couponId);
+  }
+
+  /**
    * Expire old issued coupons (for batch jobs)
    */
   async expireOldCoupons(): Promise<number> {
     return await this.couponHistoryRepository.expireOldCoupons();
+  }
+
+  // ==================== Membership-based coupon issuance ====================
+
+  /** Coupon code for birthday coupon */
+  private static readonly BIRTHDAY_COUPON_CODE = 'BIRTHDAY';
+  /** Coupon code for free shipping (issued 1/2/3/5 per level) */
+  private static readonly FREE_SHIPPING_COUPON_CODE = 'FREE_SHIPPING';
+  /** Coupon codes for shopping support by level (10% max 10k, 10% max 20k, 15% max 30k, 20% max 50k) */
+  private static readonly SHOPPING_SUPPORT_CODES: Record<string, string> = {
+    [EMembershipLevel.LV2]: 'SHOPPING_SUPPORT_LV2', // 10% max 10,000 KRW, 1 coupon
+    [EMembershipLevel.LV3]: 'SHOPPING_SUPPORT_LV3', // 10% max 20,000 KRW, 2 coupons
+    [EMembershipLevel.LV4]: 'SHOPPING_SUPPORT_LV4', // 15% max 30,000 KRW, 3 coupons
+    [EMembershipLevel.LV5]: 'SHOPPING_SUPPORT_LV5', // 20% max 50,000 KRW, 3 coupons
+  };
+  /** Number of free shipping coupons per membership level (Lv.2=1, Lv.3=2, Lv.4=3, Lv.5=5) */
+  private static readonly FREE_SHIPPING_COUNT_BY_LEVEL: Record<string, number> = {
+    [EMembershipLevel.LV2]: 1,
+    [EMembershipLevel.LV3]: 2,
+    [EMembershipLevel.LV4]: 3,
+    [EMembershipLevel.LV5]: 5,
+  };
+  /** Number of shopping support coupons per membership level */
+  private static readonly SHOPPING_SUPPORT_COUNT_BY_LEVEL: Record<string, number> = {
+    [EMembershipLevel.LV2]: 1,
+    [EMembershipLevel.LV3]: 2,
+    [EMembershipLevel.LV4]: 3,
+    [EMembershipLevel.LV5]: 3,
+  };
+
+  /**
+   * Issue birthday coupon to user. Finds coupon with code BIRTHDAY and creates one CouponHistory for the user.
+   */
+  async issueBirthdayCoupon(userId: string): Promise<{
+    message: string;
+    count: number;
+    coupon: { id: string; name: string; code: string; type: string } | null;
+    histories: any[];
+  }> {
+    let coupon: CouponEntity;
+    try {
+      coupon = await this.couponsService.findByCode(CouponHistoryService.BIRTHDAY_COUPON_CODE);
+    } catch {
+      return {
+        message: `Coupon with code ${CouponHistoryService.BIRTHDAY_COUPON_CODE} not found`,
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    if (!coupon.isActive) {
+      return {
+        message: `Coupon ${coupon.code} is not active`,
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    const expirationDate = coupon.endDate;
+    const histories = await this.couponHistoryRepository.createWithQuantity(
+      coupon.id,
+      userId,
+      1,
+      expirationDate,
+    );
+    return {
+      message: `Successfully issued 1 birthday coupon to user`,
+      count: histories.length,
+      coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
+      histories,
+    };
+  }
+
+  /**
+   * Issue free shipping coupons to user based on membership level.
+   * 새싹 (Lv.2): 1, 열매 (Lv.3): 2, 나무 (Lv.4): 3, 정원 (Lv.5): 5.
+   */
+  async issueFreeShipping(userId: string): Promise<{
+    message: string;
+    count: number;
+    coupon: { id: string; name: string; code: string; type: string } | null;
+    histories: any[];
+  }> {
+    const membershipLevel = await this.couponHistoryRepository.getMembershipLevelByUserId(userId);
+    const count = membershipLevel
+      ? CouponHistoryService.FREE_SHIPPING_COUNT_BY_LEVEL[membershipLevel] ?? 0
+      : 0;
+    if (count <= 0) {
+      return {
+        message: 'User has no eligible membership level for free shipping coupons (Lv.2~5 only)',
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    let coupon: CouponEntity;
+    try {
+      coupon = await this.couponsService.findByCode(CouponHistoryService.FREE_SHIPPING_COUPON_CODE);
+    } catch {
+      return {
+        message: `Coupon with code ${CouponHistoryService.FREE_SHIPPING_COUPON_CODE} not found`,
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    if (!coupon.isActive) {
+      return {
+        message: `Coupon ${coupon.code} is not active`,
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    const histories = await this.couponHistoryRepository.createWithQuantity(
+      coupon.id,
+      userId,
+      count,
+      coupon.endDate,
+    );
+    return {
+      message: `Successfully issued ${histories.length} free shipping coupon(s)`,
+      count: histories.length,
+      coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
+      histories,
+    };
+  }
+
+  /**
+   * Issue shopping support (percent discount) coupons to user based on membership level.
+   * 새싹 (Lv.2): 1x 10% max 10,000 KRW | 열매 (Lv.3): 2x 10% max 20,000 KRW
+   * 나무 (Lv.4): 3x 15% max 30,000 KRW | 정원 (Lv.5): 3x 20% max 50,000 KRW
+   */
+  async issueShoppingSupport(userId: string): Promise<{
+    message: string;
+    count: number;
+    coupon: { id: string; name: string; code: string; type: string } | null;
+    histories: any[];
+  }> {
+    const membershipLevel = await this.couponHistoryRepository.getMembershipLevelByUserId(userId);
+    if (!membershipLevel || !CouponHistoryService.SHOPPING_SUPPORT_CODES[membershipLevel]) {
+      return {
+        message: 'User has no eligible membership level for shopping support coupons (Lv.2~5 only)',
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    const code = CouponHistoryService.SHOPPING_SUPPORT_CODES[membershipLevel];
+    const count = CouponHistoryService.SHOPPING_SUPPORT_COUNT_BY_LEVEL[membershipLevel] ?? 0;
+    if (count <= 0) {
+      return {
+        message: 'No shopping support coupons for this level',
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    let coupon: CouponEntity;
+    try {
+      coupon = await this.couponsService.findByCode(code);
+    } catch {
+      return {
+        message: `Coupon with code ${code} not found`,
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    if (!coupon.isActive) {
+      return {
+        message: `Coupon ${coupon.code} is not active`,
+        count: 0,
+        coupon: null,
+        histories: [],
+      };
+    }
+    const histories = await this.couponHistoryRepository.createWithQuantity(
+      coupon.id,
+      userId, 
+      count,
+      coupon.endDate,
+    );
+    return {
+      message: `Successfully issued ${histories.length} shopping support coupon(s)`,
+      count: histories.length,
+      coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
+      histories,
+    };
+  }
+
+  /**
+   * Issue coupons to user after payment: birthday, free shipping, and shopping support.
+   * Calls issueBirthdayCoupon, issueFreeShipping, and issueShoppingSupport in parallel.
+   */
+  async issueAfterPayment(userId: string): Promise<{
+    message: string;
+    totalCount: number;
+    birthday: { message: string; count: number; coupon: { id: string; name: string; code: string; type: string } | null; histories: any[] };
+    freeShipping: { message: string; count: number; coupon: { id: string; name: string; code: string; type: string } | null; histories: any[] };
+    shoppingSupport: { message: string; count: number; coupon: { id: string; name: string; code: string; type: string } | null; histories: any[] };
+    allHistories: any[];
+  }> {
+    const [birthday, freeShipping, shoppingSupport] = await Promise.all([
+      this.issueBirthdayCoupon(userId),
+      this.issueFreeShipping(userId),
+      this.issueShoppingSupport(userId),
+    ]);
+
+    const totalCount = birthday.count + freeShipping.count + shoppingSupport.count;
+    const allHistories = [
+      ...birthday.histories,
+      ...freeShipping.histories,
+      ...shoppingSupport.histories,
+    ];
+
+    return {
+      message: `After payment: issued ${totalCount} coupon(s) (birthday: ${birthday.count}, free shipping: ${freeShipping.count}, shopping support: ${shoppingSupport.count})`,
+      totalCount,
+      birthday,
+      freeShipping,
+      shoppingSupport,
+      allHistories,
+    };
   }
 }
 

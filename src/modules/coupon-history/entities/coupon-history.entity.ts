@@ -2,7 +2,7 @@ import { CouponHistoryStatus, CouponType } from '../../coupons/enums/coupon.enum
 
 export class CouponHistoryEntity {
   id!: string;
-  couponId!: string;
+  couponId?: string | null;
   userId!: string;
   orderId?: string | null;
   quantity!: number;
@@ -20,6 +20,21 @@ export class CouponHistoryEntity {
   coupon?: CouponInfo;
   user?: UserInfo;
   order?: OrderInfo;
+}
+
+export class CouponReturnEntity {
+  couponId?: string | null;
+  quantity!: number;
+  status!: CouponHistoryStatus;
+  issuedAt!: Date;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  usedAt?: Date | null;
+  expiredAt?: Date | null;
+  cancelledAt?: Date | null;
+  discountAmount?: number | null;
+  maxDiscountAmount?: number | null;
+  minPurchaseAmount?: number | null;
 }
 
 export class CouponInfo {

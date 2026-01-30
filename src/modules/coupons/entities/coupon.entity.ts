@@ -15,6 +15,7 @@ export class CouponEntity {
   isActive!: boolean;
   canAutoIssue!: boolean;
   isAutoIssue!: boolean;
+  hasBeenIssued!: boolean;
   autoIssueDayOfMonth?: Date | null;
   targetGrades!: CouponTargetGrade[];
   createdAt!: Date;
@@ -24,7 +25,7 @@ export class CouponEntity {
 export class CouponWithHistories extends CouponEntity {
   histories?: {
     id: string;
-    couponId: string;
+    couponId: string | null;
     userId: string;
     status: CouponHistoryStatus;
     issuedAt?: Date | null;

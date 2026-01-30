@@ -6,7 +6,7 @@ import { CouponRepository } from './repositories/coupon.repository';
 import { CouponHistoryStatus, CouponType } from './enums/coupon.enum';
 import { CouponEntity } from './entities/coupon.entity';
 import { AppLogger } from 'src/libs/logger/logger.service';
-import { getFirstDateOfNextMonth, getFirstDateOfThisMonth } from './helpers/coupon.helper';
+import { getFirstDateOfNextMonth, getNextMonthDateRange } from './helpers/coupon.helper';
 import { CouponHistoryService } from '../coupon-history/coupon-history.service';
 
 @Injectable()
@@ -45,23 +45,22 @@ export class CouponsService {
       }
     }
 
+    // Khi isAutoIssue: startDate/endDate = ngày đầu và ngày cuối tháng sau
+    if (createCouponDto.isAutoIssue) {
+      const { startDate: nextStart, endDate: nextEnd } = getNextMonthDateRange();
+      createCouponDto.startDate = nextStart.toISOString();
+      createCouponDto.endDate = nextEnd.toISOString();
+      if (!createCouponDto.autoIssueDayOfMonth) {
+        this.logger.warn('autoIssueDayOfMonth is required when isAutoIssue is true');
+        createCouponDto.autoIssueDayOfMonth = getFirstDateOfNextMonth().toISOString();
+      }
+    }
+
     // Validate date range
     const startDate = new Date(createCouponDto.startDate);
     const endDate = new Date(createCouponDto.endDate);
     if (startDate >= endDate) {
       throw new BadRequestException('startDate must be before endDate');
-    }
-
-    // Validate auto-issue fields
-    if (createCouponDto.isAutoIssue) {
-      if (!createCouponDto.autoIssueDayOfMonth) {
-        this.logger.warn('autoIssueDayOfMonth is required when isAutoIssue is true');
-        const autoIssueDayOfMonth = getFirstDateOfNextMonth();
-        createCouponDto.autoIssueDayOfMonth = autoIssueDayOfMonth.toISOString();
-      }
-      if (!createCouponDto.targetGrades || createCouponDto.targetGrades.length === 0) {
-        throw new BadRequestException('targetGrades is required when isAutoIssue is true');
-      }
     }
 
     const created = await this.couponRepository.create(createCouponDto);
@@ -172,6 +171,11 @@ export class CouponsService {
       //   throw new BadRequestException('autoIssueDayOfMonth is required when isAutoIssue is true');
       // }
       await this.couponHistoryService.issueCouponToUsersByTargetGrades(id, targetGrades);
+    }
+
+    // Khi isActive = false: đổi status tất cả CouponHistory (ISSUED) của coupon này thành EXPIRED
+    if (updateCouponDto.isActive === false) {
+      await this.couponHistoryService.expireAllByCouponId(id);
     }
 
     return this.couponRepository.update(id, updateCouponDto);

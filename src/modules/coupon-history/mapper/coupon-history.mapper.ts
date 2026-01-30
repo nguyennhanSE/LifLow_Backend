@@ -1,5 +1,5 @@
 import { CouponHistory, Coupon, Order, User } from '@prisma/client';
-import { CouponHistoryEntity, CouponInfo, UserInfo, OrderInfo } from '../entities/coupon-history.entity';
+import { CouponHistoryEntity, CouponReturnEntity, CouponInfo, UserInfo, OrderInfo } from '../entities/coupon-history.entity';
 import { CouponHistoryStatus } from '../../coupons/enums/coupon.enum';
 import { toCouponEntity } from '../../coupons/mapper/coupon.mapper';
 
@@ -13,12 +13,38 @@ type CouponHistoryWithRelations = CouponHistory & {
 };
 
 /**
+ * Maps Prisma CouponHistory with coupon relation to CouponReturnEntity
+ */
+export function toCouponReturnEntity(history: CouponHistoryWithRelations): CouponReturnEntity {
+  return {
+    couponId: history.couponId ?? null,
+    quantity: history.quantity,
+    status: history.status as CouponHistoryStatus,
+    issuedAt: history.issuedAt,
+    usedAt: history.usedAt ?? null,
+    expiredAt: history.expiredAt ?? null,
+    cancelledAt: history.cancelledAt ?? null,
+    discountAmount: history.coupon?.discountAmount ?? null,
+    maxDiscountAmount: history.coupon?.maxDiscountAmount ?? null,
+    minPurchaseAmount: history.coupon?.minPurchaseAmount ?? null,
+    startDate: history.coupon?.startDate ?? null,
+    endDate: history.coupon?.endDate ?? null,
+  };
+}
+
+export function toCouponReturnEntityArray(
+  histories: CouponHistoryWithRelations[],
+): CouponReturnEntity[] {
+  return histories.map(toCouponReturnEntity);
+}
+
+/**
  * Maps Prisma CouponHistory model to CouponHistoryEntity
  */
 export function toCouponHistoryEntity(history: CouponHistory): CouponHistoryEntity {
   return {
     id: history.id,
-    couponId: history.couponId,
+    couponId: history.couponId ?? '',
     userId: history.userId,
     orderId: history.orderId,
     quantity: history.quantity,

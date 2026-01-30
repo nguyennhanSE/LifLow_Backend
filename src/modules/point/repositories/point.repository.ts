@@ -110,6 +110,29 @@ export class PointRepository {
     return !!orderGroup;
   }
 
+  async getUserMembershipAndPoints(
+    userId: string,
+  ): Promise<{ membershipLevel: string | null; availablePoints: number }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { membershipLevel: true, availablePoints: true },
+    });
+    if (!user) {
+      return { membershipLevel: null, availablePoints: 0 };
+    }
+    return {
+      membershipLevel: user.membershipLevel ?? null,
+      availablePoints: user.availablePoints ?? 0,
+    };
+  }
+
+  async updateUserAvailablePoints(userId: string, availablePoints: number): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { availablePoints },
+    });
+  }
+
   private handlePrismaError(error: any, id?: string): never {
     if (error?.code === 'P2025') {
       throw new PointNotFoundException(`Point with id ${id ?? ''} not found`.trim());

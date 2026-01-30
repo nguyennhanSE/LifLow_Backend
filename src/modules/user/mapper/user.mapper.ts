@@ -179,7 +179,7 @@ export function toUserEntityWithRelations(user: UserWithRelations): UserEntity {
 /**
  * Maps CreateUserDto to Prisma User create input
  */
-export function toPrismaUserCreateInput(dto: CreateUserDto & {password?: string; phoneNumber?: string; id?: string; avatarImageUrl?: string }) {
+export function toPrismaUserCreateInput(dto: CreateUserDto & {password?: string; phoneNumber?: string; id?: string; avatarImageUrl?: string; membershipLevel?: string }) {
   const registrationDate = new Date().toISOString().split('T')[0];
   
   return {
@@ -201,6 +201,7 @@ export function toPrismaUserCreateInput(dto: CreateUserDto & {password?: string;
     nickName: dto.nickName ?? null,
     statusMessage: dto.statusMessage ?? null,
     avatarURL: dto.avatarImageUrl ?? null,
+    membershipLevel: dto.membershipLevel ?? null,
   };
 }
 

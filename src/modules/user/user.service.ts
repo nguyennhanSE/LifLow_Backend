@@ -4,6 +4,7 @@ import { CreateUserDto, UpdateShippingAddressDto, UpdateUserDto, UserFilterDto }
 import { UserRepository } from './repositories/user.repository';
 import { IPaginate, PaginateOptions } from '../../libs/models/paginate/pagimate.model';
 import { ERoleName } from '../roles/enums/role.enum';
+import { EMembershipLevel } from '../memberships/enums/membership.enum';
 import * as bcrypt from 'bcrypt';
 import { UserEmailService } from '../email/email.service';
 import { SendEmailDto } from '../email/dto/email.dto';
@@ -68,6 +69,7 @@ export class UserService {
       password: hashedPassword,
       phoneNumber: createUserDto.phoneNumber || '',
       avatarImageUrl,
+      membershipLevel: EMembershipLevel.LV1, // New users always start at LV1. 씨앗
     });
 
     // Send welcome email
