@@ -308,8 +308,9 @@ export class PaymentService {
       });
       this.logger.log('Payment confirmed with Toss successfully');
 
-      // 2. Execute single database transaction
-      const payment = await this.prisma.$transaction(async (tx) => {
+      // 2. Execute single database transaction (long timeout: many orders + coupon history + points + payment)
+      const payment = await this.prisma.$transaction(
+        async (tx) => {
         this.logger.log('Starting database transaction');
 
         // 2.1. Get OrderGroup by orderGroupNumber
@@ -735,19 +736,28 @@ export class PaymentService {
           },
         });
 
-        // 2.13. Issue
-        await this.pointService.issueAfterPayment(
-          userId,
-          savedPayment.totalAmount ?? 0,
-          validatedDto.orderGroupNumber,
-        );
-
-
         this.logger.log(`Deleted ${orderGroup.cartItemIds.length} cart items`);
         this.logger.log('Transaction completed successfully');
 
         return savedPayment;
-      });
+        },
+        { timeout: 30_000, maxWait: 10_000 },
+      );
+
+      // 2.13. Issue reward points AFTER transaction (avoids deadlock: pointService uses its own connection)
+      try {
+        await this.pointService.issueAfterPayment(
+          userId,
+          payment.totalAmount ?? 0,
+          validatedDto.orderGroupNumber,
+        );
+      } catch (pointError) {
+        this.logger.error(
+          `Payment succeeded but failed to issue reward points for orderGroup ${validatedDto.orderGroupNumber}`,
+          pointError,
+        );
+        // Do not throw: payment is already committed; points can be reconciled by a job if needed
+      }
 
       this.logger.log(`Payment confirmation completed successfully: ${payment.id}`);
 
@@ -755,7 +765,25 @@ export class PaymentService {
     } catch (error) {
       this.logger.error('Failed to confirm payment', error);
 
-      // Try to save failed payment record
+      // Rollback: mark OrderGroup as ORDER_CANCELLED on any failure
+      try {
+        await this.prisma.orderGroup.updateMany({
+          where: { orderGroupNumber: validatedDto.orderGroupNumber },
+          data: {
+            situation: EOrderSituation.ORDER_CANCELLED as OrderSituation,
+          },
+        });
+        this.logger.log(
+          `OrderGroup ${validatedDto.orderGroupNumber} updated to ORDER_CANCELLED after failure`,
+        );
+      } catch (updateError) {
+        this.logger.error(
+          `Failed to update OrderGroup ${validatedDto.orderGroupNumber} to ORDER_CANCELLED`,
+          updateError,
+        );
+      }
+
+      // Save failed payment record for audit
       try {
         await this.paymentRepository.create({
           userId: userId,
