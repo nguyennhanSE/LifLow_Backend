@@ -266,26 +266,6 @@ export class UserController {
     return responseModel;
   }
 
-  @Patch(':id')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER)
-  @ApiOperation({ summary: 'Update user information' })
-  @ApiResponse({ status: 200, description: 'User updated successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    const responseModel = new ResponseModel();
-
-    try {
-      const user = await this.userService.update(id, updateUserDto);
-      const result = toResponse(user);
-      responseModel.setData(result);
-    } catch (error) {
-      throw error;
-    }
-
-    return responseModel;
-  }
-
   @Delete(':id')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
   @ApiOperation({ summary: 'Delete user' })
@@ -644,6 +624,26 @@ export class UserController {
       responseModel.setData(result);
     } catch (error) {
       console.error('Error in updateUserProfile:', error);
+      throw error;
+    }
+
+    return responseModel;
+  }
+  
+  @Patch(':id')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER)
+  @ApiOperation({ summary: 'Update user information' })
+  @ApiResponse({ status: 200, description: 'User updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const user = await this.userService.update(id, updateUserDto);
+      const result = toResponse(user);
+      responseModel.setData(result);
+    } catch (error) {
       throw error;
     }
 

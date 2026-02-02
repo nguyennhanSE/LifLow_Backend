@@ -230,3 +230,35 @@ export function toResponse(entity: UserEntity) {
   return rest;
 }
 
+const TIMESTAMP_KEYS = ['createdAt', 'updatedAt'];
+
+/**
+ * Recursively removes null/undefined values and createdAt/updatedAt from an object (or array).
+ * Use to wrap API responses for a clean payload.
+ */
+export function stripNullsAndTimestamps<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => stripNullsAndTimestamps(item)) as T;
+  }
+  if (typeof obj === 'object' && obj !== null && obj.constructor === Object) {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (TIMESTAMP_KEYS.includes(k)) continue;
+      if (v === null || v === undefined) continue;
+      result[k] = stripNullsAndTimestamps(v);
+    }
+    return result as T;
+  }
+  return obj;
+}
+
+/**
+ * Wraps getUserInfo raw result: strips null fields and createdAt/updatedAt from user and nested relations (orderGroups, orders, point, etc.).
+ */
+export function toUserInfoResponse<T>(userWithRelations: T): T {
+  return stripNullsAndTimestamps(userWithRelations);
+}
+

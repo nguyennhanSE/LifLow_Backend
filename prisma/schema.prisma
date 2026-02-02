@@ -216,6 +216,7 @@ model RefreshTokenUsed {
 enum OrderSituation {
   ORDER_PAYMENT_PENDING // 결제대기
   ORDER_PAYMENT_COMPLETED // 결제완료
+  ORDER_PAYMENT_FAILED  // 결제실패
   // ORDER_IN_PREPARE // 결제실패
   ORDER_BEING_SHIPPED // 배송중
   ORDER_SHIPPED // 배송완료

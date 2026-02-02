@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "prisma/prisma.service";
 import { UserEntity } from "../entities/user.entity";
 import { CreateUserDto, UpdateShippingAddressDto, UserFilterDto } from "../dto/user.dto";
-import { toUserEntity, toPrismaUserCreateInput, toUserEntityWithRelations } from "../mapper/user.mapper";
+import { toUserEntity, toPrismaUserCreateInput, toUserEntityWithRelations, toUserInfoResponse } from "../mapper/user.mapper";
 import { IPaginate, PaginateOptions } from "../../../libs/models/paginate/pagimate.model";
 import { Prisma, User } from "@prisma/client";
 import { ERoleName } from "../../roles/enums/role.enum";
@@ -10,6 +10,7 @@ import { BadRequestException } from "@nestjs/common";
 import { OrderRepository } from "../../order/repositories/order.repository";
 import { toOrderGroupResponseDto, toOrderGroupEntityWithRelations } from "../../order/mapper/order.mapper";
 import { OrderGroupResponseDto } from "../../order/dto/order.dto";
+import { EOrderSituation } from "src/modules/order/enum/order.enum";
 
 @Injectable()
 export class UserRepository {
@@ -697,7 +698,11 @@ export class UserRepository {
       }
 
       if (options.includeOrders) {
-        include.orderGroups = true;
+        include.orderGroups = {
+          where: { situation: { not: { in: [EOrderSituation.ORDER_PAYMENT_FAILED, EOrderSituation.ORDER_PAYMENT_PENDING] } } }, 
+          include: { orders: true },
+          orderBy: { createdAt: 'desc' },
+        };
       }
 
       if (options.includeCarts) {
@@ -721,7 +726,9 @@ export class UserRepository {
       }
 
       if (options.includeRecipes) {
-        include.recipes = true;
+        include.recipes = {
+          include : {recipeComments : true}
+        }
       }
 
       const user = await this.prisma.user.findUnique({
@@ -788,7 +795,7 @@ export class UserRepository {
         userWithRelations.recipes = userWithRelations.recipes ?? [];
       }
 
-      return userWithRelations;
+      return toUserInfoResponse(userWithRelations);
     } catch (error) {
       console.error('Prisma error in getUserInfo:', error);
       throw error;

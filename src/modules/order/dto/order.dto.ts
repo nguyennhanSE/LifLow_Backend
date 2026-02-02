@@ -1077,6 +1077,17 @@ export class UpdateOrderGroupDto {
   invoiceNumber?: string;
 }
 
+// Cancel order group (set situation to ORDER_PAYMENT_FAILED)
+export class CancelOrderGroupDto {
+  @ApiProperty({
+    description: 'Order group number to cancel',
+    example: '20250123-0000001',
+  })
+  @IsNotEmpty({ message: 'Order group number is required' })
+  @IsString({ message: 'Order group number must be a string' })
+  orderGroupNumber!: string;
+}
+
 // 3. ORDER GROUP RESPONSE DTO
 export class OrderGroupResponseDto {
   @ApiProperty({ description: 'Order group number', example: '20250123-0000001' })

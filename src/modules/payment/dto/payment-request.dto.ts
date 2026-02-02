@@ -158,6 +158,11 @@ export class CouponIdQuantityDto {
 // }
 
 export class ConfirmPaymentRequestDto {
+  @ApiProperty({ description: 'Payment token from initiatePayment (required, expires in 1 hour)' })
+  @IsString()
+  @IsNotEmpty({ message: 'Payment token is required' })
+  paymentToken: string;
+
   @ApiProperty({ description: '결제 키 (Toss에서 전달)' })
   @IsString()
   paymentKey: string;

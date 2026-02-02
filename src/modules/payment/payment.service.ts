@@ -29,6 +29,15 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { EOrderSituation } from '../order/enum/order.enum';
 import { CouponHistoryService } from '../coupon-history/coupon-history.service';
 import { PointService } from '../point/point.service';
+import { JwtService } from '@nestjs/jwt';
+import { config } from '../../libs/config';
+
+export interface PaymentTokenPayload {
+  orderGroupNumber: string;
+  userId: string;
+  iat?: number;
+  exp?: number;
+}
 
 @Injectable()
 export class PaymentService {
@@ -42,6 +51,7 @@ export class PaymentService {
     private readonly prisma: PrismaService,
     private readonly couponHistoryService: CouponHistoryService,
     private readonly pointService: PointService,
+    private readonly jwtService: JwtService,
   ) {}
 
   /**
@@ -68,12 +78,13 @@ export class PaymentService {
     }
 
     try {
-      // 1. Validate user exists
+      // 1. Validate user exists (need name, phoneNumber for order creation)
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { 
+        select: {
           name: true,
           availablePoints: true,
+          phoneNumber: true,
         },
       });
 
@@ -133,9 +144,10 @@ export class PaymentService {
       const appliedCouponIds: string[] = [];
       let effectiveDeliveryFee = deliveryFee ?? 0;
 
+      let coupons: Coupon[] = [];
       if (couponIds && couponIds.length > 0) {
         const couponIdsFromDto = couponIds.map((c) => c.couponId);
-        const coupons = await this.prisma.coupon.findMany({
+        coupons = await this.prisma.coupon.findMany({
           where: {
             id: { in: couponIdsFromDto },
             isActive: true,
@@ -191,36 +203,169 @@ export class PaymentService {
       // 8. Generate unique order group number
       const orderGroupNumber = await this.ordersService.generateUniqueOrderGroupNumber();
 
-      // 9. Generate customerKey for Toss
+      // 9. Fetch cart, shipping address, membership for order creation
+      const cart = await this.prisma.cart.findUnique({
+        where: { userId },
+      });
+      if (!cart) {
+        throw new NotFoundException(`Cart for user ${userId} not found`);
+      }
+
+      let shippingAddress: {
+        recipientName: string;
+        addressFull: string;
+        postalCode: number | null;
+        mobilePhone: string | null;
+        phoneNumber: string | null;
+      } | null = null;
+      if (userShippingAddressId) {
+        const address = await this.prisma.userShippingAddress.findUnique({
+          where: { id: userShippingAddressId },
+        });
+        if (!address) {
+          throw new NotFoundException(`Shipping address with ID ${userShippingAddressId} not found`);
+        }
+        if (address.userId !== userId) {
+          throw new BadRequestException('Shipping address does not belong to this user');
+        }
+        shippingAddress = address;
+      }
+
+      const userMembership = await this.prisma.userMembership.findFirst({
+        where: {
+          userId,
+          startDate: { lte: new Date() },
+          endDate: { gte: new Date() },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      const membershipLevelAtOrderTime = userMembership?.membershipName || '';
+      const couponMap = new Map(coupons.map((c) => [c.id, c]));
+      const today = this.formatLocalYyyyMmDd(new Date());
+
+      // 10. Create OrderGroup and Orders in a single transaction
+      await this.prisma.$transaction(
+        async (tx) => {
+          await tx.orderGroup.create({
+            data: {
+              orderGroupNumber,
+              situation: EOrderSituation.ORDER_PAYMENT_PENDING as OrderSituation,
+              orderGroupName: 'Order Group Number: ' + orderGroupNumber,
+              originalAmount,
+              discountAmount: totalDiscountAmount,
+              finalAmount,
+              cartItemIds,
+              pointsUsed: points || 0,
+              deliveryFee: effectiveDeliveryFee,
+              ordererId: userId,
+            },
+          });
+
+          for (const cartItem of fetchedCartItems) {
+            const totalOrderAmount = cartItem.salePrice * cartItem.quantity;
+            let totalDiscount = 0;
+            const orderAppliedCouponIds: string[] = [];
+
+            if (couponIds && couponIds.length > 0) {
+              for (const entry of couponIds) {
+                const coupon = couponMap.get(entry.couponId);
+                if (!coupon) continue;
+
+                let discount = 0;
+                if (coupon.type === 'PERCENT') {
+                  discount = Math.floor(
+                    (totalOrderAmount * (coupon.discountRate || 0)) / 100,
+                  );
+                  if (
+                    coupon.maxDiscountAmount != null &&
+                    discount > coupon.maxDiscountAmount
+                  ) {
+                    discount = coupon.maxDiscountAmount;
+                  }
+                } else if (coupon.type === 'AMOUNT') {
+                  discount = (coupon.discountAmount || 0) * (entry.quantity ?? 1);
+                }
+                totalDiscount += discount;
+                orderAppliedCouponIds.push(coupon.id);
+              }
+            }
+
+            const totalPaymentAmount = Math.max(0, totalOrderAmount - totalDiscount);
+
+            let orderNumber = '';
+            const maxRetries = 5;
+            let retryCount = 0;
+            let orderCreated = false;
+
+            while (!orderCreated && retryCount < maxRetries) {
+              try {
+                orderNumber = await this.ordersService.generateOrderNumberInTransaction(
+                  tx,
+                  orderGroupNumber,
+                );
+
+                const orderData: Prisma.OrderCreateInput = {
+                  orderNumber,
+                  orderGroup: {
+                    connect: { orderGroupNumber },
+                  },
+                  totalOrderAmount,
+                  totalPaymentAmount,
+                  productName: cartItem.product?.productName || '',
+                  productNameWithOptions: cartItem.product?.productName || '',
+                  quantity: cartItem.quantity,
+                  salePrice: cartItem.salePrice,
+                  couponUsed: orderAppliedCouponIds,
+                  discountAmount: totalDiscount,
+                  recipient: shippingAddress?.recipientName || user.name || '',
+                  recipientAddressFull: shippingAddress?.addressFull || '',
+                  recipientPostalCode: shippingAddress?.postalCode || 0,
+                  recipientMobilePhone: shippingAddress?.mobilePhone || user.phoneNumber || '',
+                  recipientPhoneNumber: shippingAddress?.phoneNumber || '',
+                  deliveryMessage: '',
+                  orderDate: today,
+                  ordererName: user.name || '',
+                  ordererMobilePhone: user.phoneNumber || '',
+                  membershipLevelAtOrderTime,
+                  cart: { connect: { id: cart.id } },
+                  product: { connect: { id: cartItem.productId } },
+                };
+
+                await tx.order.create({ data: orderData });
+
+                this.logger.log(
+                  `Created order ${orderNumber}: ${totalOrderAmount} KRW -> ${totalPaymentAmount} KRW (discount: ${totalDiscount})`,
+                );
+                orderCreated = true;
+              } catch (error: any) {
+                if (error?.code === 'P2002' && error?.meta?.target?.includes('order_number')) {
+                  retryCount++;
+                  this.logger.warn(
+                    `Duplicate order number ${orderNumber}, retrying (${retryCount}/${maxRetries})`,
+                  );
+                  await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
+                  continue;
+                }
+                throw error;
+              }
+            }
+
+            if (!orderCreated) {
+              throw new InternalServerErrorException(
+                `Failed to create order for cart item ${cartItem.id} after ${maxRetries} attempts`,
+              );
+            }
+          }
+
+          this.logger.log(`Created ${fetchedCartItems.length} orders for order group ${orderGroupNumber}`);
+        },
+        { timeout: 30_000, maxWait: 10_000 },
+      );
+
+      // 11. Generate customerKey for Toss
       const customerKey = `customer_${userId}`;
 
-      // 10. Create order group name
-      // const productNames = fetchedCartItems
-      //   .slice(0, 2)
-      //   .map(item => item.product?.productName || 'Unknown Product')
-      //   .join(', ');
-      // const orderGroupName = 
-      //   fetchedCartItems.length > 2
-      //     ? `${productNames} 외 ${fetchedCartItems.length - 2}건`
-      //     : productNames;
-
-      // 11. Create OrderGroup in database
-      await this.prisma.orderGroup.create({
-        data: {
-          orderGroupNumber,
-          situation: EOrderSituation.ORDER_PAYMENT_PENDING as OrderSituation,
-          orderGroupName: 'Order Group Number: ' + orderGroupNumber,
-          originalAmount,
-          discountAmount: totalDiscountAmount,
-          finalAmount,
-          cartItemIds,
-          pointsUsed: points || 0,
-          deliveryFee: effectiveDeliveryFee,
-          ordererId : userId
-        },
-      });
-
-      // 12. Build response with URLs for Toss
+      // 12. Build response with URLs for Toss (orders already created and linked to OrderGroup)
       const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
       const successUrl = `${frontendUrl}/payment/success`;
       const failUrl = `${frontendUrl}/payment/fail`;
@@ -236,6 +381,14 @@ export class PaymentService {
         deliveryFee: effectiveDeliveryFee,
         userShippingAddressId,
       });
+
+      const paymentToken = await this.jwtService.signAsync(
+        { orderGroupNumber, userId } as PaymentTokenPayload,
+        {
+          secret: config.JWT_SECRET_ACCESS_TOKEN,
+          expiresIn: '1h',
+        },
+      );
 
       return {
         orderId: orderGroupNumber,
@@ -253,6 +406,7 @@ export class PaymentService {
           couponId: id,
           quantity: 1,
         })),
+        paymentToken,
       };
     } catch (error) {
       this.logger.error('Failed to initiate payment', error);
@@ -271,11 +425,29 @@ export class PaymentService {
   /**
    * Confirm payment after user completes checkout
    * This is called from the success callback URL
-   * Transaction flow: 1. Create orders, 2. Confirm payment with Toss, 3. Save payment
+   * Transaction flow: 1. Confirm payment with Toss, 2. Save coupon history / points / payment (orders already created in initiatePayment)
    */
   async confirmPayment(
     dto: ConfirmPaymentRequestDto,
   ): Promise<PaymentResponseDto> {
+    // Validate and decode payment token (expires in 1 hour)
+    try {
+      const payload = await this.jwtService.verifyAsync<PaymentTokenPayload>(
+        dto.paymentToken,
+        {
+          secret: config.JWT_SECRET_ACCESS_TOKEN,
+        },
+      );
+      if (
+        payload.orderGroupNumber !== dto.orderGroupNumber ||
+        payload.userId !== dto.userId
+      ) {
+        throw new BadRequestException('Payment token is outdated or invalid');
+      }
+    } catch {
+      throw new BadRequestException('Payment token is outdated or invalid');
+    }
+
     // Validate userId is provided and is a string
     if (!dto.userId || typeof dto.userId !== 'string') {
       throw new BadRequestException('User ID is required and must be a string');
@@ -341,89 +513,20 @@ export class PaymentService {
           throw new NotFoundException(`User with ID ${userId} not found`);
         }
 
-        // 2.2.1. Get User Shipping Address
-        let shippingAddress: {
-          id: string;
-          userId: string;
-          recipientName: string;
-          deliveryAddress: string;
-          address: string;
-          addressFull: string;
-          postalCode: number | null;
-          mobilePhone: string | null;
-          phoneNumber: string | null;
-          setAsDefault: boolean;
-        } | null = null;
-        
-        if (validatedDto.userShippingAddressId) {
-          // Get specific shipping address by ID
-          const address = await tx.userShippingAddress.findUnique({
-            where: { id: validatedDto.userShippingAddressId },
-          });
-
-          if (!address) {
-            throw new NotFoundException(`Shipping address with ID ${validatedDto.userShippingAddressId} not found`);
-          }
-
-          // Verify that the shipping address belongs to the user
-          if (address.userId !== userId) {
-            throw new BadRequestException('Shipping address does not belong to this user');
-          }
-          
-          shippingAddress = address;
-        } else {
-          // Get default shipping address by userId
-          shippingAddress = await tx.userShippingAddress.findFirst({
-            where: { userId: userId },
-          });
-        }
-
-        this.logger.log(`Shipping address found: ${shippingAddress ? 'Yes' : 'No (will use user info as fallback)'}`);
-
-        // 2.3. Get Cart
-        const cart = await tx.cart.findUnique({
-          where: { userId: userId },
+        // 2.3. Load existing orders (created in initiatePayment)
+        const existingOrders = await tx.order.findMany({
+          where: { orderGroupNumber: validatedDto.orderGroupNumber },
         });
 
-        if (!cart) {
-          throw new NotFoundException(`Cart for user ${userId} not found`);
+        if (existingOrders.length === 0) {
+          throw new NotFoundException(
+            `No orders found for order group ${validatedDto.orderGroupNumber}. Ensure payment was initiated first.`,
+          );
         }
 
-        // 2.4. Get Cart Items using cartItemIds from OrderGroup
-        const cartItems = await tx.cartItem.findMany({
-          where: {
-            id: { in: orderGroup.cartItemIds },
-            status: 'ACTIVE',
-          },
-          include: {
-            product: {
-              select: {
-                id: true,
-                productName: true,
-              },
-            },
-          },
-        });
+        this.logger.log(`Found ${existingOrders.length} existing orders for order group`);
 
-        if (cartItems.length === 0) {
-          throw new NotFoundException('No active cart items found');
-        }
-
-        this.logger.log(`Found ${cartItems.length} cart items`);
-
-        // 2.5. Get user's active membership
-        const userMembership = await tx.userMembership.findFirst({
-          where: {
-            userId: userId,
-            startDate: { lte: new Date() },
-            endDate: { gte: new Date() },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-
-        const membershipLevelAtOrderTime = userMembership?.membershipName || '';
-
-        // 2.6. Collect applied coupon IDs from DTO (order-level from initiate response)
+        // 2.4. Collect applied coupon IDs and coupon map for coupon history
         const today = this.formatLocalYyyyMmDd(new Date());
         const allCouponIds = new Set<string>();
         if (validatedDto.coupons && validatedDto.coupons.length > 0) {
@@ -439,143 +542,25 @@ export class PaymentService {
           this.logger.log(`Found ${coupons.length} coupons for order group`);
         }
 
-        interface CreatedOrder {
-          id: string;
-          orderNumber: string;
-          totalOrderAmount: number;
-          totalPaymentAmount: number;
-          appliedDiscount: number;
-          appliedCouponIds: string[];
-        }
-        const createdOrders: CreatedOrder[] = [];
-
-        for (let i = 0; i < cartItems.length; i++) {
-          const cartItem = cartItems[i];
-          const totalOrderAmount = cartItem.salePrice * cartItem.quantity;
-          let totalDiscount = 0;
-          const orderAppliedCouponIds: string[] = [];
-
-          if (validatedDto.coupons && validatedDto.coupons.length > 0) {
-            for (const entry of validatedDto.coupons) {
-              const coupon = couponMap.get(entry.couponId);
-              if (!coupon) continue;
-
-              let discount = 0;
-              if (coupon.type === 'PERCENT') {
-                discount = Math.floor(
-                  (totalOrderAmount * (coupon.discountRate || 0)) / 100,
-                );
-                if (
-                  coupon.maxDiscountAmount != null &&
-                  discount > coupon.maxDiscountAmount
-                ) {
-                  discount = coupon.maxDiscountAmount;
-                }
-              } else if (coupon.type === 'AMOUNT') {
-                discount = (coupon.discountAmount || 0) * (entry.quantity ?? 1);
-              }
-              totalDiscount += discount;
-              orderAppliedCouponIds.push(coupon.id);
-            }
-          }
-
-          const totalPaymentAmount = Math.max(0, totalOrderAmount - totalDiscount);
-
-          let orderNumber = '';
-          let order: any;
-          const maxRetries = 5;
-          let retryCount = 0;
-          let orderCreated = false;
-
-          while (!orderCreated && retryCount < maxRetries) {
-            try {
-              orderNumber = await this.ordersService.generateOrderNumberInTransaction(
-                tx,
-                validatedDto.orderGroupNumber,
-              );
-
-              const orderData: Prisma.OrderCreateInput = {
-                orderNumber,
-                orderGroup: {
-                  connect: { orderGroupNumber: validatedDto.orderGroupNumber },
-                },
-                totalOrderAmount,
-                totalPaymentAmount,
-                productName: cartItem.product?.productName || '',
-                productNameWithOptions: cartItem.product?.productName || '',
-                quantity: cartItem.quantity,
-                salePrice: cartItem.salePrice,
-                couponUsed: orderAppliedCouponIds,
-                discountAmount: totalDiscount,
-                recipient: shippingAddress?.recipientName || user.name || '',
-                recipientAddressFull: shippingAddress?.addressFull || '',
-                recipientPostalCode: shippingAddress?.postalCode || 0,
-                recipientMobilePhone: shippingAddress?.mobilePhone || user.phoneNumber || '',
-                recipientPhoneNumber: shippingAddress?.phoneNumber || '',
-                deliveryMessage: '',
-                orderDate: today,
-                ordererName: user.name || '',
-                ordererMobilePhone: user.phoneNumber || '',
-                membershipLevelAtOrderTime,
-                cart: { connect: { id: cart.id } },
-                product: { connect: { id: cartItem.productId } },
-              };
-
-              order = await tx.order.create({ data: orderData });
-
-              createdOrders.push({
-                id: order.id,
-                orderNumber: order.orderNumber || orderNumber,
-                totalOrderAmount,
-                totalPaymentAmount,
-                appliedDiscount: totalDiscount,
-                appliedCouponIds: orderAppliedCouponIds,
-              });
-
-              this.logger.log(
-                `Created order ${orderNumber}: ${totalOrderAmount} KRW -> ${totalPaymentAmount} KRW (discount: ${totalDiscount})`,
-              );
-              orderCreated = true;
-            } catch (error: any) {
-              if (error?.code === 'P2002' && error?.meta?.target?.includes('order_number')) {
-                retryCount++;
-                this.logger.warn(
-                  `Duplicate order number ${orderNumber}, retrying (${retryCount}/${maxRetries})`,
-                );
-                await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
-                continue;
-              }
-              throw error;
-            }
-          }
-
-          if (!orderCreated) {
-            throw new InternalServerErrorException(
-              `Failed to create order for cart item ${cartItem.id} after ${maxRetries} attempts`,
-            );
-          }
-        }
-
-        this.logger.log(`Created ${createdOrders.length} orders`);
-
-        // 2.8. Save coupon history: one USED record per (order, coupon)
-        if (createdOrders.length > 0 && validatedDto.coupons?.length) {
+        // 2.5. Save coupon history: one USED record per (order, coupon)
+        if (existingOrders.length > 0 && validatedDto.coupons?.length) {
           const couponQuantityByEntry = new Map<string, number>();
           validatedDto.coupons.forEach((c) => {
             couponQuantityByEntry.set(c.couponId, c.quantity ?? 1);
           });
 
-          for (const order of createdOrders) {
-            for (const couponId of order.appliedCouponIds) {
+          for (const order of existingOrders) {
+            const orderAmount = order.totalOrderAmount ?? 0;
+            for (const couponId of order.couponUsed) {
               const coupon = couponMap.get(couponId);
               if (!coupon) continue;
 
               let discountAppliedAmount = 0;
               if (coupon.type === 'PERCENT') {
                 discountAppliedAmount = Math.floor(
-                  (order.totalOrderAmount * (coupon.discountRate || 0)) / 100,
+                  (orderAmount * (coupon.discountRate || 0)) / 100,
                 );
-                if (
+                if  (
                   coupon.maxDiscountAmount != null &&
                   discountAppliedAmount > coupon.maxDiscountAmount
                 ) {
@@ -611,7 +596,7 @@ export class PaymentService {
                       issuedAt: new Date(),
                       usedAt: new Date(),
                       discountAppliedAmount: discountAppliedAmount,
-                      purchaseAmountAtUse: order.totalOrderAmount,
+                      purchaseAmountAtUse: orderAmount,
                     },
                   });
                 } else {
@@ -622,7 +607,7 @@ export class PaymentService {
                       orderId: order.id,
                       usedAt: new Date(),
                       discountAppliedAmount: discountAppliedAmount,
-                      purchaseAmountAtUse: order.totalOrderAmount,
+                      purchaseAmountAtUse: orderAmount,
                     },
                   });
                 }
@@ -636,7 +621,7 @@ export class PaymentService {
                     issuedAt: new Date(),
                     usedAt: new Date(),
                     discountAppliedAmount: discountAppliedAmount,
-                    purchaseAmountAtUse: order.totalOrderAmount,
+                    purchaseAmountAtUse: orderAmount,
                   },
                 });
               }
@@ -645,7 +630,7 @@ export class PaymentService {
           }
         }
 
-        // 2.9. Apply points if pointsUsed > 0
+        // 2.6. Apply points if pointsUsed > 0
         if (orderGroup.pointsUsed > 0) {
           this.logger.log(`Applying ${orderGroup.pointsUsed} points`);
 
@@ -674,7 +659,7 @@ export class PaymentService {
           this.logger.log(`${orderGroup.pointsUsed} points deducted from user`);
         }
 
-        // 2.10. Update user's total purchase amount
+        // 2.7. Update user's total purchase amount
         await tx.user.update({
           where: { id: userId },
           data: {
@@ -682,7 +667,7 @@ export class PaymentService {
           },
         });
 
-        // 2.11. Save payment to database
+        // 2.8. Save payment to database
         this.logger.log('Saving payment to database');
         const savedPayment = await tx.payment.create({
           data: {
@@ -720,7 +705,7 @@ export class PaymentService {
           },
         });
 
-        // 2.11.1. Update OrderGroup situation to ORDER_PAYMENT_COMPLETED
+        // 2.9. Update OrderGroup situation to ORDER_PAYMENT_COMPLETED
         this.logger.log('Updating OrderGroup situation to ORDER_PAYMENT_COMPLETED');
         await tx.orderGroup.update({
           where: { orderGroupNumber: validatedDto.orderGroupNumber },
@@ -730,7 +715,7 @@ export class PaymentService {
         });
         this.logger.log(`OrderGroup ${validatedDto.orderGroupNumber} situation updated to ORDER_PAYMENT_COMPLETED`);
 
-        // 2.12. Delete cart items from cart
+        // 2.10. Delete cart items from cart
         this.logger.log('Deleting cart items');
         await tx.cartItem.deleteMany({
           where: {

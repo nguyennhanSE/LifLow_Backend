@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "OrderSituation" ADD VALUE 'ORDER_PAYMENT_FAILED';

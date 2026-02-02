@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -23,6 +24,7 @@ import {
   CreateOrderGroupDto,
   UpdateOrderGroupDto,
   OrderGroupFilterDto,
+  CancelOrderGroupDto,
 } from './dto/order.dto';
 import { paginationResponse, successResponse } from '../../utils/responseFormatter';
 import type { Response } from 'express';
@@ -304,6 +306,27 @@ export class OrdersController {
         req.user.id,
       );
       responseModel.setData(orderGroup);
+    } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  @Put('/orderGroup/cancel')
+  @Roles(ERoleName.ADMIN, ERoleName.USER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel an order group (set situation to ORDER_PAYMENT_FAILED)' })
+  @ApiBody({ type: CancelOrderGroupDto })
+  @ApiResponse({ status: 200, description: 'Order group cancelled successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+  @ApiResponse({ status: 404, description: 'Order group not found' })
+  async cancelOrderGroup(@Body() cancelOrderGroupDto: CancelOrderGroupDto) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const result = await this.ordersService.cancelOrderGroup(cancelOrderGroupDto);
+      responseModel.setData(result);
     } catch (error) {
       throw error;
     }

@@ -93,6 +93,9 @@ export class InitiatePaymentResponseDto {
     couponId: string;
     quantity: number;
   }[];
+
+  @ApiProperty({ description: 'Payment token for confirmPayment (expires in 1 hour)' })
+  paymentToken: string;
 }
 
 export class PaymentListResponseDto {

@@ -15,7 +15,7 @@ import {
   OrderGroupListResponse,
 } from './dto/order.dto';
 import { OrderRepository } from './repositories/order.repository';
-import { OrderGroupRepository } from './repositories/order-group.repository';
+import { OrderGroupRepository, OrderGroupWithRelations } from './repositories/order-group.repository';
 import { 
   toOrderResponseDto, 
   toOrderEntity, 
@@ -1076,6 +1076,7 @@ export class OrdersService {
           skip,
           take: limit,
           includeRelations: true,
+          
         }),
         this.orderGroupRepository.count(where),
       ]);
@@ -1235,6 +1236,23 @@ export class OrdersService {
       return { message: `OrderGroup ${orderGroupNumber} deleted successfully` };
     } catch (error) {
       this.handleOrderGroupPrismaError(error, `Failed to delete order group ${orderGroupNumber}`);
+    }
+  }
+
+  /**
+   * Cancel an order group: update situation to ORDER_PAYMENT_FAILED
+   */
+  async cancelOrderGroup(dto: { orderGroupNumber: string }): Promise<OrderGroupResponseDto> {
+    const { orderGroupNumber } = dto;
+    try {
+      const updated = await this.orderGroupRepository.update(
+        orderGroupNumber,
+        { situation: EOrderSituation.ORDER_PAYMENT_FAILED },
+      );
+      const entity = toOrderGroupEntityWithRelations(updated as OrderGroupWithRelations);
+      return toOrderGroupResponseDto(entity);
+    } catch (error) {
+      this.handleOrderGroupPrismaError(error, `Failed to cancel order group ${orderGroupNumber}`);
     }
   }
 
@@ -1459,6 +1477,8 @@ export class OrdersService {
         (where.createdAt as Prisma.DateTimeFilter).lt = dateTo;
       }
     }
+
+    where.situation = { not: { in: [EOrderSituation.ORDER_PAYMENT_FAILED, EOrderSituation.ORDER_PAYMENT_PENDING] } };
 
     return where;
   }
