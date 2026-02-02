@@ -181,7 +181,7 @@ export class PaymentService {
       // 7. Calculate final amount
       const pointsDiscount = points ? points : 0;
       const totalDiscountAmount = totalCouponDiscount + pointsDiscount;
-      const finalAmount = originalAmount - totalDiscountAmount - effectiveDeliveryFee;
+      const finalAmount = originalAmount - totalDiscountAmount + effectiveDeliveryFee;
 
       // Ensure final amount is not negative
       if (finalAmount < 0) {
