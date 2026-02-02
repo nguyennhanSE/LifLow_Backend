@@ -389,6 +389,17 @@ export class CouponHistoryRepository {
   }
 
   /**
+   * Check if user already has any coupon history for this coupon (any status).
+   */
+  async existsByUserAndCoupon(userId: string, couponId: string): Promise<boolean> {
+    const existing = await this.prisma.couponHistory.findFirst({
+      where: { userId, couponId },
+      select: { id: true },
+    });
+    return existing != null;
+  }
+
+  /**
    * Find active coupon history for a user and specific coupon
    */
   async findActiveHistoryByUserAndCoupon(

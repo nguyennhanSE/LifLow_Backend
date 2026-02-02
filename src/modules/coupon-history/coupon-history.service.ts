@@ -598,6 +598,18 @@ export class CouponHistoryService {
         histories: [],
       };
     }
+    const alreadyHas = await this.couponHistoryRepository.existsByUserAndCoupon(
+      userId,
+      coupon.id,
+    );
+    if (alreadyHas) {
+      return {
+        message: 'User already has this SPECIAL_BENEFIT coupon (any status); skip issuing',
+        count: 0,
+        coupon: { id: coupon.id, name: coupon.name, code: coupon.code, type: coupon.type },
+        histories: [],
+      };
+    }
     const histories = await this.couponHistoryRepository.createWithQuantity(
       coupon.id,
       userId,
