@@ -24,7 +24,7 @@ export class CouponHistoryCronjobService {
     await this.issueAutoIssueCouponsToTargetGrades();
     this.logger.log('Completed scheduled auto-issue coupons');
   }
-
+  
   /**
    * Phát hành coupon tự động cho user theo targetGrades (EMembershipLevel).
    * Chỉ xử lý coupon có hasBeenIssued = false và isAutoIssue = true.
@@ -158,5 +158,43 @@ export class CouponHistoryCronjobService {
       );
       throw error;
     }
+  }
+}
+
+export class CouponHistoryExpireCronjobService {
+  private readonly logger = new Logger(CouponHistoryExpireCronjobService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Xoá các coupon history có endDate < today (không quan tâm status).
+   * Dùng start of day Asia/Seoul để thống nhất với cron timeZone.
+   */
+  async expireCouponHistories(): Promise<{ deleted: number }> {
+    const dateStr = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'Asia/Seoul',
+    });
+    const todayStart = new Date(`${dateStr}T00:00:00.000+09:00`);
+
+    const result = await this.prisma.couponHistory.deleteMany({
+      where: {
+        endDate: { lt: todayStart },
+      },
+    });
+
+    this.logger.log(
+      `Expired coupon histories: deleted ${result.count} record(s) with endDate < ${dateStr}`,
+    );
+    return { deleted: result.count };
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_1AM, {
+    name: 'expire-coupon-histories',
+    timeZone: 'Asia/Seoul',
+  })
+  async handleScheduledExpireCouponHistories() {
+    this.logger.log('Starting scheduled expire coupon histories...');
+    await this.expireCouponHistories();
+    this.logger.log('Completed scheduled expire coupon histories');
   }
 }

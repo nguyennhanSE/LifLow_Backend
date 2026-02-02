@@ -577,4 +577,38 @@ export class AnnouncementsController {
       throw error;
     }
   }
+
+  @Patch(':id/add-view')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Add view count to an announcement',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Announcement ID (UUID)',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'View count added successfully',
+    type: AnnouncementResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Announcement not found',
+  })
+  async addView(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const announcement = await this.announcementsService.addView(id);
+      responseModel.setData(announcement);
+      return responseModel;
+    } catch (error) {
+      throw error;
+    }
+  }
 }

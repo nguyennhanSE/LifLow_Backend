@@ -526,6 +526,13 @@ export class AnnouncementsService {
   }
 
   /**
+   * Increment view count by 1 (single transaction)
+   */
+  async addView(id: string): Promise<AnnouncementEntity> {
+    return await this.announcementsRepository.addView(id);
+  }
+
+  /**
    * Admin method to hard delete an announcement
    * Use with caution - this is permanent
    */

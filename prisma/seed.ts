@@ -2492,7 +2492,7 @@ async function seedCoupons() {
       isActive: true,
       isAutoIssue: false,
       autoIssueDayOfMonth: null,
-      targetGrades: ['LV1. 씨앗', 'LV2. 새싹', 'LV3. 열매', 'LV4. 나무', 'LV5. 정원'],
+      targetGrades: ['LV5. 정원'],
     }
     // {
     //   name: 'Shopping Support Discount Coupons',

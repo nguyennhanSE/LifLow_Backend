@@ -136,6 +136,26 @@ export class AnnouncementsRepository {
   }
 
   /**
+   * Increment view count by 1 (single transaction)
+   */
+  async addView(id: string): Promise<AnnouncementEntity> {
+    const announcement = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.announcement.findUnique({
+        where: { id },
+      });
+      if (!existing) {
+        throw new NotFoundException(`Announcement with ID ${id} not found`);
+      }
+      return tx.announcement.update({
+        where: { id },
+        data: { views: { increment: 1 } },
+        include: { author: true },
+      });
+    });
+    return AnnouncementMapper.toEntityWithAuthor(announcement);
+  }
+
+  /**
    * Update an announcement
    */
   async update(
