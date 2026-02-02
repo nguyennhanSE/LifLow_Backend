@@ -496,6 +496,15 @@ export class PaymentService {
 
         this.logger.log(`OrderGroup found with ${orderGroup.cartItemIds.length} cart items`);
 
+        // 2.1b. Delete cart items from cart (at start of transaction)
+        this.logger.log('Deleting cart items');
+        await tx.cartItem.deleteMany({
+          where: {
+            id: { in: orderGroup.cartItemIds },
+          },
+        });
+        this.logger.log(`Deleted ${orderGroup.cartItemIds.length} cart items`);
+
         // 2.2. Get User
         const user = await tx.user.findUnique({
           where: { id: userId },
@@ -715,15 +724,6 @@ export class PaymentService {
         });
         this.logger.log(`OrderGroup ${validatedDto.orderGroupNumber} situation updated to ORDER_PAYMENT_COMPLETED`);
 
-        // 2.10. Delete cart items from cart
-        this.logger.log('Deleting cart items');
-        await tx.cartItem.deleteMany({
-          where: {
-            id: { in: orderGroup.cartItemIds },
-          },
-        });
-
-        this.logger.log(`Deleted ${orderGroup.cartItemIds.length} cart items`);
         this.logger.log('Transaction completed successfully');
 
         return { payment: savedPayment, membershipLevelBeforePayment };
