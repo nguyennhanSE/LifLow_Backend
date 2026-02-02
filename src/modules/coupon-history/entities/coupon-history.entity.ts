@@ -37,6 +37,9 @@ export class CouponReturnEntity {
   discountAmount?: number | null;
   maxDiscountAmount?: number | null;
   minPurchaseAmount?: number | null;
+  couponName?: string | null;
+  couponCode?: string | null;
+  couponImageUrl?: string | null;
   /** Coupon type (PERCENT, AMOUNT, FREE_SHIPPING, etc.) */
   couponType?: string | null;
   /** Discount rate in % (for PERCENT type) */

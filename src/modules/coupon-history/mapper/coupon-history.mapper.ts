@@ -31,6 +31,9 @@ export function toCouponReturnEntity(history: CouponHistoryWithRelations): Coupo
     endDate: history.endDate ?? null,
     couponType: history.coupon?.type ?? null,
     discountRate: history.coupon?.discountRate ?? null,
+    couponName: history.coupon?.name ?? null,
+    couponCode: history.coupon?.code ?? null,
+    couponImageUrl: history.coupon?.imageUrl ?? null,
   };
 }
 

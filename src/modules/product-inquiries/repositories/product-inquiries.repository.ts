@@ -165,11 +165,21 @@ export class ProductInquiriesRepository {
           },
         },
         {
-          content: {
-            contains: search,
-            mode: 'insensitive',
+          user: {
+            name: {
+              contains: search,
+              mode: 'insensitive',
+            },
           },
         },
+        {
+          product: {
+            productName: {
+              contains: search,
+              mode: 'insensitive',
+            },
+          },
+        }
       ];
     }
 
