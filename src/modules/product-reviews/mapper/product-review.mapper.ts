@@ -129,6 +129,7 @@ export class ProductReviewMapper {
       imageUrl: prismaReview.imageUrl ?? null,
       review: prismaReview.review,
       rating: prismaReview.rating,
+      likes: prismaReview.likes ?? null,
       createdAt: prismaReview.createdAt,
       updatedAt: prismaReview.updatedAt,
     });
