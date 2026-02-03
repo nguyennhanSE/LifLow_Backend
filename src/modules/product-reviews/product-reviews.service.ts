@@ -14,6 +14,11 @@ import { ProductReviewMapper } from './mapper/product-review.mapper';
 import {
   ProductReviewResponseDto,
 } from './dto/product-review-response.dto';
+import {
+  ProductReviewsByProductResponseDto,
+  ProductReviewOrRecipeItemDto,
+  RecipeSummaryDto,
+} from './dto/product-reviews-by-product-response.dto';
 import { PaginatedResponseDto } from '../../libs/models/response/paginated-response.dto';
 import { PrismaService } from '../../../prisma/prisma.service';
 
@@ -202,26 +207,64 @@ export class ProductReviewsService {
   }
 
   /**
-   * Find all reviews for a specific product
+   * Find all reviews for a specific product (with user only) and recipes linked to the product
    * @param productId - Product ID
    * @param queryDto - Optional query parameters for filtering
-   * @returns Array of reviews for the product
+   * @returns Product reviews (with user) and recipes linked to the product
    */
   async findByProduct(
     productId: string,
     queryDto?: Partial<QueryProductReviewsDto>,
-  ): Promise<ProductReviewResponseDto[]> {
+  ): Promise<ProductReviewsByProductResponseDto> {
     try {
-      this.logger.log(`Fetching reviews for product: ${productId}`);
+      this.logger.log(`Fetching reviews and recipes for product: ${productId}`);
 
-      const reviewEntities = await this.productReviewsRepository.findByProductId(
-        productId,
-        queryDto,
-      );
+      const page = queryDto?.page ?? 1;
+      const limit = queryDto?.limit ?? 10;
 
-      return reviewEntities.map((entity) =>
-        ProductReviewMapper.toResponseDto(entity),
-      );
+      const { items: rawItems, total } =
+        await this.productReviewsRepository.findByProductId(productId, queryDto);
+
+      const result = new ProductReviewsByProductResponseDto();
+      result.items = rawItems.map((item) => {
+        const dto = new ProductReviewOrRecipeItemDto();
+        dto.type = item.type;
+        dto.createdAt = item.createdAt;
+        if (item.type === 'review') {
+          dto.review = ProductReviewMapper.toResponseDto(item.data);
+        } else {
+          const recipeDto = new RecipeSummaryDto();
+          const r = item.data;
+          recipeDto.id = r.id;
+          recipeDto.title = r.title;
+          recipeDto.content = r.content;
+          recipeDto.authorName = r.authorName;
+          recipeDto.category = r.category as RecipeSummaryDto['category'];
+          recipeDto.dateOfWriting = r.dateOfWriting;
+          recipeDto.views = r.views;
+          recipeDto.thumbnailUrl = Array.isArray(r.thumbnailUrl)
+            ? r.thumbnailUrl
+            : r.thumbnailUrl
+              ? [r.thumbnailUrl]
+              : [];
+          recipeDto.status = r.status;
+
+          dto.recipe = recipeDto;
+        }
+        return dto;
+      });
+
+      const totalPages = Math.ceil(total / limit);
+      result.meta = {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      };
+
+      return result;
     } catch (error) {
       this.logger.error(
         `Failed to fetch reviews for product ${productId}: ${error instanceof Error ? error.message : 'Unknown error'}`,

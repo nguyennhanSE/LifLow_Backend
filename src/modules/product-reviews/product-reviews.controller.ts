@@ -28,6 +28,7 @@ import {
   UpdateProductReviewDto,
   QueryProductReviewsDto,
   ProductReviewResponseDto,
+  ProductReviewsByProductResponseDto,
 } from './dto';
 import { ResponseModel } from '../../libs/models/response/response.model';
 import { Roles } from '../../libs/decorator/roles.decorator';
@@ -256,8 +257,8 @@ export class ProductReviewsController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Reviews retrieved successfully',
-    type: [ProductReviewResponseDto],
+    description: 'Reviews (with user) and recipes linked to the product',
+    type: ProductReviewsByProductResponseDto,
   })
   @ApiResponse({
     status: 400,

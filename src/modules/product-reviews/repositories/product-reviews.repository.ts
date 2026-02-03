@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
-import { Prisma, ProductReviews } from '@prisma/client';
+import { Prisma, ProductReviews, Recipe } from '@prisma/client';
 import { CreateProductReviewDto } from '../dto/create-product-review.dto';
 import { UpdateProductReviewDto } from '../dto/update-product-review.dto';
 import { QueryProductReviewsDto } from '../dto/query-product-reviews.dto';
@@ -12,6 +12,11 @@ import { ProductReviewMapper } from '../mapper/product-review.mapper';
  * Using any due to Prisma type generation complexity
  */
 export type ProductReviewWithRelations = any;
+
+/** Item type for merged reviews + recipes list (findByProductId), sorted by createdAt */
+export type FindByProductIdItem =
+  | { type: 'review'; createdAt: Date; data: ProductReviewEntity }
+  | { type: 'recipe'; createdAt: Date; data: Recipe };
 
 /**
  * Repository for ProductReviews entity
@@ -171,28 +176,26 @@ export class ProductReviewsRepository {
   }
 
   /**
-   * Find all reviews for a specific product
-   * @param productId - Product ID
-   * @param queryDto - Optional query parameters for pagination
-   * @returns Array of ProductReviewEntity
+   * Find all reviews for a specific product (with user only) and recipes linked to the product.
+   * Returns a single list merged and sorted by createdAt (newest first), with pagination.
    */
   async findByProductId(
     productId: string,
     queryDto?: Partial<QueryProductReviewsDto>,
-  ): Promise<ProductReviewEntity[]> {
+  ): Promise<{ items: FindByProductIdItem[]; total: number }> {
     const {
       sortBy = 'createdAt',
       sortOrder = 'desc',
       minRating,
       maxRating,
+      page = 1,
+      limit = 10,
     } = queryDto || {};
 
-    // Build where clause
     const where: Prisma.ProductReviewsWhereInput = {
       productId,
     };
 
-    // Filter by rating range if provided
     if (minRating !== undefined || maxRating !== undefined) {
       where.rating = {};
       if (minRating !== undefined) {
@@ -203,23 +206,50 @@ export class ProductReviewsRepository {
       }
     }
 
-    // Build orderBy clause
     const orderBy: Prisma.ProductReviewsOrderByWithRelationInput = {
       [sortBy]: sortOrder,
     };
 
-    const reviews = await this.prisma.productReviews.findMany({
-      where,
-      orderBy,
-      include: {
-        user: true,
-        product: true,
-      },
-    });
+    const [reviews, recipes] = await Promise.all([
+      this.prisma.productReviews.findMany({
+        where,
+        orderBy,
+        include: {
+          user: true,
+        },
+      }),
+      this.prisma.recipe.findMany({
+        where: { productId },
+      }),
+    ]);
 
-    return reviews.map((review) =>
-      ProductReviewMapper.toEntityWithRelations(review),
+    const reviewEntities = reviews.map((review) =>
+      ProductReviewMapper.toEntityWithUser(review),
     );
+
+    const combined: Array<
+      | { type: 'review'; createdAt: Date; data: ProductReviewEntity }
+      | { type: 'recipe'; createdAt: Date; data: Recipe }
+    > = [
+      ...reviewEntities.map((data) => ({
+        type: 'review' as const,
+        createdAt: data.createdAt ?? new Date(0),
+        data,
+      })),
+      ...recipes.map((data) => ({
+        type: 'recipe' as const,
+        createdAt: data.createdAt,
+        data,
+      })),
+    ];
+
+    combined.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    const total = combined.length;
+    const skip = (page - 1) * limit;
+    const items = combined.slice(skip, skip + limit);
+
+    return { items, total };
   }
 
   /**

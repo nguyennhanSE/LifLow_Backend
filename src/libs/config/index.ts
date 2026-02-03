@@ -1,9 +1,10 @@
-import 'dotenv/config';
 import * as dotenv from 'dotenv';
 
 export const NODE_ENV = process.env.NODE_ENV || 'development';
-const envFile = NODE_ENV === 'production' ? '.env.prod' : '.env.dev'
-dotenv.config({ path: envFile });
+const envFile = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
+// Load env-specific file with override: true so .env.dev/.env.prod wins over .env
+dotenv.config({ path: envFile, override: true });
+dotenv.config(); // fallback: load .env for any vars not in envFile
 
 export const config = {
   // App Configuration
@@ -34,10 +35,10 @@ export const config = {
   NAVER_CLIENT_SECRET: process.env.NAVER_CLIENT_SECRET ?? '',
   NAVER_REDIRECT_URI: process.env.NAVER_REDIRECT_URI ?? 'http://localhost:3500/api/v1/auth/naver/callback',
 
-  // Email Configuration
+  // Email Configuration (supports both EMAIL_SECURE and EMAIL_USE_SSL)
   EMAIL_HOST: process.env.EMAIL_HOST ?? 'smtp.naver.com',
   EMAIL_PORT: process.env.EMAIL_PORT ?? 465,
-  EMAIL_SECURE: process.env.EMAIL_SECURE ?? true,
+  EMAIL_SECURE: process.env.EMAIL_SECURE ?? process.env.EMAIL_USE_SSL ?? true,
   EMAIL_USER: process.env.EMAIL_USER ?? '',
   EMAIL_PASSWORD: process.env.EMAIL_PASSWORD ?? '',
   EMAIL_FROM: process.env.EMAIL_FROM ?? 'noreply@liflow.com',

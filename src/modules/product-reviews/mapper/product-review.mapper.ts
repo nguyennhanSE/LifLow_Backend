@@ -22,12 +22,12 @@ type ProductReviewBase = {
 };
 
 /**
- * Type for ProductReview with User relation
+ * Type for ProductReview with User relation (compatible with Prisma User)
  */
 type ProductReviewWithUser = ProductReviewBase & {
   user?: {
     id: string;
-    name: string;
+    name: string | null;
     email: string | null;
     membershipLevel: string | null;
   } | null;
@@ -86,18 +86,9 @@ export class ProductReviewMapper {
   static toEntityWithUser(prismaReview: ProductReviewWithUser): ProductReviewEntity {
     const entity = this.toEntity(prismaReview as ProductReviews);
     
-    // Map user if included
-    if (prismaReview.user) {
-      entity.user = {
-        id: prismaReview.user.id,
-        name: prismaReview.user.name,
-        email: prismaReview.user.email ?? null,
-        membershipLevel: prismaReview.user.membershipLevel ?? null,
-      } as any;
-    } else {
-      entity.user = null;
-    }
-    
+    entity.authorName = prismaReview.user?.name ?? null;
+    entity.user = null;
+
     return entity;
   }
 
@@ -180,17 +171,18 @@ export class ProductReviewMapper {
     dto.id = entity.id;
     dto.productId = entity.productId;
     dto.authorId = entity.authorId;
+    dto.authorName = entity.authorName ?? null;
     dto.imageUrl = entity.imageUrl ?? null;
     dto.review = entity.review;
     dto.rating = entity.rating;
     dto.createdAt = entity.createdAt ?? null;
     dto.updatedAt = entity.updatedAt ?? null;
     
-    // Map user if present
+    // Map user if present (other code paths may still set entity.user)
     if (entity.user) {
       const userInfo = new ReviewUserInfoDto();
       userInfo.id = entity.user.id;
-      userInfo.name = entity.user.name;
+      userInfo.name = entity.user.name ?? '';
       userInfo.email = entity.user.email ?? null;
       userInfo.membershipLevel = entity.user.membershipLevel ?? null;
       dto.user = userInfo;

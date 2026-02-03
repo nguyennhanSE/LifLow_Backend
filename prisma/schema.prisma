@@ -510,6 +510,9 @@ model ProductReviews {
   createdAt DateTime? @default(now()) @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
 
+  // extension
+  likes Int? @map("likes")
+
   // Relations
   product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [authorId], references: [id], onDelete: Cascade)

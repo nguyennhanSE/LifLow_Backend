@@ -18,6 +18,9 @@ export class ProductReviewEntity {
   /** User ID of the review author (maps to author_id in database) */
   authorId!: string;
 
+  /** Author display name (from user.name when user is included) */
+  authorName?: string | null;
+
   /** Review content text (maps to review in database) */
   review!: string;
 

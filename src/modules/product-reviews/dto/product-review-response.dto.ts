@@ -50,6 +50,9 @@ export class ProductReviewResponseDto {
   @ApiProperty({ description: 'Author ID', example: '123e4567-e89b-12d3-a456-426614174000' })
   authorId!: string;
 
+  @ApiPropertyOptional({ description: 'Author display name (from user)', example: 'John Doe' })
+  authorName?: string | null;
+
   @ApiPropertyOptional({ description: 'Image URL', example: 'https://example.com/image.jpg' })
   imageUrl?: string | null;
 
