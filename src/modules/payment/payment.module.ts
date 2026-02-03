@@ -9,8 +9,10 @@ import { OrderModule } from '../order/order.module';
 import { OrdersService } from '../order/order.service';
 import { CouponHistoryModule } from '../coupon-history/coupon-history.module';
 import { PointModule } from '../point/point.module';
+import { CartsModule } from '../carts/carts.module';
+
 @Module({
-  imports: [ConfigModule, PrismaModule, OrderModule, CouponHistoryModule, PointModule],
+  imports: [ConfigModule, PrismaModule, OrderModule, CouponHistoryModule, PointModule, CartsModule],
   controllers: [PaymentController],
   providers: [PaymentService, PaymentRepository, TossPaymentApiService],
   exports: [PaymentService, PaymentRepository, TossPaymentApiService],

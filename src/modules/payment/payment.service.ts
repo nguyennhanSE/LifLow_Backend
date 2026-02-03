@@ -31,6 +31,7 @@ import { CouponHistoryService } from '../coupon-history/coupon-history.service';
 import { PointService } from '../point/point.service';
 import { JwtService } from '@nestjs/jwt';
 import { config } from '../../libs/config';
+import { CartItemService } from '../carts/services/cart-item.service';
 
 export interface PaymentTokenPayload {
   orderGroupNumber: string;
@@ -52,6 +53,7 @@ export class PaymentService {
     private readonly couponHistoryService: CouponHistoryService,
     private readonly pointService: PointService,
     private readonly jwtService: JwtService,
+    private readonly cartItemService: CartItemService,
   ) {}
 
   /**
@@ -121,6 +123,7 @@ export class PaymentService {
             select: {
               id: true,
               productName: true,
+              origin: true,
             },
           },
         },
@@ -132,6 +135,16 @@ export class PaymentService {
 
       if (fetchedCartItems.length !== cartItemIds.length) {
         throw new BadRequestException('Some cart items are not available');
+      }
+
+      // Check if product origin >= cart item quantity
+      for (const item of fetchedCartItems) {
+        const origin = item.product?.origin;
+        if (origin != null && origin < item.quantity) {
+          throw new BadRequestException(
+            `Not enough quantity for "${item.product?.productName ?? 'Product'}". Available: ${origin}, Requested: ${item.quantity}`,
+          );
+        }
       }
 
       // 5. Calculate original amount (sum of salePrice * quantity)
@@ -410,7 +423,20 @@ export class PaymentService {
       };
     } catch (error) {
       this.logger.error('Failed to initiate payment', error);
-      
+
+      if (cartItemIds?.length) {
+        for (const cartItemId of cartItemIds) {
+          try {
+            await this.cartItemService.removeItem(String(cartItemId));
+          } catch (deleteError) {
+            this.logger.warn(
+              `Failed to remove cart item ${cartItemId} after initiate error.`,
+              deleteError,
+            );
+          }
+        }
+      }
+
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
@@ -754,6 +780,20 @@ export class PaymentService {
       return this.mapToResponseDto(payment);
     } catch (error) {
       this.logger.error('Failed to confirm payment', error);
+
+      const cartItemIdsToRemove = validatedDto.cartItems;
+      if (cartItemIdsToRemove?.length) {
+        for (const cartItemId of cartItemIdsToRemove) {
+          try {
+            await this.cartItemService.removeItem(String(cartItemId));
+          } catch (deleteError) {
+            this.logger.warn(
+              `Failed to remove cart item ${cartItemId} after confirm error`,
+              deleteError,
+            );
+          }
+        }
+      }
 
       // Rollback: mark OrderGroup as ORDER_CANCELLED on any failure
       try {

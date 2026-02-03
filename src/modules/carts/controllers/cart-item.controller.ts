@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,6 +23,7 @@ import { CartItemService } from '../services/cart-item.service';
 import { CreateCartItemDto } from '../dto/create-cart-item.dto';
 import { UpdateCartItemDto } from '../dto/update-cart-item.dto';
 import { BulkUpdateCartItemsDto } from '../dto/bulk-update-cart-item.dto';
+import { BulkDeleteCartItemsDto } from '../dto/bulk-delete-cart-item.dto';
 import { CartItemResponseDto } from '../dto/cart-response.dto';
 import { ResponseModel } from '../../../libs/models/response/response.model';
 
@@ -194,6 +196,31 @@ export class CartItemController {
     const responseModel = new ResponseModel();
     const cartItem = await this.cartItemService.updateItem(id, updateCartItemDto);
     responseModel.setData(cartItem);
+    return responseModel;
+  }
+
+  /**
+   * Bulk remove cart items
+   * DELETE /cart-items/bulk-remove
+   * Must be declared before @Delete(':id') so "bulk-remove" is not matched as :id.
+   */
+  @Delete('bulk-remove')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Bulk delete cart items',
+    description:
+      'Delete multiple cart items in a single request. Each item is removed via removeItem; cart total is recalculated after each removal.',
+  })
+  @ApiBody({ type: BulkDeleteCartItemsDto })
+  @ApiResponse({ status: 200, description: 'Cart items deleted successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error or business rule violation' })
+  @ApiResponse({ status: 404, description: 'One or more cart items not found' })
+  async bulkRemove(@Body() bulkRemoveDto: BulkDeleteCartItemsDto) {
+    const responseModel = new ResponseModel();
+    for (const cartItemId of bulkRemoveDto.cartItemIds) {
+      await this.cartItemService.removeItem(String(cartItemId));
+    }
+    responseModel.setData({ message: 'Cart items removed successfully' });
     return responseModel;
   }
 

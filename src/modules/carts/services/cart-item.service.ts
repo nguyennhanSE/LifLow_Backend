@@ -84,7 +84,7 @@ export class CartItemService {
 
         if (existingItem) {
           // Check if existing item is already checked out
-          if (existingItem.status === ECartItemStatus.CHECKED_OUT) {
+          if (existingItem.status === 'CHECKED_OUT') {
             throw new BadRequestException('Cannot update checked out cart item');
           }
 
@@ -391,7 +391,7 @@ export class CartItemService {
 
       // Validate all cart items are not checked out
       const checkedOutItems = existingItems.filter(
-        (item) => item.status === ECartItemStatus.CHECKED_OUT,
+        (item) => item.status === 'CHECKED_OUT',
       );
       if (checkedOutItems.length > 0) {
         throw new BadRequestException('Cannot update checked out cart items');
