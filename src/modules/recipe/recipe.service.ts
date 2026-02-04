@@ -205,6 +205,24 @@ export class RecipeService {
   }
 
   /**
+   * Find a single recipe by ID for admin (same as findOne but does not increment views)
+   */
+  async findOneForAdmin(id: string): Promise<RecipeEntityWithAuthor> {
+    try {
+      if (!this.isValidUUID(id)) {
+        throw new BadRequestException('Invalid recipe ID format');
+      }
+      const recipe = await this.recipeRepository.findById(id, true);
+      if (!recipe) {
+        throw new NotFoundException(`Recipe with id ${id} not found`);
+      }
+      return toRecipeEntityWithAuthor(recipe);
+    } catch (error: any) {
+      this.handleError(error, `Failed to fetch recipe ${id}`);
+    }
+  }
+
+  /**
    * Update a recipe
    * - Checks ownership: user can only update their own recipes
    * - Validates recipe exists
@@ -429,10 +447,17 @@ export class RecipeService {
   /**
    * Get all distinct categories
    */
-  async getCategories(): Promise<string[]> {
+  getCategories(): string[] {
+    // try {
+    //   return await this.recipeRepository.getCategories();
+    // } catch (error: any) {
+    //   this.handleError(error, 'Failed to fetch categories');
+    // }
     try {
-      return await this.recipeRepository.getCategories();
-    } catch (error: any) {
+      const categories = Object.values(ERecipeCategory).map(category => category.toString());
+      return categories;
+    }
+    catch (error: any) {
       this.handleError(error, 'Failed to fetch categories');
     }
   }

@@ -89,27 +89,17 @@ export class RecipeRepository {
       ];
     }
 
-    // Build orderBy
+    // Build orderBy (must match RecipeListQueryDto.sortBy: createdAt | views | alphabetical)
     const orderBy: Prisma.RecipeOrderByWithRelationInput = {};
-    
     switch (sortBy) {
       case 'createdAt':
         orderBy.createdAt = order;
         break;
-      case 'updatedAt':
-        orderBy.updatedAt = order;
-        break;
-      case 'dateOfWriting':
-        orderBy.dateOfWriting = order;
-        break;
       case 'views':
         orderBy.views = order;
         break;
-      case 'title':
+      case 'alphabetical':
         orderBy.title = order;
-        break;
-      case 'category':
-        orderBy.category = order;
         break;
       default:
         orderBy.createdAt = order;

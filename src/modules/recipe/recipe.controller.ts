@@ -221,11 +221,11 @@ export class RecipeController {
     status: 200,
     description: 'Categories retrieved successfully',
   })
-  async getCategories() {
+  getCategories() {
     const responseModel = new ResponseModel();
 
     try {
-      const categories = await this.recipeService.getCategories();
+      const categories = this.recipeService.getCategories();
       const result = successResponse(categories, 'Categories retrieved successfully');
       responseModel.setData(result);
     } catch (error) {
@@ -471,6 +471,45 @@ export class RecipeController {
       throw error;
     }
 
+    return responseModel;
+  }
+
+  /**
+   * Get a single recipe by ID for admin (same as findOne but does not increment views)
+   */
+  @Get('for-admin/:id')
+  @Public()
+  @ApiOperation({
+    summary: 'Get recipe by ID (admin, no view increment)',
+    description: 'Retrieves a single recipe by its ID. Does not increment the view count. If authenticated, returns likedByMe field.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Recipe UUID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Recipe retrieved successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid UUID format',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Recipe not found',
+  })
+  async findOneForAdmin(@Param('id') id: string) {
+    const responseModel = new ResponseModel();
+    try {
+      const recipe = await this.recipeService.findOneForAdmin(id);
+      const result = successResponse(recipe, 'Recipe retrieved successfully');
+      responseModel.setData(result);
+    } catch (error) {
+      throw error;
+    }
     return responseModel;
   }
 

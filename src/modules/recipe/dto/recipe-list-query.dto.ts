@@ -77,11 +77,8 @@ export class RecipeListQueryDto {
     example: 'createdAt',
     enum: [
       'createdAt',
-      'updatedAt',
-      'dateOfWriting',
       'views',
-      'title',
-      'category',
+      'alphabetical',
     ],
   })
   @IsOptional()
@@ -89,11 +86,8 @@ export class RecipeListQueryDto {
   @IsIn(
     [
       'createdAt',
-      'updatedAt',
-      'dateOfWriting',
       'views',
-      'title',
-      'category',
+      'alphabetical',
     ],
     { message: 'Invalid sort field' },
   )
