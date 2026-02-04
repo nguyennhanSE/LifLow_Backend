@@ -444,12 +444,13 @@ export class PaymentService {
   }
 
   /**
-   * Initiate payment V2 - Same logic as initiatePayment but uses productIds instead of cart items.
-   * No cart involvement: fetches products by ID, creates OrderGroup and Orders without cart.
+   * Initiate payment V2 - Direct pay for a single product (no cart).
+   * Uses productId + quantity; creates OrderGroup and one Order.
    */
   async initiatePaymentV2(
     userId: string,
-    productIds: string[],
+    productId: string,
+    quantity: number,
     couponIds?: CouponIdQuantityDto[],
     userShippingAddressId?: string,
     points?: number,
@@ -457,6 +458,13 @@ export class PaymentService {
   ): Promise<InitiatePaymentResponseDto> {
     if (!userShippingAddressId) {
       throw new BadRequestException('User shipping address ID is required');
+    }
+
+    if (!productId) {
+      throw new BadRequestException('Product ID is required');
+    }
+    if (quantity == null || quantity < 1) {
+      throw new BadRequestException('Quantity must be at least 1');
     }
 
     try {
@@ -487,20 +495,9 @@ export class PaymentService {
         }
       }
 
-      // 3. Validate product IDs (group by id to get quantity per product)
-      if (!productIds || productIds.length === 0) {
-        throw new BadRequestException('At least one product is required');
-      }
-
-      const productIdToQuantity = new Map<string, number>();
-      for (const id of productIds) {
-        productIdToQuantity.set(id, (productIdToQuantity.get(id) ?? 0) + 1);
-      }
-      const uniqueProductIds = Array.from(productIdToQuantity.keys());
-
-      // 4. Fetch products by IDs
-      const products = await this.prisma.product.findMany({
-        where: { id: { in: uniqueProductIds } },
+      // 3. Fetch single product by ID
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
         select: {
           id: true,
           productName: true,
@@ -509,34 +506,24 @@ export class PaymentService {
         },
       });
 
-      if (products.length === 0) {
-        throw new NotFoundException('No products found');
+      if (!product) {
+        throw new NotFoundException(`Product with ID ${productId} not found`);
       }
 
-      if (products.length !== uniqueProductIds.length) {
-        throw new BadRequestException('Some products are not found');
+      const origin = product.origin ?? 0;
+      if (origin < quantity) {
+        throw new BadRequestException(
+          `Not enough quantity for "${product.productName ?? 'Product'}". Available: ${origin}, Requested: ${quantity}`,
+        );
+      }
+      const salePrice = product.salePrice ?? 0;
+      if (salePrice <= 0) {
+        throw new BadRequestException(
+          `Product "${product.productName ?? productId}" has invalid sale price`,
+        );
       }
 
-      const productMap = new Map(products.map((p) => [p.id, p]));
-      const orderItems: { product: (typeof products)[0]; quantity: number }[] = [];
-      for (const pid of uniqueProductIds) {
-        const product = productMap.get(pid);
-        const quantity = productIdToQuantity.get(pid)!;
-        if (!product) continue;
-        const origin = product.origin ?? 0;
-        if (origin < quantity) {
-          throw new BadRequestException(
-            `Not enough quantity for "${product.productName ?? 'Product'}". Available: ${origin}, Requested: ${quantity}`,
-          );
-        }
-        const salePrice = product.salePrice ?? 0;
-        if (salePrice <= 0) {
-          throw new BadRequestException(
-            `Product "${product.productName ?? pid}" has invalid sale price`,
-          );
-        }
-        orderItems.push({ product, quantity });
-      }
+      const orderItems: { product: typeof product; quantity: number }[] = [{ product, quantity }];
 
       // 5. Calculate original amount (sum of salePrice * quantity)
       const originalAmount = orderItems.reduce((sum, { product, quantity }) => {
@@ -645,7 +632,7 @@ export class PaymentService {
               originalAmount,
               discountAmount: totalDiscountAmount,
               finalAmount,
-              cartItemIds: productIds,
+              cartItemIds: [productId],
               pointsUsed: points || 0,
               deliveryFee: effectiveDeliveryFee,
               ordererId: userId,
@@ -760,7 +747,8 @@ export class PaymentService {
 
       this.logger.log('Payment V2 initiated successfully', {
         orderGroupNumber,
-        productIdsCount: productIds.length,
+        productId,
+        quantity,
         originalAmount,
         couponDiscount: totalCouponDiscount,
         pointsDiscount,
@@ -789,7 +777,7 @@ export class PaymentService {
         failUrl,
         deliveryFee: effectiveDeliveryFee,
         userShippingAddressId,
-        cartItems: productIds,
+        cartItems: [productId],
         coupons: appliedCouponIds.map((id) => ({
           couponId: id,
           quantity: 1,

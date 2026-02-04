@@ -291,3 +291,41 @@ export class InitiatePaymentRequestDto {
   @IsString()
   userShippingAddressId: string;
 }
+
+/** DTO for direct pay (single product, no cart) */
+export class InitiateDirectPayRequestDto {
+  @ApiProperty({ description: '상품 ID (직결제 1개 상품)', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @IsString()
+  @IsNotEmpty({ message: 'Product ID is required' })
+  productId!: string;
+
+  @ApiProperty({ description: '주문 수량', example: 2, minimum: 1 })
+  @IsInt({ message: 'Quantity must be an integer' })
+  @Min(1, { message: 'Quantity must be at least 1' })
+  @Type(() => Number)
+  quantity!: number;
+
+  @ApiProperty({ description: '수령인 주소 ID (필수)' })
+  @IsString()
+  @IsNotEmpty({ message: 'User shipping address ID is required' })
+  userShippingAddressId!: string;
+
+  @ApiPropertyOptional({ description: '쿠폰 정보 배열', type: [CouponIdQuantityDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CouponIdQuantityDto)
+  coupons?: CouponIdQuantityDto[];
+
+  @ApiPropertyOptional({ description: '사용할 포인트' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0, { message: 'Points must be at least 0' })
+  points?: number;
+
+  @ApiPropertyOptional({ description: '배송비 (KRW)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0, { message: 'Delivery fee must be at least 0' })
+  deliveryFee?: number;
+}

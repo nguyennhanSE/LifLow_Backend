@@ -29,6 +29,7 @@ import {
   GetPaymentDto,
   PaymentWebhookDto,
   InitiatePaymentRequestDto,
+  InitiateDirectPayRequestDto,
 } from './dto/payment-request.dto';
 import {
   PaymentResponseDto,
@@ -88,6 +89,39 @@ export class PaymentController {
         initiatePaymentDto.userShippingAddressId,
         initiatePaymentDto.points,
         initiatePaymentDto.deliveryFee
+      );
+      responseModel.setData(payment);
+      return responseModel;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  @Post('initiate-directly-pay')
+  @ApiOperation({ summary: 'Initiate a new payment' })
+  @ApiResponse({
+    status: 201,
+    description: 'Payment initiated successfully',
+    type: InitiatePaymentResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  // @UseGuards(AuthGuard) // Add your auth guard here
+  // @ApiBearerAuth()
+  async initiatePaymentDirectlyPay(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: InitiateDirectPayRequestDto,
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const userId = req.user.sub;
+      const payment = await this.paymentService.initiatePaymentV2(
+        userId,
+        dto.productId,
+        dto.quantity,
+        dto.coupons ?? [],
+        dto.userShippingAddressId,
+        dto.points,
+        dto.deliveryFee,
       );
       responseModel.setData(payment);
       return responseModel;
