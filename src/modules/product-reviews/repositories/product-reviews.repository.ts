@@ -217,9 +217,10 @@ export class ProductReviewsRepository {
         include: {
           user: true,
         },
+        
       }),
       this.prisma.recipe.findMany({
-        where: { productId },
+        where: { productId, status: 'approved' },
       }),
     ]);
 
@@ -502,13 +503,142 @@ export class ProductReviewsRepository {
   }
 
   /**
-   * Get length of product reviews
-   * @returns Number of reviews
+   * Get length of product reviews + recipes for this product
+   * @returns Number of product reviews + recipes with this productId
    */
   async getLengthOfProductReviews(productId: string): Promise<number> {
-    return await this.prisma.productReviews.count({
-      where: { productId },
+    const [reviewsCount, recipesCount] = await Promise.all([
+      this.prisma.productReviews.count({ where: { productId } }),
+      this.prisma.recipe.count({ where: { productId, status: 'approved' } }),
+    ]);
+    return reviewsCount + recipesCount; 
+  }
+
+  /**
+   * Check if a user has liked a review
+   * @param reviewId - Review ID
+   * @param userId - User ID
+   * @returns true if user has liked the review
+   */
+  async hasUserLikedReview(reviewId: string, userId: string): Promise<boolean> {
+    const like = await this.prisma.productReviewLikes.findUnique({
+      where: {
+        userId_reviewId: {
+          userId,
+          reviewId,
+        },
+      },
     });
+    return !!like;
+  }
+
+  /**
+   * Like a review
+   * @param reviewId - Review ID
+   * @param userId - User ID
+   * @returns Updated review entity
+   */
+  async likeReview(reviewId: string, userId: string): Promise<ProductReviewEntity> {
+    try {
+      // Use transaction to create like and increment count atomically
+      const review = await this.prisma.$transaction(async (tx) => {
+        // Create the like record
+        await tx.productReviewLikes.create({
+          data: {
+            userId,
+            reviewId,
+          },
+        });
+
+        // Increment the likes count on the review
+        const updatedReview = await tx.productReviews.update({
+          where: { id: reviewId },
+          data: {
+            likes: { increment: 1 },
+          },
+          include: { user: true, product: true },
+        });
+
+        return updatedReview;
+      });
+
+      return ProductReviewMapper.toEntityWithRelations(review);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new BadRequestException('You have already liked this review');
+        }
+        if (error.code === 'P2025') {
+          throw new NotFoundException(`Review with ID ${reviewId} not found`);
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Unlike a review
+   * @param reviewId - Review ID
+   * @param userId - User ID
+   * @returns Updated review entity
+   */
+  async unlikeReview(reviewId: string, userId: string): Promise<ProductReviewEntity> {
+    try {
+      // Use transaction to delete like and decrement count atomically
+      const review = await this.prisma.$transaction(async (tx) => {
+        // Delete the like record
+        await tx.productReviewLikes.delete({
+          where: {
+            userId_reviewId: {
+              userId,
+              reviewId,
+            },
+          },
+        });
+
+        // Decrement the likes count on the review (ensure it doesn't go below 0)
+        const currentReview = await tx.productReviews.findUnique({ where: { id: reviewId } });
+        const newLikes = Math.max((currentReview?.likes ?? 0) - 1, 0);
+
+        const updatedReview = await tx.productReviews.update({
+          where: { id: reviewId },
+          data: {
+            likes: newLikes,
+          },
+          include: { user: true, product: true },
+        });
+
+        return updatedReview;
+      });
+
+      return ProductReviewMapper.toEntityWithRelations(review);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          throw new BadRequestException('You have not liked this review');
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Toggle like on a review.
+   * Like: increment review.likes and create like record (via likeReview).
+   * Unlike: decrement review.likes and delete like record (via unlikeReview).
+   * @param reviewId - Review ID
+   * @param userId - User ID
+   * @returns Object with updated review and whether it's now liked
+   */
+  async toggleLike(reviewId: string, userId: string): Promise<{ review: ProductReviewEntity; liked: boolean }> {
+    const hasLiked = await this.hasUserLikedReview(reviewId, userId);
+
+    if (hasLiked) {
+      const review = await this.unlikeReview(reviewId, userId);
+      return { review, liked: false };
+    }
+    const review = await this.likeReview(reviewId, userId);
+    return { review, liked: true };
   }
 }
 

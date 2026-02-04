@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateProductReviewDto } from './dto/create-product-review.dto';
 import { UpdateProductReviewDto } from './dto/update-product-review.dto';
@@ -21,6 +22,7 @@ import {
 } from './dto/product-reviews-by-product-response.dto';
 import { PaginatedResponseDto } from '../../libs/models/response/paginated-response.dto';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { RecipeRepository } from '../recipe/repositories/recipe.repository';
 
 /**
  * Service for managing product reviews
@@ -34,6 +36,7 @@ export class ProductReviewsService {
     private readonly productReviewsRepository: ProductReviewsRepository,
     private readonly awsService: AwsService,
     private readonly prisma: PrismaService,
+    private readonly recipeRepository: RecipeRepository,
   ) {}
 
   /**
@@ -185,9 +188,10 @@ export class ProductReviewsService {
   /**
    * Find a single product review by ID
    * @param id - Review ID
+   * @param userId - Optional user ID to check if user has liked this review
    * @returns Review with relations
    */
-  async findOne(id: string): Promise<ProductReviewResponseDto> {
+  async findOne(id: string, userId?: string): Promise<ProductReviewResponseDto> {
     try {
       this.logger.log(`Fetching review by ID: ${id}`);
 
@@ -195,6 +199,11 @@ export class ProductReviewsService {
 
       if (!reviewEntity) {
         throw new NotFoundException(`Review with ID ${id} not found`);
+      }
+
+      // Check if user has liked this review
+      if (userId) {
+        reviewEntity.likedByMe = await this.productReviewsRepository.hasUserLikedReview(id, userId);
       }
 
       return ProductReviewMapper.toResponseDto(reviewEntity);
@@ -215,6 +224,7 @@ export class ProductReviewsService {
   async findByProduct(
     productId: string,
     queryDto?: Partial<QueryProductReviewsDto>,
+    userId?: string,
   ): Promise<ProductReviewsByProductResponseDto> {
     try {
       this.logger.log(`Fetching reviews and recipes for product: ${productId}`);
@@ -226,33 +236,51 @@ export class ProductReviewsService {
         await this.productReviewsRepository.findByProductId(productId, queryDto);
 
       const result = new ProductReviewsByProductResponseDto();
-      result.items = rawItems.map((item) => {
-        const dto = new ProductReviewOrRecipeItemDto();
-        dto.type = item.type;
-        dto.createdAt = item.createdAt;
-        if (item.type === 'review') {
-          dto.review = ProductReviewMapper.toResponseDto(item.data);
-        } else {
-          const recipeDto = new RecipeSummaryDto();
-          const r = item.data;
-          recipeDto.id = r.id;
-          recipeDto.title = r.title;
-          recipeDto.content = r.content;
-          recipeDto.authorName = r.authorName;
-          recipeDto.category = r.category as RecipeSummaryDto['category'];
-          recipeDto.dateOfWriting = r.dateOfWriting;
-          recipeDto.views = r.views;
-          recipeDto.thumbnailUrl = Array.isArray(r.thumbnailUrl)
-            ? r.thumbnailUrl
-            : r.thumbnailUrl
-              ? [r.thumbnailUrl]
-              : [];
-          recipeDto.status = r.status;
+      result.items = await Promise.all(
+        rawItems.map(async (item) => {
+          const dto = new ProductReviewOrRecipeItemDto();
+          dto.type = item.type;
+          dto.createdAt = item.createdAt;
 
-          dto.recipe = recipeDto;
-        }
-        return dto;
-      });
+          if (item.type === 'review') {
+            const reviewEntity = item.data;
+            reviewEntity.likedByMe = userId
+              ? await this.productReviewsRepository.hasUserLikedReview(
+                  reviewEntity.id,
+                  userId,
+                )
+              : false;
+            dto.likes = reviewEntity.likes ?? 0;
+            dto.likedByMe = reviewEntity.likedByMe ?? false;
+            dto.review = ProductReviewMapper.toResponseDto(reviewEntity);
+          } else {
+            const r = item.data;
+            const recipeDto = new RecipeSummaryDto();
+            recipeDto.id = r.id;
+            recipeDto.title = r.title;
+            recipeDto.content = r.content;
+            recipeDto.authorName = r.authorName;
+            recipeDto.category = r.category as RecipeSummaryDto['category'];
+            recipeDto.dateOfWriting = r.dateOfWriting;
+            recipeDto.views = r.views;
+            recipeDto.thumbnailUrl = Array.isArray(r.thumbnailUrl)
+              ? r.thumbnailUrl
+              : r.thumbnailUrl
+                ? [r.thumbnailUrl]
+                : [];
+            recipeDto.status = r.status;
+            recipeDto.likes = r.likes ?? 0;
+            recipeDto.likedByMe = userId
+              ? await this.recipeRepository.hasUserLikedRecipe(r.id, userId)
+              : false;
+
+            dto.likes = recipeDto.likes;
+            dto.likedByMe = recipeDto.likedByMe;
+            dto.recipe = recipeDto;
+          }
+          return dto;
+        }),
+      );
 
       const totalPages = Math.ceil(total / limit);
       result.meta = {
@@ -508,5 +536,43 @@ export class ProductReviewsService {
    */
   async getLengthOfProductReviews(productId: string): Promise<number> {
     return await this.productReviewsRepository.getLengthOfProductReviews(productId);
+  }
+
+  /**
+   * Toggle like on a product review
+   * @param reviewId - Review ID
+   * @param userId - User ID
+   * @returns Object with updated review and liked status
+   */
+  async toggleLike(reviewId: string, userId: string): Promise<{ review: ProductReviewResponseDto; liked: boolean }> {
+    try {
+      this.logger.log(`Toggling like on review ${reviewId} by user ${userId}`);
+      if (!userId) {
+        throw new UnauthorizedException ('Need to login to like a review');
+      }
+      // Check if review exists
+      const existingReview = await this.productReviewsRepository.findOne(reviewId);
+      if (!existingReview) {
+        throw new NotFoundException(`Review with ID ${reviewId} not found`);
+      }
+
+      // Toggle like
+      const result = await this.productReviewsRepository.toggleLike(reviewId, userId);
+      
+      // Add likedByMe to entity
+      result.review.likedByMe = result.liked;
+
+      this.logger.log(`Like toggled on review ${reviewId}: ${result.liked ? 'liked' : 'unliked'}`);
+      
+      return {
+        review: ProductReviewMapper.toResponseDto(result.review),
+        liked: result.liked,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to toggle like on review ${reviewId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      throw error;
+    }
   }
 }

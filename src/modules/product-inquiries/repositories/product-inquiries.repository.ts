@@ -284,7 +284,6 @@ export class ProductInquiriesRepository {
       orderBy,
       include: {
         user: true,
-        product: true,
         productInquiryAnswers: {
           include: {
             user: true,
@@ -294,7 +293,7 @@ export class ProductInquiriesRepository {
     });
 
     return inquiries.map((inquiry) =>
-      ProductInquiryMapper.toEntityWithRelations(inquiry),
+      ProductInquiryMapper.toEntityWithRelations(inquiry as ProductInquiryWithRelations),
     );
   }
 

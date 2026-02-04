@@ -203,13 +203,13 @@ export class ProductReviewsController {
 
   /**
    * Get a single product review by ID
-   * Public endpoint
+   * Public endpoint - if authenticated, returns likedByMe field
    */
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get product review by ID',
-    description: 'Retrieves a single product review with relations. Public endpoint.',
+    description: 'Retrieves a single product review with relations. Public endpoint. If authenticated, returns likedByMe field.',
   })
   @ApiParam({
     name: 'id',
@@ -225,11 +225,13 @@ export class ProductReviewsController {
     status: 404,
     description: 'Review not found',
   })
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     const responseModel = new ResponseModel();
 
     try {
-      const review = await this.productReviewsService.findOne(id);
+      // Pass userId if authenticated to get likedByMe field
+      const userId = req.user?.sub;
+      const review = await this.productReviewsService.findOne(id, userId);
       responseModel.setData(review);
     } catch (error) {
       throw error;
@@ -267,6 +269,7 @@ export class ProductReviewsController {
   async findByProduct(
     @Param('productId') productId: string,
     @Query() queryDto: Partial<QueryProductReviewsDto>,
+    @Request() req: AuthenticatedRequest,
   ) {
     const responseModel = new ResponseModel();
 
@@ -274,6 +277,7 @@ export class ProductReviewsController {
       const reviews = await this.productReviewsService.findByProduct(
         productId,
         queryDto,
+        req.user?.sub,
       );
       responseModel.setData(reviews);
     } catch (error) {
@@ -518,6 +522,57 @@ export class ProductReviewsController {
     try {
       await this.productReviewsService.delete(id, req.user.sub);
       responseModel.setData({ message: 'Review deleted successfully' });
+    } catch (error) {
+      throw error;
+    }
+    return responseModel;
+  }
+
+  /**
+   * Toggle like on a product review
+   * Requires authentication
+   */
+  @Patch(':id/like')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Toggle like on a product review',
+    description:
+      'Toggles like status on a product review. If already liked, it will unlike. If not liked, it will like. Requires authentication.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Review ID',
+    example: '123e4567-e89b-12d3-a456-426614174002',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Like toggled successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        review: { type: 'object', description: 'Updated review' },
+        liked: { type: 'boolean', description: 'Whether the review is now liked' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - authentication required',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Review not found',
+  })
+  async toggleLike(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const result = await this.productReviewsService.toggleLike(id, req.user.sub);
+      const message = result.liked ? 'Review liked successfully' : 'Review unliked successfully';
+      responseModel.setData({ ...result, message });
     } catch (error) {
       throw error;
     }

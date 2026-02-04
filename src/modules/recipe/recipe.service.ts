@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
   InternalServerErrorException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
@@ -170,8 +171,10 @@ export class RecipeService {
    * Find a single recipe by ID
    * - Increments view count
    * - Returns recipe with author information
+   * @param id - Recipe ID
+   * @param userId - Optional user ID to check if user has liked this recipe
    */
-  async findOne(id: string): Promise<RecipeEntityWithAuthor> {
+  async findOne(id: string, userId?: string): Promise<RecipeEntityWithAuthor> {
     try {
       // Validate UUID format
       if (!this.isValidUUID(id)) {
@@ -189,7 +192,13 @@ export class RecipeService {
         console.error(`Failed to increment views for recipe ${id}:`, err);
       });
 
-      return toRecipeEntityWithAuthor(recipe);
+      // Check if user has liked this recipe
+      let likedByMe: boolean | undefined;
+      if (userId) {
+        likedByMe = await this.recipeRepository.hasUserLikedRecipe(id, userId);
+      }
+
+      return toRecipeEntityWithAuthor(recipe, likedByMe);
     } catch (error: any) {
       this.handleError(error, `Failed to fetch recipe ${id}`);
     }
@@ -657,6 +666,36 @@ export class RecipeService {
       return toRecipeEntityWithAuthor(updatedRecipe);
     } catch (error: any) {
       this.handleError(error, `Failed to reject recipe ${id}`);
+    }
+  }
+
+  /**
+   * Toggle like on a recipe
+   * @param id - Recipe ID
+   * @param userId - User ID
+   * @returns Object with updated recipe entity and liked status
+   */
+  async toggleLike(id: string, userId: string): Promise<{ recipe: RecipeEntityWithAuthor; liked: boolean }> {
+    try {
+      if (!userId) {
+        throw new UnauthorizedException ('Need to login to like a recipe');
+      }
+      // Check if recipe exists
+      const existingRecipe = await this.recipeRepository.findById(id, false);
+      if (!existingRecipe) {
+        throw new NotFoundException(`Recipe with id ${id} not found`);
+      }
+
+      // Toggle like
+      const result = await this.recipeRepository.toggleLike(id, userId);
+      
+      return {
+        recipe: toRecipeEntityWithAuthor(result.recipe, result.liked),
+        liked: result.liked,
+
+      };
+    } catch (error: any) {
+      this.handleError(error, `Failed to toggle like on recipe ${id}`);
     }
   }
 }

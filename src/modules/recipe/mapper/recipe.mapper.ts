@@ -14,7 +14,7 @@ export type RecipeWithAuthor = Recipe & { author?: User | null; product?: Produc
  * Maps Prisma Recipe to RecipeEntity
  */
 
-export function toRecipeEntity(recipe: Recipe): RecipeEntity {
+export function toRecipeEntity(recipe: Recipe, likedByMe?: boolean): RecipeEntity {
   return {
     id: recipe.id,
     title: recipe.title,
@@ -32,12 +32,14 @@ export function toRecipeEntity(recipe: Recipe): RecipeEntity {
     createdAt: recipe.createdAt,
     updatedAt: recipe.updatedAt,
     isActive: recipe.isActive,
+    likes: recipe.likes ?? 0,
+    likedByMe: likedByMe ?? false,
   };
 }
 
-export function toRecipeEntityWithAuthor(recipe: RecipeWithAuthor): RecipeEntityWithAuthor{
+export function toRecipeEntityWithAuthor(recipe: RecipeWithAuthor, likedByMe?: boolean): RecipeEntityWithAuthor{
   return {
-    ...toRecipeEntity(recipe),
+    ...toRecipeEntity(recipe, likedByMe),
     author: recipe.author ? toUserEntity(recipe.author) : null,
     product: recipe.product ? toProductEntity(recipe.product) : null,
   };

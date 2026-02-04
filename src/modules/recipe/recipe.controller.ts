@@ -12,6 +12,7 @@ import {
   Request,
   UseInterceptors,
   UploadedFiles,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -38,18 +39,18 @@ import {
   paginationResponse,
 } from '../../utils/responseFormatter';
 import { ResponseModel } from '../../libs/models/response/response.model';
-import { RecipeUserInterceptor } from './interceptors/recipe.interceptor';
+// import { RecipeUserInterceptor } from './interceptors/recipe.interceptor';
 import { ERecipeCategory } from './enums/recipe.enum';
 
 /**
  * Interface for authenticated request with user info
- * Note: Adjust based on your JWT payload structure
+ * Matches the structure set by AuthGuard
  */
 interface AuthenticatedRequest extends Request {
   user: {
-    id: string;
-    name: string;
-    email?: string;
+    sub: string;        // User ID from JWT payload
+    email: string;
+    tokenType: string;
     roles?: string[];
   };
 }
@@ -66,7 +67,6 @@ export class RecipeController {
   @HttpCode(HttpStatus.CREATED)
   @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
   @UseInterceptors(
-    RecipeUserInterceptor,
     FileFieldsInterceptor([
       { name: 'thumbnail', maxCount: 10 },
     ])
@@ -139,13 +139,13 @@ export class RecipeController {
     @Request() req: AuthenticatedRequest,
   ) {
     const responseModel = new ResponseModel();
-    createRecipeDto.authorId = req.user.id;
+    createRecipeDto.authorId = req.user.sub;
 
     try {
       const thumbnails = files?.thumbnail || [];
       const recipe = await this.recipeService.create(
-        req.user.id,
-        req.user.name,
+        req.user.sub,
+        req.user.email,
         createRecipeDto,
         thumbnails,
       );
@@ -481,7 +481,7 @@ export class RecipeController {
   @Public()
   @ApiOperation({
     summary: 'Get recipe by ID',
-    description: 'Retrieves a single recipe by its ID. Automatically increments the view count.',
+    description: 'Retrieves a single recipe by its ID. Automatically increments the view count. If authenticated, returns likedByMe field.',
   })
   @ApiParam({
     name: 'id',
@@ -501,11 +501,13 @@ export class RecipeController {
     status: 404,
     description: 'Recipe not found',
   })
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     const responseModel = new ResponseModel();
 
     try {
-      const recipe = await this.recipeService.findOne(id);
+      // Pass userId if authenticated to get likedByMe field
+      const userId = req.user?.sub;
+      const recipe = await this.recipeService.findOne(id, userId);
       const result = successResponse(recipe, 'Recipe retrieved successfully');
       responseModel.setData(result);
     } catch (error) {
@@ -521,7 +523,6 @@ export class RecipeController {
   @Patch(':id')
   @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
   @UseInterceptors(
-    RecipeUserInterceptor,
     FileFieldsInterceptor([
       { name: 'thumbnail', maxCount: 10 },
     ])
@@ -611,7 +612,7 @@ export class RecipeController {
       const thumbnails = files?.thumbnail || [];
       const recipe = await this.recipeService.update(
         id,
-        req.user.id,
+        req.user.sub,
         updateRecipeDto,
         thumbnails,
       );
@@ -630,7 +631,6 @@ export class RecipeController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
-  @UseInterceptors(RecipeUserInterceptor)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Delete a recipe',
@@ -666,7 +666,7 @@ export class RecipeController {
     const responseModel = new ResponseModel();
 
     try {
-      const result = await this.recipeService.remove(id, req.user.id);
+      const result = await this.recipeService.remove(id, req.user.sub);
       const data = successResponse(result, result.message);
       responseModel.setData(data);
     } catch (error) {
@@ -850,6 +850,58 @@ export class RecipeController {
     try {
       const result = await this.recipeService.reject(id);
       const data = successResponse(result, 'Recipe rejected successfully');
+      responseModel.setData(data);
+    } catch (error) {
+      throw error;
+    }
+    return responseModel;
+  }
+
+  /**
+   * Toggle like on a recipe (authenticated users only)
+   */
+  @Patch(':id/like')
+  @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Toggle like on a recipe',
+    description: 'Toggles like status on a recipe. If already liked, it will unlike. If not liked, it will like. Requires authentication.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Recipe UUID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Like toggled successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        recipe: { type: 'object', description: 'Updated recipe' },
+        liked: { type: 'boolean', description: 'Whether the recipe is now liked' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid UUID format',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - authentication required',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Recipe not found',
+  })
+  async toggleLike(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    const responseModel = new ResponseModel();
+    try {
+      const result = await this.recipeService.toggleLike(id, req.user.sub);
+      const message = result.liked ? 'Recipe liked successfully' : 'Recipe unliked successfully';
+      const data = successResponse(result, message);
       responseModel.setData(data);
     } catch (error) {
       throw error;

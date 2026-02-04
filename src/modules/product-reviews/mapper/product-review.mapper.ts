@@ -63,9 +63,10 @@ export class ProductReviewMapper {
   /**
    * Converts Prisma ProductReviews model to ProductReviewEntity
    * @param prismaReview - Prisma ProductReviews model from database
+   * @param likedByMe - Optional flag indicating if current user liked this review
    * @returns ProductReviewEntity instance
    */
-  static toEntity(prismaReview: ProductReviews): ProductReviewEntity {
+  static toEntity(prismaReview: ProductReviews, likedByMe?: boolean): ProductReviewEntity {
     const entity = new ProductReviewEntity();
     entity.id = prismaReview.id;
     entity.productId = prismaReview.productId;
@@ -73,6 +74,8 @@ export class ProductReviewMapper {
     entity.imageUrl = prismaReview.imageUrl ?? null;
     entity.review = prismaReview.review;
     entity.rating = prismaReview.rating;
+    entity.likes = prismaReview.likes ?? 0;
+    entity.likedByMe = likedByMe;
     entity.createdAt = prismaReview.createdAt;
     entity.updatedAt = prismaReview.updatedAt;
     return entity;
@@ -176,6 +179,8 @@ export class ProductReviewMapper {
     dto.imageUrl = entity.imageUrl ?? null;
     dto.review = entity.review;
     dto.rating = entity.rating;
+    dto.likes = entity.likes ?? 0;
+    dto.likedByMe = entity.likedByMe;
     dto.createdAt = entity.createdAt ?? null;
     dto.updatedAt = entity.updatedAt ?? null;
     

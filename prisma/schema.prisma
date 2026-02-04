@@ -64,6 +64,8 @@ model User {
   announcement Announcement[]
   productInquiryAnswers ProductInquiryAnswers[]
   orderGroups OrderGroup[]
+  productReviewLikes ProductReviewLikes[]
+  recipeLikes RecipeLikes[]
   @@map("users")
 }
 
@@ -516,8 +518,40 @@ model ProductReviews {
   // Relations
   product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  
+  productReviewLikes ProductReviewLikes[]   
   @@map("product_reviews")  
+}
+
+model ProductReviewLikes {
+  userId String @map("user_id")
+  reviewId String @map("review_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  review ProductReviews? @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, reviewId])
+  @@index([reviewId])
+  @@index([userId])
+  @@map("product_review_likes")
+}
+
+model RecipeLikes {
+  userId String @map("user_id")
+  recipeId String @map("recipe_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, recipeId])
+  @@index([recipeId])
+  @@index([userId])
+  @@map("recipe_likes")
 }
 model ProductDiscount{
   id String @id @default(uuid())
@@ -620,11 +654,13 @@ model Recipe {
   updatedAt      DateTime @updatedAt @map("updated_at")
   // extension
   isActive       Boolean @default(true) @map("is_active") // 활성화 여부
+  likes          Int?   @default(0) @map("likes") // 좋아요 수
 
   // Relations
   author         User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
   product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   recipeComments RecipeComments[]
+  recipeLikes RecipeLikes[]
   @@index([status])
   @@index([authorId])
   @@index([dateOfWriting])

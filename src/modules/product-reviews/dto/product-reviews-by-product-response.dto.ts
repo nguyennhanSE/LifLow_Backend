@@ -37,6 +37,12 @@ export class RecipeSummaryDto {
 
   @ApiProperty({ description: 'Recipe status', example: 'approved' })
   status!: string;
+
+  @ApiProperty({ description: 'Like count', example: 10 })
+  likes!: number;
+
+  @ApiProperty({ description: 'Whether the current user has liked this recipe', example: false })
+  likedByMe!: boolean;
 }
 
 /**
@@ -48,6 +54,12 @@ export class ProductReviewOrRecipeItemDto {
 
   @ApiProperty({ description: 'Created at (for sorting)', example: '2025-01-01T00:00:00.000Z' })
   createdAt!: Date;
+
+  @ApiProperty({ description: 'Like count for this item (review or recipe)', example: 10 })
+  likes!: number;
+
+  @ApiProperty({ description: 'Whether the current user has liked this item', example: false })
+  likedByMe!: boolean;
 
   @ApiPropertyOptional({
     description: 'Present when type is "review"',

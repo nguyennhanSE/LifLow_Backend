@@ -62,6 +62,12 @@ export class ProductReviewResponseDto {
   @ApiProperty({ description: 'Rating value (1.0 to 5.0)', example: 4.5 })
   rating!: number;
 
+  @ApiPropertyOptional({ description: 'Number of likes', example: 10 })
+  likes?: number | null;
+
+  @ApiPropertyOptional({ description: 'Whether the current user has liked this review', example: false })
+  likedByMe?: boolean;
+
   @ApiPropertyOptional({ description: 'Created at timestamp', example: '2025-01-01T00:00:00.000Z' })
   createdAt?: Date | null;
 

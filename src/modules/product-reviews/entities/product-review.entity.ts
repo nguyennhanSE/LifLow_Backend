@@ -27,6 +27,12 @@ export class ProductReviewEntity {
   /** Rating value (maps to rating in database) */
   rating!: number;
 
+  /** Like count (maps to likes in database) */
+  likes?: number | null;
+
+  /** Whether the current user has liked this review */
+  likedByMe?: boolean;
+
   /** Timestamp when the review was created (maps to created_at in database) */
   createdAt?: Date | null;
 

@@ -30,15 +30,43 @@ export class AuthGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (isPublic) {
-      this.logger.debug(
-        `[${this.context}] Route is public, skipping authentication`,
-      );
-      return true;
-    }
-
     const request = context.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(request);
+
+    // For public routes, try to extract user info but don't require it
+    if (isPublic) {
+      if (token) {
+        try {
+          const payload = await this.jwtService.verifyAsync<TokenPayload>(token, {
+            secret: config.JWT_SECRET_ACCESS_TOKEN,
+          });
+
+          if (payload.tokenType === tokenType.AccessToken) {
+            // Attach user information to the request (soft auth)
+            request['user'] = {
+              sub: payload.sub,
+              email: payload.email,
+              tokenType: payload.tokenType,
+              roles: payload.roles,
+            };
+            this.logger.debug(
+              `[${this.context}] Public route with valid token, user attached`,
+              { sub: payload.sub },
+            );
+          }
+        } catch {
+          // Token invalid on public route - just ignore
+          this.logger.debug(
+            `[${this.context}] Public route with invalid/expired token, continuing without user`,
+          );
+        }
+      } else {
+        this.logger.debug(
+          `[${this.context}] Public route without token, continuing`,
+        );
+      }
+      return true;
+    }
 
     if (!token) {
       this.logger.warn(`[${this.context}] No token found in request`);

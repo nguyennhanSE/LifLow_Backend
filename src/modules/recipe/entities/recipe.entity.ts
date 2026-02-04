@@ -17,6 +17,8 @@ export class RecipeEntity {
   createdAt?: Date; // @map("created_at")
   updatedAt?: Date; // @map("updated_at")
   isActive!: boolean; // @map("is_active")
+  likes?: number | null; // @map("likes") - like count
+  likedByMe?: boolean; // whether the current user has liked this recipe
 }
 
 export class RecipeEntityWithAuthor extends RecipeEntity {

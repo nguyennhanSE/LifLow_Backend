@@ -6,6 +6,7 @@ import { PrismaModule } from '../../../prisma/prisma.module';
 import { UserModule } from '../user/user.module';
 import { ProductModule } from '../product/product.module';
 import { AwsModule } from '../../libs/integration/aws/aws.module';
+import { RecipeModule } from '../recipe/recipe.module';
 
 /**
  * ProductReviewsModule
@@ -17,6 +18,7 @@ import { AwsModule } from '../../libs/integration/aws/aws.module';
     UserModule,      // For user validation and relations
     ProductModule,   // For product validation and relations
     AwsModule,
+    RecipeModule,   // For recipe likes (likedByMe)
   ],
   controllers: [ProductReviewsController],
   providers: [ProductReviewsService, ProductReviewsRepository],

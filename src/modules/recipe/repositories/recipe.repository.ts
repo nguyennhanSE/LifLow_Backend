@@ -399,5 +399,120 @@ export class RecipeRepository {
       this.handlePrismaError(error, id);
     }
   }
+
+  /**
+   * Check if a user has liked a recipe
+   * @param recipeId - Recipe ID
+   * @param userId - User ID
+   * @returns true if user has liked the recipe
+   */
+  async hasUserLikedRecipe(recipeId: string, userId: string): Promise<boolean> {
+    const like = await this.prisma.recipeLikes.findUnique({
+      where: {
+        userId_recipeId: {
+          userId,
+          recipeId,
+        },
+      },
+    });
+    return !!like;
+  }
+
+  /**
+   * Like a recipe
+   * @param recipeId - Recipe ID
+   * @param userId - User ID
+   * @returns Updated recipe
+   */
+  async likeRecipe(recipeId: string, userId: string): Promise<RecipeWithAuthor> {
+    try {
+      // Use transaction to create like and increment count atomically
+      return await this.prisma.$transaction(async (tx) => {
+        // Create the like record
+        await tx.recipeLikes.create({
+          data: {
+            userId,
+            recipeId,
+          },
+        });
+
+        // Increment the likes count on the recipe
+        const updatedRecipe = await tx.recipe.update({
+          where: { id: recipeId },
+          data: {
+            likes: { increment: 1 },
+          },
+          include: { author: true, product: true },
+        });
+
+        return updatedRecipe;
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new BadRequestException('You have already liked this recipe');
+      }
+      this.handlePrismaError(error, recipeId);
+    }
+  }
+
+  /**
+   * Unlike a recipe
+   * @param recipeId - Recipe ID
+   * @param userId - User ID
+   * @returns Updated recipe
+   */
+  async unlikeRecipe(recipeId: string, userId: string): Promise<RecipeWithAuthor> {
+    try {
+      // Use transaction to delete like and decrement count atomically
+      return await this.prisma.$transaction(async (tx) => {
+        // Delete the like record
+        await tx.recipeLikes.delete({
+          where: {
+            userId_recipeId: {
+              userId,
+              recipeId,
+            },
+          },
+        });
+
+        // Decrement the likes count on the recipe (ensure it doesn't go below 0)
+        const currentRecipe = await tx.recipe.findUnique({ where: { id: recipeId } });
+        const newLikes = Math.max((currentRecipe?.likes ?? 0) - 1, 0);
+
+        const updatedRecipe = await tx.recipe.update({
+          where: { id: recipeId },
+          data: {
+            likes: newLikes,
+          },
+          include: { author: true, product: true },
+        });
+
+        return updatedRecipe;
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2025') {
+        throw new BadRequestException('You have not liked this recipe');
+      }
+      this.handlePrismaError(error, recipeId);
+    }
+  }
+
+  /**
+   * Toggle like on a recipe
+   * @param recipeId - Recipe ID
+   * @param userId - User ID
+   * @returns Object with updated recipe and whether it's now liked
+   */
+  async toggleLike(recipeId: string, userId: string): Promise<{ recipe: RecipeWithAuthor; liked: boolean }> {
+    const hasLiked = await this.hasUserLikedRecipe(recipeId, userId);
+    
+    if (hasLiked) {
+      const recipe = await this.unlikeRecipe(recipeId, userId);
+      return { recipe, liked: false };
+    } else {
+      const recipe = await this.likeRecipe(recipeId, userId);
+      return { recipe, liked: true };
+    }
+  }
 }
 

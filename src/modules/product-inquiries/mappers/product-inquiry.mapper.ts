@@ -199,17 +199,17 @@ export class ProductInquiryMapper {
     }
     
     // Map product if included
-    if (prismaInquiry.product) {
-      entity.product = {
-        id: prismaInquiry.product.id,
-        productName: prismaInquiry.product.productName ?? null,
-        productCode: prismaInquiry.product.productCode ?? null,
-        imageRegistrationThumbnail: prismaInquiry.product.imageRegistrationThumbnail ?? null,
-        salePrice: prismaInquiry.product.salePrice ?? null,
-      } as any;
-    } else {
-      entity.product = null;
-    }
+    // if (prismaInquiry.product) {
+    //   entity.product = {
+    //     id: prismaInquiry.product.id,
+    //     productName: prismaInquiry.product.productName ?? null,
+    //     productCode: prismaInquiry.product.productCode ?? null,
+    //     imageRegistrationThumbnail: prismaInquiry.product.imageRegistrationThumbnail ?? null,
+    //     salePrice: prismaInquiry.product.salePrice ?? null,
+    //   } as any;
+    // } else {
+    //   entity.product = null;
+    // }
     
     // Map answers if included
     if (prismaInquiry.productInquiryAnswers) {
