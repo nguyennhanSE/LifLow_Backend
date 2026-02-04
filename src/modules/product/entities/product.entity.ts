@@ -99,6 +99,7 @@ export class ProductEntity {
   createdAt?: Date | null;
   updatedAt?: Date | null;
   // extension
+  isSoldOut?: boolean | null;
   stockQuantity?: number | null;
   storageMethod?: string | null;
   additionalImages?: string[] | null;

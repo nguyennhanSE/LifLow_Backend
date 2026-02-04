@@ -36,6 +36,7 @@ import { CartItemService } from '../carts/services/cart-item.service';
 export interface PaymentTokenPayload {
   orderGroupNumber: string;
   userId: string;
+  directPay?: boolean;
   iat?: number;
   exp?: number;
 }
@@ -389,7 +390,7 @@ export class PaymentService {
       });
 
       const paymentToken = await this.jwtService.signAsync(
-        { orderGroupNumber, userId } as PaymentTokenPayload,
+        { orderGroupNumber, userId, directPay: false } as PaymentTokenPayload,
         {
           secret: config.JWT_SECRET_ACCESS_TOKEN,
           expiresIn: '1h',
@@ -413,6 +414,7 @@ export class PaymentService {
           quantity: 1,
         })),
         paymentToken,
+        directPay: false,
       };
     } catch (error) {
       this.logger.error('Failed to initiate payment', error);
@@ -769,7 +771,7 @@ export class PaymentService {
       });
 
       const paymentToken = await this.jwtService.signAsync(
-        { orderGroupNumber, userId } as PaymentTokenPayload,
+        { orderGroupNumber, userId, directPay: true } as PaymentTokenPayload,
         {
           secret: config.JWT_SECRET_ACCESS_TOKEN,
           expiresIn: '1h',
@@ -793,6 +795,7 @@ export class PaymentService {
           quantity: 1,
         })),
         paymentToken,
+        directPay: true,
       };
     } catch (error) {
       this.logger.error('Failed to initiate payment V2', error);
@@ -818,23 +821,25 @@ export class PaymentService {
   async confirmPayment(
     dto: ConfirmPaymentRequestDto,
   ): Promise<PaymentResponseDto> {
-    // Validate and decode payment token (expires in 1 hour)
+    // Validate and decode payment token (expires in 1 hour); keep payload for directPay in transaction/catch
+    let tokenPayload: PaymentTokenPayload;
     try {
-      const payload = await this.jwtService.verifyAsync<PaymentTokenPayload>(
+      tokenPayload = await this.jwtService.verifyAsync<PaymentTokenPayload>(
         dto.paymentToken,
         {
           secret: config.JWT_SECRET_ACCESS_TOKEN,
         },
       );
       if (
-        payload.orderGroupNumber !== dto.orderGroupNumber ||
-        payload.userId !== dto.userId
+        tokenPayload.orderGroupNumber !== dto.orderGroupNumber ||
+        tokenPayload.userId !== dto.userId
       ) {
         throw new BadRequestException('Payment token is outdated or invalid');
       }
     } catch {
       throw new BadRequestException('Payment token is outdated or invalid');
     }
+    const directPay = tokenPayload.directPay === true;
 
     // Validate userId is provided and is a string
     if (!dto.userId || typeof dto.userId !== 'string') {
@@ -884,14 +889,18 @@ export class PaymentService {
 
         this.logger.log(`OrderGroup found with ${orderGroup.cartItemIds.length} cart items`);
 
-        // 2.1b. Delete cart items from cart (at start of transaction)
-        this.logger.log('Deleting cart items');
-        await tx.cartItem.deleteMany({
-          where: {
-            id: { in: orderGroup.cartItemIds },
-          },
-        });
-        this.logger.log(`Deleted ${orderGroup.cartItemIds.length} cart items`);
+        // 2.1b. Delete cart items from cart (skip when directPay: no cart was used)
+        if (!directPay && orderGroup.cartItemIds.length > 0) {
+          this.logger.log('Deleting cart items');
+          await tx.cartItem.deleteMany({
+            where: {
+              id: { in: orderGroup.cartItemIds },
+            },
+          });
+          this.logger.log(`Deleted ${orderGroup.cartItemIds.length} cart items`);
+        } else if (directPay) {
+          this.logger.log('Skipping cart item deletion (directPay)');
+        }
 
         // 2.2. Get User
         const user = await tx.user.findUnique({
@@ -1143,16 +1152,18 @@ export class PaymentService {
     } catch (error) {
       this.logger.error('Failed to confirm payment', error);
 
-      const cartItemIdsToRemove = validatedDto.cartItems;
-      if (cartItemIdsToRemove?.length) {
-        for (const cartItemId of cartItemIdsToRemove) {
-          try {
-            await this.cartItemService.removeItem(String(cartItemId));
-          } catch (deleteError) {
-            this.logger.warn(
-              `Failed to remove cart item ${cartItemId} after confirm error`,
-              deleteError,
-            );
+      if (!directPay) {
+        const cartItemIdsToRemove = validatedDto.cartItems;
+        if (cartItemIdsToRemove?.length) {
+          for (const cartItemId of cartItemIdsToRemove) {
+            try {
+              await this.cartItemService.removeItem(String(cartItemId));
+            } catch (deleteError) {
+              this.logger.warn(
+                `Failed to remove cart item ${cartItemId} after confirm error`,
+                deleteError,
+              );
+            }
           }
         }
       }

@@ -128,6 +128,7 @@ export class ProductService {
       const result = await this.prisma.$transaction(async (tx) => {
         // Prepare product data
         const createProductData: Prisma.ProductCreateInput = productData as Prisma.ProductCreateInput;
+        createProductData.displayStatus = 'Y';
         if (hsCode !== undefined) {
           createProductData.hsCode = hsCode !== null ? BigInt(String(hsCode)) : null;
         }
