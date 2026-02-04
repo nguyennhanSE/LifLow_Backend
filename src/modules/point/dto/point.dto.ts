@@ -53,11 +53,11 @@ export class CreatePointDto {
   @ApiPropertyOptional({
     description: 'Content/Details',
     example: 'Order points',
-    maxLength: 50,
+    maxLength: 500,
   })
   @IsOptional()
   @IsString({ message: 'Content must be a string' })
-  @MaxLength(50, { message: 'Content must not exceed 50 characters' })
+  @MaxLength(500, { message: 'Content must not exceed 500 characters' })
   content?: string;
 
   @ApiPropertyOptional({
@@ -152,11 +152,11 @@ export class UpdatePointDto {
   @ApiPropertyOptional({
     description: 'Content/Details',
     example: 'Order points',
-    maxLength: 50,
+    maxLength: 500,
   })
   @IsOptional()
   @IsString({ message: 'Content must be a string' })
-  @MaxLength(50, { message: 'Content must not exceed 50 characters' })
+  @MaxLength(500, { message: 'Content must not exceed 500 characters' })
   content?: string;
 
   @ApiPropertyOptional({

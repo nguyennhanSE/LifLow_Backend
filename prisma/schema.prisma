@@ -354,7 +354,7 @@ model Point {
   date String? @db.VarChar(50) @map("date") // 일자 (Date) - character varying(50)
   userId String? @db.VarChar(50) @map("user_id") // 아이디 (ID) - character varying(50)
   membershipLevel String? @db.VarChar(50) @map("membership_level") // 회원등급 (Membership Level) - character varying(50)
-  content String? @db.VarChar(50) @map("content") // 내용 (Content/Details) - character varying(50)
+  content String? @db.VarChar(500) @map("content") // 내용 (Content/Details) - character varying(500)
   orderGroupNumber String? @db.VarChar(50) @map("order_group_number") // 주문번호 (Order Number) - character varying(50)
   pointsType String? @db.VarChar(50) @map("points_type") // 적립금 유형 (Accumulated Points Type) - character varying(50)
   availablePointsIncrease Int? @map("available_points_increase") // 가용적립금 증가 (Available Points Increase) - integer

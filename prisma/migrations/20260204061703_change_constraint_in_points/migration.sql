@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "points" ALTER COLUMN "content" SET DATA TYPE VARCHAR(500);

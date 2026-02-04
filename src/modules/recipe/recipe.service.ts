@@ -618,7 +618,7 @@ export class RecipeService {
             pointsType: 'REWARD',
             availablePointsIncrease: pointsIncrease,
             availablePointsBalance: newPoints,
-            content: 'Recipe approval reward for recipe' + existingRecipe.title, // VarChar(50)
+            content: 'Recipe approval reward for recipe' + existingRecipe.title, // VarChar(500)
           },
         });
 
