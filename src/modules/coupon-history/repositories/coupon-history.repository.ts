@@ -33,30 +33,36 @@ export class CouponHistoryRepository {
       endDate,
     }));
 
-    const histories = await this.prisma.$transaction(async (tx) => {
-      await tx.couponHistory.createMany({
-        data,
-      });
+    const histories = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.couponHistory.createMany({
+          data,
+        });
 
-      // Return the created records
-      return tx.couponHistory.findMany({
-        where: {
-          couponId,
-          userId: { in: userIds },
-          issuedAt: now,
-        },
-        include: {
-          coupon: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
+        // Return the created records
+        return tx.couponHistory.findMany({
+          where: {
+            couponId,
+            userId: { in: userIds },
+            issuedAt: now,
+          },
+          include: {
+            coupon: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
             },
           },
-        },
-      });
-    });
+        });
+      },
+      {
+        maxWait: 10_000,
+        timeout: 60_000, // bulk issue can involve many users; default 5s is too short
+      },
+    );
 
     return toCouponHistoryEntityWithRelationsArray(histories);
   }
