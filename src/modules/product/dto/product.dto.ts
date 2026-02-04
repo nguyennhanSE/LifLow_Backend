@@ -186,7 +186,7 @@ export class CreateProductDto {
   @ApiPropertyOptional({ description: 'Sale status', example: '판매중' })
   @IsOptional()
   @IsString()
-  saleStatus?: string;
+  displayStatus?: string;
 
   // stock quantity
   @ApiPropertyOptional({ description: 'Stock quantity', example: 100, minimum: 0 })

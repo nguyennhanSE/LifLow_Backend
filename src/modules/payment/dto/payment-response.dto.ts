@@ -96,6 +96,9 @@ export class InitiatePaymentResponseDto {
 
   @ApiProperty({ description: 'Payment token for confirmPayment (expires in 1 hour)' })
   paymentToken: string;
+
+
+  // directlyPay: boolean;
 }
 
 export class PaymentListResponseDto {

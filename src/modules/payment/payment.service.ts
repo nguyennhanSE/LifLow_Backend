@@ -68,13 +68,6 @@ export class PaymentService {
     points?: number,
     deliveryFee?: number,
   ): Promise<InitiatePaymentResponseDto> {
-    // this.logger.log(`Initiating payment for user: ${userId}`, {
-    //   cartItemIds,
-    //   couponIds,
-    //   userShippingAddressId,
-    //   points,
-    //   deliveryFee,
-    // });
     if (!userShippingAddressId) {
       throw new BadRequestException('User shipping address ID is required');
     }
@@ -447,6 +440,375 @@ export class PaymentService {
       );
     }
   }
+
+  /**
+   * Initiate payment V2 - Same logic as initiatePayment but uses productIds instead of cart items.
+   * No cart involvement: fetches products by ID, creates OrderGroup and Orders without cart.
+   */
+  async initiatePaymentV2(
+    userId: string,
+    productIds: string[],
+    couponIds?: CouponIdQuantityDto[],
+    userShippingAddressId?: string,
+    points?: number,
+    deliveryFee?: number,
+  ): Promise<InitiatePaymentResponseDto> {
+    if (!userShippingAddressId) {
+      throw new BadRequestException('User shipping address ID is required');
+    }
+
+    try {
+      // 1. Validate user exists (need name, phoneNumber for order creation)
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          name: true,
+          availablePoints: true,
+          phoneNumber: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+      const availablePoints = user?.availablePoints ?? 0;
+
+      // 2. Validate points
+      if (points && points > 0) {
+        if (availablePoints === 0) {
+          throw new BadRequestException('Available points is 0');
+        }
+        if (points > availablePoints) {
+          throw new BadRequestException(
+            `Insufficient points. Available: ${availablePoints}, Requested: ${points}`,
+          );
+        }
+      }
+
+      // 3. Validate product IDs (group by id to get quantity per product)
+      if (!productIds || productIds.length === 0) {
+        throw new BadRequestException('At least one product is required');
+      }
+
+      const productIdToQuantity = new Map<string, number>();
+      for (const id of productIds) {
+        productIdToQuantity.set(id, (productIdToQuantity.get(id) ?? 0) + 1);
+      }
+      const uniqueProductIds = Array.from(productIdToQuantity.keys());
+
+      // 4. Fetch products by IDs
+      const products = await this.prisma.product.findMany({
+        where: { id: { in: uniqueProductIds } },
+        select: {
+          id: true,
+          productName: true,
+          origin: true,
+          salePrice: true,
+        },
+      });
+
+      if (products.length === 0) {
+        throw new NotFoundException('No products found');
+      }
+
+      if (products.length !== uniqueProductIds.length) {
+        throw new BadRequestException('Some products are not found');
+      }
+
+      const productMap = new Map(products.map((p) => [p.id, p]));
+      const orderItems: { product: (typeof products)[0]; quantity: number }[] = [];
+      for (const pid of uniqueProductIds) {
+        const product = productMap.get(pid);
+        const quantity = productIdToQuantity.get(pid)!;
+        if (!product) continue;
+        const origin = product.origin ?? 0;
+        if (origin < quantity) {
+          throw new BadRequestException(
+            `Not enough quantity for "${product.productName ?? 'Product'}". Available: ${origin}, Requested: ${quantity}`,
+          );
+        }
+        const salePrice = product.salePrice ?? 0;
+        if (salePrice <= 0) {
+          throw new BadRequestException(
+            `Product "${product.productName ?? pid}" has invalid sale price`,
+          );
+        }
+        orderItems.push({ product, quantity });
+      }
+
+      // 5. Calculate original amount (sum of salePrice * quantity)
+      const originalAmount = orderItems.reduce((sum, { product, quantity }) => {
+        return sum + (product.salePrice ?? 0) * quantity;
+      }, 0);
+
+      // 6. Process order-level coupons (from couponIds DTO)
+      let totalCouponDiscount = 0;
+      const appliedCouponIds: string[] = [];
+      let effectiveDeliveryFee = deliveryFee ?? 0;
+
+      let coupons: Coupon[] = [];
+      if (couponIds && couponIds.length > 0) {
+        const couponIdsFromDto = couponIds.map((c) => c.couponId);
+        coupons = await this.prisma.coupon.findMany({
+          where: {
+            id: { in: couponIdsFromDto },
+            isActive: true,
+          },
+        });
+
+        for (const coupon of coupons) {
+          const dtoEntry = couponIds.find((c) => c.couponId === coupon.id);
+          const quantity = dtoEntry?.quantity ?? 1;
+
+          let discount = 0;
+
+          if (coupon.type === 'PERCENT') {
+            discount = Math.floor((originalAmount * (coupon.discountRate || 0)) / 100);
+            if (coupon.maxDiscountAmount != null && discount > coupon.maxDiscountAmount) {
+              discount = coupon.maxDiscountAmount;
+            }
+          } else if (coupon.type === 'AMOUNT') {
+            discount = (coupon.discountAmount || 0) * quantity;
+          } else if (coupon.type === 'FREE_SHIPPING') {
+            effectiveDeliveryFee = 0;
+            discount = 0;
+          }
+
+          totalCouponDiscount += discount;
+          appliedCouponIds.push(coupon.id);
+          this.logger.log(`Applied order-level coupon ${coupon.code} with discount ${discount} KRW`);
+        }
+      }
+
+      // 7. Calculate final amount
+      const pointsDiscount = points ? points : 0;
+      const totalDiscountAmount = totalCouponDiscount + pointsDiscount;
+      const finalAmount = originalAmount - totalDiscountAmount + effectiveDeliveryFee;
+
+      if (finalAmount < 0) {
+        throw new BadRequestException('Total discount exceeds order amount');
+      }
+
+      const MINIMUM_PAYMENT_AMOUNT = 200;
+      if (finalAmount < MINIMUM_PAYMENT_AMOUNT) {
+        throw new BadRequestException(
+          `Payment amount must be at least ${MINIMUM_PAYMENT_AMOUNT}원. Current amount: ${finalAmount}원`,
+        );
+      }
+
+      // 8. Generate unique order group number
+      const orderGroupNumber = await this.ordersService.generateUniqueOrderGroupNumber();
+
+      // 9. Fetch shipping address and membership (no cart)
+      let shippingAddress: {
+        recipientName: string;
+        addressFull: string;
+        postalCode: number | null;
+        mobilePhone: string | null;
+        phoneNumber: string | null;
+      } | null = null;
+      if (userShippingAddressId) {
+        const address = await this.prisma.userShippingAddress.findUnique({
+          where: { id: userShippingAddressId },
+        });
+        if (!address) {
+          throw new NotFoundException(`Shipping address with ID ${userShippingAddressId} not found`);
+        }
+        if (address.userId !== userId) {
+          throw new BadRequestException('Shipping address does not belong to this user');
+        }
+        shippingAddress = address;
+      }
+
+      const userMembership = await this.prisma.userMembership.findFirst({
+        where: {
+          userId,
+          startDate: { lte: new Date() },
+          endDate: { gte: new Date() },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      const membershipLevelAtOrderTime = userMembership?.membershipName || '';
+      const couponMap = new Map(coupons.map((c) => [c.id, c]));
+      const today = this.formatLocalYyyyMmDd(new Date());
+
+      // 10. Create OrderGroup and Orders in a single transaction (no cart)
+      await this.prisma.$transaction(
+        async (tx) => {
+          await tx.orderGroup.create({
+            data: {
+              orderGroupNumber,
+              situation: EOrderSituation.ORDER_PAYMENT_PENDING as OrderSituation,
+              orderGroupName: 'Order Group Number: ' + orderGroupNumber,
+              originalAmount,
+              discountAmount: totalDiscountAmount,
+              finalAmount,
+              cartItemIds: productIds,
+              pointsUsed: points || 0,
+              deliveryFee: effectiveDeliveryFee,
+              ordererId: userId,
+            },
+          });
+
+          for (const { product, quantity } of orderItems) {
+            const salePrice = product.salePrice ?? 0;
+            const totalOrderAmount = salePrice * quantity;
+            let totalDiscount = 0;
+            const orderAppliedCouponIds: string[] = [];
+
+            if (couponIds && couponIds.length > 0) {
+              for (const entry of couponIds) {
+                const coupon = couponMap.get(entry.couponId);
+                if (!coupon) continue;
+
+                let discount = 0;
+                if (coupon.type === 'PERCENT') {
+                  discount = Math.floor(
+                    (totalOrderAmount * (coupon.discountRate || 0)) / 100,
+                  );
+                  if (
+                    coupon.maxDiscountAmount != null &&
+                    discount > coupon.maxDiscountAmount
+                  ) {
+                    discount = coupon.maxDiscountAmount;
+                  }
+                } else if (coupon.type === 'AMOUNT') {
+                  discount = (coupon.discountAmount || 0) * (entry.quantity ?? 1);
+                }
+                totalDiscount += discount;
+                orderAppliedCouponIds.push(coupon.id);
+              }
+            }
+
+            const totalPaymentAmount = Math.max(0, totalOrderAmount - totalDiscount);
+
+            let orderNumber = '';
+            const maxRetries = 5;
+            let retryCount = 0;
+            let orderCreated = false;
+
+            while (!orderCreated && retryCount < maxRetries) {
+              try {
+                orderNumber = await this.ordersService.generateOrderNumberInTransaction(
+                  tx,
+                  orderGroupNumber,
+                );
+
+                const orderData: Prisma.OrderCreateInput = {
+                  orderNumber,
+                  orderGroup: { connect: { orderGroupNumber } },
+                  totalOrderAmount,
+                  totalPaymentAmount,
+                  productName: product.productName || '',
+                  productNameWithOptions: product.productName || '',
+                  quantity,
+                  salePrice,
+                  couponUsed: orderAppliedCouponIds,
+                  discountAmount: totalDiscount,
+                  recipient: shippingAddress?.recipientName || user.name || '',
+                  recipientAddressFull: shippingAddress?.addressFull || '',
+                  recipientPostalCode: shippingAddress?.postalCode || 0,
+                  recipientMobilePhone: shippingAddress?.mobilePhone || user.phoneNumber || '',
+                  recipientPhoneNumber: shippingAddress?.phoneNumber || '',
+                  deliveryMessage: '',
+                  orderDate: today,
+                  ordererName: user.name || '',
+                  ordererMobilePhone: user.phoneNumber || '',
+                  membershipLevelAtOrderTime,
+                  product: { connect: { id: product.id } },
+                };
+
+                await tx.order.create({ data: orderData });
+
+                this.logger.log(
+                  `Created order ${orderNumber}: ${totalOrderAmount} KRW -> ${totalPaymentAmount} KRW (discount: ${totalDiscount})`,
+                );
+                orderCreated = true;
+              } catch (error: any) {
+                if (error?.code === 'P2002' && error?.meta?.target?.includes('order_number')) {
+                  retryCount++;
+                  this.logger.warn(
+                    `Duplicate order number ${orderNumber}, retrying (${retryCount}/${maxRetries})`,
+                  );
+                  await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
+                  continue;
+                }
+                throw error;
+              }
+            }
+
+            if (!orderCreated) {
+              throw new InternalServerErrorException(
+                `Failed to create order for product ${product.id} after ${maxRetries} attempts`,
+              );
+            }
+          }
+
+          this.logger.log(`Created ${orderItems.length} orders for order group ${orderGroupNumber}`);
+        },
+        { timeout: 30_000, maxWait: 10_000 },
+      );
+
+      // 11. Generate customerKey for Toss
+      const customerKey = `customer_${userId}`;
+
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+      const successUrl = `${frontendUrl}/payment/success`;
+      const failUrl = `${frontendUrl}/payment/fail`;
+
+      this.logger.log('Payment V2 initiated successfully', {
+        orderGroupNumber,
+        productIdsCount: productIds.length,
+        originalAmount,
+        couponDiscount: totalCouponDiscount,
+        pointsDiscount,
+        totalDiscountAmount,
+        finalAmount,
+        deliveryFee: effectiveDeliveryFee,
+        userShippingAddressId,
+      });
+
+      const paymentToken = await this.jwtService.signAsync(
+        { orderGroupNumber, userId } as PaymentTokenPayload,
+        {
+          secret: config.JWT_SECRET_ACCESS_TOKEN,
+          expiresIn: '1h',
+        },
+      );
+
+      return {
+        orderId: orderGroupNumber,
+        originalAmount,
+        discountAmount: totalDiscountAmount,
+        finalAmount,
+        orderGroupName: 'Order Group Number: ' + orderGroupNumber,
+        customerKey,
+        successUrl,
+        failUrl,
+        deliveryFee: effectiveDeliveryFee,
+        userShippingAddressId,
+        cartItems: productIds,
+        coupons: appliedCouponIds.map((id) => ({
+          couponId: id,
+          quantity: 1,
+        })),
+        paymentToken,
+      };
+    } catch (error) {
+      this.logger.error('Failed to initiate payment V2', error);
+
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        'Failed to initiate payment',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+
 
   /**
    * Confirm payment after user completes checkout
