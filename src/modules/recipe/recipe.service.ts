@@ -411,32 +411,27 @@ export class RecipeService {
   /**
    * Get recipes by author
    * - Returns all recipes by a specific author
-   * - Supports pagination and status filtering
+   * - Supports pagination and isActive filtering
    */
   async getByAuthor(
     authorId: string,
     options?: {
       page?: number;
       limit?: number;
-      status?: 'approved' | 'rejected' | 'pending';
+      isActive?: boolean;
     },
   ): Promise<RecipeEntityWithAuthor[]> {
     try {
-      // Validate UUID format
-      if (!this.isValidUUID(authorId)) {
-        throw new BadRequestException('Invalid author ID format');
-      }
-
       // Check if author exists
       const authorExists = await this.recipeRepository.authorExists(authorId);
       if (!authorExists) {
         throw new NotFoundException(`Author with id ${authorId} not found`);
       }
 
-      const recipes = await this.recipeRepository.findByAuthor(
-        authorId,
-        options,
-      );
+      const recipes = await this.recipeRepository.findByAuthor(authorId, {
+        ...options,
+        includeAuthor: false,
+      });
 
       return recipes.map(recipe => toRecipeEntityWithAuthor(recipe));
     } catch (error: any) {

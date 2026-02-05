@@ -170,21 +170,16 @@ export class RecipeRepository {
     options?: {
       page?: number;
       limit?: number;
-      status?: 'approved' | 'rejected' | 'pending';
+      isActive?: boolean;
       includeAuthor?: boolean;
     },
   ): Promise<RecipeWithAuthor[]> {
-    const { page = 1, limit = 20, status, includeAuthor = true } = options || {};
+    const { page = 1, limit = 20, isActive, includeAuthor = true } = options || {};
 
     const where: Prisma.RecipeWhereInput = { authorId };
-    
-    if (status) {
-      // Validate status is one of the allowed values
-      if (status === 'approved' || status === 'rejected' || status === 'pending') {
-        where.status = status;
-      } else {
-        throw new BadRequestException('Status must be either "approved", "pending" or "rejected"');
-      }
+
+    if (isActive !== undefined) {
+      where.isActive = isActive;
     }
 
     const skip = (page - 1) * limit;

@@ -218,13 +218,7 @@ export class PaymentService {
         throw new NotFoundException(`Cart for user ${userId} not found`);
       }
 
-      let shippingAddress: {
-        recipientName: string;
-        addressFull: string;
-        postalCode: number | null;
-        mobilePhone: string | null;
-        phoneNumber: string | null;
-      } | null = null;
+      let shippingAddress: any = null;
       if (userShippingAddressId) {
         const address = await this.prisma.userShippingAddress.findUnique({
           where: { id: userShippingAddressId },
@@ -589,13 +583,7 @@ export class PaymentService {
       const orderGroupNumber = await this.ordersService.generateUniqueOrderGroupNumber();
 
       // 9. Fetch shipping address and membership (no cart)
-      let shippingAddress: {
-        recipientName: string;
-        addressFull: string;
-        postalCode: number | null;
-        mobilePhone: string | null;
-        phoneNumber: string | null;
-      } | null = null;
+      let shippingAddress: any = null;
       if (userShippingAddressId) {
         const address = await this.prisma.userShippingAddress.findUnique({
           where: { id: userShippingAddressId },

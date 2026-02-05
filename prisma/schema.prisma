@@ -76,7 +76,7 @@ model UserShippingAddress {
   // address
   deliveryAddress String @map("delivery_address")
   address String @map("address_name")
-  addressFull String @map("address_full")
+  addressFull String? @map("address_full")
   postalCode Int? @map("postal_code")
   mobilePhone String? @map("mobile_phone")
   phoneNumber String? @map("phone_number")

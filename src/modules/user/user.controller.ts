@@ -125,11 +125,13 @@ export class UserController {
   ) {
     const responseModel = new ResponseModel();
     const avatarImage = files?.avatarImage?.[0];
-    if (!avatarImage) {
-      throw new BadRequestException('Avatar image is required');
+    // if (!avatarImage) {
+    //   throw new BadRequestException('Avatar image is required');
+    // }
+    let avatarImageUrl: string | undefined;
+    if (avatarImage) {
+      avatarImageUrl = await this.awsService.uploadFile('users', createUserDto.id, avatarImage);
     }
-    
-    const avatarImageUrl = await this.awsService.uploadFile('users', createUserDto.id, avatarImage);
 
     try {
       const user = await this.userService.create(createUserDto, avatarImageUrl);

@@ -314,7 +314,7 @@ export class UserService {
     phoneNumber?: string;
     postalCode: number;
     address: string;
-    addressFull: string;
+    addressFull?: string;
     setAsDefault?: boolean;
   }): Promise<any> {
     try {

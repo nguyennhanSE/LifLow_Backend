@@ -712,16 +712,16 @@ export class CreateShippingAddressDto {
     @MaxLength(500)
     address!: string;
 
-    @ApiProperty({ 
+    @ApiPropertyOptional({ 
         description: 'Detailed address (building/lake, etc.)', 
         example: '456호',
         maxLength: 500
     })
+    @IsOptional()
     @IsString() 
-    @IsNotEmpty() 
     @trim() 
     @MaxLength(500)
-    addressFull!: string;
+    addressFull?: string;
 
     @ApiPropertyOptional({ 
         description: 'Set as default shipping address', 

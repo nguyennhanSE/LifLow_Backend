@@ -889,7 +889,7 @@ export class UserRepository {
     phoneNumber?: string;
     postalCode: number;
     address: string;
-    addressFull: string;
+    addressFull?: string;
     setAsDefault?: boolean;
   }): Promise<any> {
     try {
@@ -897,16 +897,17 @@ export class UserRepository {
       const { phoneNumber, setAsDefault, ...restData } = addressData;
       const isDefault = setAsDefault ?? false;
       
+      const { addressFull, ...rest } = restData;
       const dbData = {
-        ...restData,
+        ...rest,
         phoneNumber: phoneNumber || '', // Default to empty string if not provided
         setAsDefault: isDefault,
       };
-      
+
       // If setting as default, update all existing addresses to setAsDefault = false
       if (isDefault) {
         await this.prisma.userShippingAddress.updateMany({
-          where: { 
+          where: {
             userId,
             setAsDefault: true,
           },
@@ -916,11 +917,12 @@ export class UserRepository {
         });
       }
 
-      // Create new address
+      // Create new address (include addressFull only when defined)
       return await this.prisma.userShippingAddress.create({
         data: {
           ...dbData,
           userId,
+          ...(addressFull !== undefined ? { addressFull } : {}),
         },
       });
     } catch (error) {

@@ -312,18 +312,8 @@ export class RecipeController {
   /**
    * Get recipes by author (public)
    */
-  @Get('author/:authorId')
-  @Public()
-  @ApiOperation({
-    summary: 'Get recipes by author',
-    description: 'Retrieves all recipes created by a specific author.',
-  })
-  @ApiParam({
-    name: 'authorId',
-    type: String,
-    description: 'Author user UUID',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
+  @Get('author/me')
+  // @Public()
   @ApiQuery({
     name: 'page',
     required: false,
@@ -339,11 +329,11 @@ export class RecipeController {
     example: 20,
   })
   @ApiQuery({
-    name: 'status',
+    name: 'isActive',
     required: false,
-    enum: ['Active', 'Hidden'],
-    description: 'Filter by status',
-    example: 'Active',
+    type: Boolean,
+    description: 'Filter by active state (true | false)',
+    example: true,
   })
   @ApiResponse({
     status: 200,
@@ -358,18 +348,19 @@ export class RecipeController {
     description: 'Author not found',
   })
   async getByAuthor(
-    @Param('authorId') authorId: string,
+    @Request() req: AuthenticatedRequest,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-    @Query('status') status?: 'approved' | 'rejected' | 'pending',
+    @Query('isActive') isActive?: boolean,
   ) {
     const responseModel = new ResponseModel();
 
     try {
-      const recipes = await this.recipeService.getByAuthor(authorId, {
+      const isActiveFilter = isActive ? true : false;
+      const recipes = await this.recipeService.getByAuthor(req.user.sub, {
         page: page || 1,
         limit: limit || 20,
-        status,
+        isActive: isActiveFilter || undefined,
       });
       const result = successResponse(
         recipes,
