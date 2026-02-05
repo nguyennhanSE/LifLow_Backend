@@ -1349,13 +1349,51 @@ export class PaymentService {
             },
           });
 
-          // 4. Update order group situation to ORDER_PAYMENT_FAILED
+          // 4. Update order group situation to ORDER_CANCELLED
           await tx.orderGroup.update({
             where: { orderGroupNumber: payment.orderGroupNumber },
             data: {
               situation: EOrderSituation.ORDER_CANCELLED as OrderSituation,
             },
           });
+
+          // 5. Restore user points from Point records (reverse increase/deduction)
+          const points = await tx.point.findMany({
+            where: { orderGroupNumber: payment.orderGroupNumber },
+            select: {
+              userId: true,
+              availablePointsIncrease: true,
+              availablePointsDeduction: true,
+            },
+          });
+          const byUser = new Map<
+            string,
+            { increase: number; deduction: number }
+          >();
+          for (const p of points) {
+            const uid = p.userId;
+            if (!uid) continue;
+            const cur = byUser.get(uid) ?? { increase: 0, deduction: 0 };
+            cur.increase += p.availablePointsIncrease ?? 0;
+            cur.deduction += p.availablePointsDeduction ?? 0;
+            byUser.set(uid, cur);
+          }
+          for (const [userId, { increase, deduction }] of byUser) {
+            const netRestore = deduction - increase;
+            const data: Prisma.UserUpdateInput = {};
+            if (netRestore !== 0) {
+              data.availablePoints = { increment: netRestore };
+            }
+            if (deduction > 0) {
+              data.totalUsedPoints = { decrement: deduction };
+            }
+            if (Object.keys(data).length > 0) {
+              await tx.user.update({ where: { id: userId }, data });
+              this.logger.log(
+                `Restored points for user ${userId}: availablePoints ${netRestore >= 0 ? '+' : ''}${netRestore}, totalUsedPoints -${deduction}`,
+              );
+            }
+          }
 
           return paymentUpdated;
         },
