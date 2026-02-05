@@ -148,6 +148,7 @@ export class ProductReviewsController {
   // get length of product reviews
   @Get('/count/:productId')
   @HttpCode(HttpStatus.OK)
+  @Public()
   @ApiOperation({
     summary: 'Get length of product reviews',
     description: 'Retrieves the length of product reviews.',
@@ -258,7 +259,7 @@ export class ProductReviewsController {
     example: '123e4567-e89b-12d3-a456-426614174001',
   })
   @ApiResponse({
-    status: 200,
+    status: 200, 
     description: 'Reviews (with user) and recipes linked to the product',
     type: ProductReviewsByProductResponseDto,
   })

@@ -18,6 +18,7 @@ import { ResponseModel } from '../../libs/models/response/response.model';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { PolicyEntity } from './entities/policy.entity';
+import { Public } from 'src/libs/decorator/public.decorator';
 
 @ApiTags('Policy')
 @ApiBearerAuth()
@@ -51,6 +52,7 @@ export class PolicyController {
   }
 
   @Get('active')
+  @Public()
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER)
   @ApiOperation({ summary: 'Get active policy (if exists)' })
   @ApiResponse({ status: 200, description: 'Active policy retrieved successfully', type: PolicyEntity })
