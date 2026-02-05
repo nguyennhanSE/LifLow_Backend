@@ -45,6 +45,7 @@ export class OrderEntity {
 export class OrderGroupEntity {
   orderGroupNumber!: string;
   orderGroupName?: string | null;
+  paymentId?: string | null;
   originalAmount?: number | null;
   discountAmount?: number | null;
   ordererId?: string | null;

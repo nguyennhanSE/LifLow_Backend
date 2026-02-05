@@ -208,7 +208,7 @@ export class PaymentService {
       }
 
       // 8. Generate unique order group number
-      const orderGroupNumber = await this.ordersService.generateUniqueOrderGroupNumber();
+      const orderGroupNumber = await this.ordersService.generateOrderGroupNumber();
 
       // 9. Fetch cart, shipping address, membership for order creation
       const cart = await this.prisma.cart.findUnique({
@@ -1093,6 +1093,7 @@ export class PaymentService {
           where: { orderGroupNumber: validatedDto.orderGroupNumber },
           data: {
             situation: EOrderSituation.ORDER_PAYMENT_COMPLETED as OrderSituation,
+            paymentId: savedPayment.id,
           },
         });
         this.logger.log(`OrderGroup ${validatedDto.orderGroupNumber} situation updated to ORDER_PAYMENT_COMPLETED`);
@@ -1149,15 +1150,15 @@ export class PaymentService {
         await this.prisma.orderGroup.updateMany({
           where: { orderGroupNumber: validatedDto.orderGroupNumber },
           data: {
-            situation: EOrderSituation.ORDER_CANCELLED as OrderSituation,
+            situation: EOrderSituation.ORDER_PAYMENT_FAILED as OrderSituation,
           },
         });
         this.logger.log(
-          `OrderGroup ${validatedDto.orderGroupNumber} updated to ORDER_CANCELLED after failure`,
+          `OrderGroup ${validatedDto.orderGroupNumber} updated to ORDER_PAYMENT_FAILED after failure`,
         );
       } catch (updateError) {
         this.logger.error(
-          `Failed to update OrderGroup ${validatedDto.orderGroupNumber} to ORDER_CANCELLED`,
+          `Failed to update OrderGroup ${validatedDto.orderGroupNumber} to ORDER_PAYMENT_FAILED`,
           updateError,
         );
       }
@@ -1267,6 +1268,26 @@ export class PaymentService {
         );
       }
 
+      // Find order group and allow cancel only when situation is ORDER_PAYMENT_COMPLETED or ORDER_SHIPPED
+      const orderGroup = await this.prisma.orderGroup.findUnique({
+        where: { orderGroupNumber: payment.orderGroupNumber },
+        select: { situation: true },
+      });
+      if (!orderGroup) {
+        throw new NotFoundException(
+          `Order group ${payment.orderGroupNumber} not found`,
+        );
+      }
+      const allowedSituations = [
+        EOrderSituation.ORDER_PAYMENT_COMPLETED,
+        EOrderSituation.ORDER_SHIPPED,
+      ];
+      if (!allowedSituations.includes(orderGroup.situation as EOrderSituation)) {
+        throw new BadRequestException(
+          `Cancel is only allowed when order group situation is ${EOrderSituation.ORDER_PAYMENT_COMPLETED} or ${EOrderSituation.ORDER_SHIPPED}. Current: ${orderGroup.situation}`,
+        );
+      }
+
       // Check if payment can be canceled
       if (payment.status !== PaymentStatus.SUCCESS) {
         throw new BadRequestException(
@@ -1287,17 +1308,59 @@ export class PaymentService {
         },
       );
 
-      // Update payment in database
-      const updatedPayment = await this.paymentRepository.update(payment.id, {
-        status:
-          tossPayment.balanceAmount === 0
-            ? PaymentStatus.CANCELLED
-            : PaymentStatus.SUCCESS,
-        balanceAmount: tossPayment.balanceAmount,
-        cancels: tossPayment.cancels,
-        canceledAmount:
-          payment.totalAmount - tossPayment.balanceAmount,
-      });
+      // Run restore product quantity + update payment in a single transaction
+      const updatedPayment = await this.prisma.$transaction(
+        async (tx) => {
+          // 1. Get all orders for this order group
+          const orders = await tx.order.findMany({
+            where: { orderGroupNumber: payment.orderGroupNumber },
+            select: { productId: true, quantity: true },
+          });
+
+          // 2. Restore product origin and stockQuantity for each order
+          for (const order of orders) {
+            if (!order.productId) continue;
+            const qty = order.quantity ?? 0;
+            if (qty <= 0) continue;
+            await tx.product.update({
+              where: { id: order.productId },
+              data: {
+                origin: { increment: qty },
+                stockQuantity: { increment: qty },
+              },
+            });
+          }
+          this.logger.log(
+            `Restored quantity for ${orders.length} order(s) in order group ${payment.orderGroupNumber}`,
+          );
+
+          // 3. Update payment in database
+          const paymentUpdated = await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status:
+                tossPayment.balanceAmount === 0
+                  ? PaymentStatus.CANCELLED
+                  : PaymentStatus.SUCCESS,
+              balanceAmount: tossPayment.balanceAmount,
+              cancels: tossPayment.cancels as any,
+              canceledAmount:
+                payment.totalAmount - tossPayment.balanceAmount,
+            },
+          });
+
+          // 4. Update order group situation to ORDER_PAYMENT_FAILED
+          await tx.orderGroup.update({
+            where: { orderGroupNumber: payment.orderGroupNumber },
+            data: {
+              situation: EOrderSituation.ORDER_CANCELLED as OrderSituation,
+            },
+          });
+
+          return paymentUpdated;
+        },
+        { timeout: 15_000, maxWait: 5_000 },
+      );
 
       this.logger.log(`Payment canceled successfully: ${payment.id}`);
 

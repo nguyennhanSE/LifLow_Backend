@@ -1096,6 +1096,9 @@ export class OrderGroupResponseDto {
   @ApiPropertyOptional({ description: 'Order group name', example: 'Order Group 2025-01-23' })
   orderGroupName?: string | null;
 
+  @ApiPropertyOptional({ description: 'Payment ID (UUID) for this order group', example: '123e4567-e89b-12d3-a456-426614174000' })
+  paymentId?: string | null;
+
   @ApiPropertyOptional({ description: 'Original amount before discounts', example: 150000 })
   originalAmount?: number | null;
 

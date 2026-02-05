@@ -284,6 +284,7 @@ model OrderGroup {
   pointsUsed Int @map("points_used")
   cartItemIds String[] @map("cart_item_ids")
   deliveryFee Int @default(0) @map("delivery_fee")
+  paymentId String? @map("payment_id")
 
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -295,7 +296,7 @@ model OrderGroup {
   invoiceNumber String? @map("invoice_number") // 송장번호
 
   orders Order[]
-  payments Payment[]
+  payment Payment? // 1-1: optional until payment is confirmed
   points Point[]
   
   @@index([orderGroupNumber])
@@ -861,12 +862,12 @@ enum PaymentType {
 }
 
 
- model Payment {
+model Payment {
   id String @id @default(uuid())
   
-  // User & Order
+  // User & Order (1-1 with OrderGroup: each order group has exactly one payment)
   userId String @map("user_id")
-  orderGroupNumber String @map("order_group_number") // 가맹점 주문번호
+  orderGroupNumber String @unique @map("order_group_number") // 가맹점 주문번호
   
   // Toss Payment Keys
   paymentKey String @unique @map("payment_key") // Toss 결제 키 (중요!)

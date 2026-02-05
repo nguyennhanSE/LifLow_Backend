@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Prisma, Order, OrderSituation, OrderGroup } from '@prisma/client';
 import {
@@ -817,6 +818,23 @@ export class OrdersService {
     
     // Pad to 7 digits minimum, but allow expansion if needed
     return `${datePrefix}-${nextNumber.toString().padStart(7, '0')}`;
+  }
+
+  /**
+   * Generate a unique order group number for testing. No fixed format; uniqueness in DB is ensured.
+   */
+  async generateOrderGroupNumberForTesting(): Promise<string> {
+    const maxAttempts = 10;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const orderGroupNumber = randomUUID();
+      const exists = await this.orderGroupRepository.count({ orderGroupNumber });
+      if (exists === 0) {
+        return orderGroupNumber;
+      }
+    }
+    throw new InternalServerErrorException(
+      'Failed to generate unique order group number for testing',
+    );
   }
 
   /**

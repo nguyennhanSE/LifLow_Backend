@@ -9,8 +9,8 @@ import { ProductEntity } from 'src/modules/product/entities/product.entity';
 // type OrderWithUser = Order & { user?: User | null };
 
 type OrderWithRelations = Order & { user?: User | null; product?: Product | null };
-type OrderGroupWithRelations = OrderGroup & { 
-  user?: User | null; 
+type OrderGroupWithRelations = OrderGroup & {
+  user?: User | null;
   orders?: (Order & { product?: Product | null })[] | null;
 };
 
@@ -47,6 +47,7 @@ export function toOrderEntity(order: Order): OrderEntity {
     // situation, courierCompany, invoiceNumber moved to OrderGroup - get from orderGroup relation if needed
     couponUsed: order.couponUsed,
     discountAmount: order.discountAmount,
+    
   };
 }
 
@@ -70,6 +71,7 @@ export function toOrderGroupEntity(orderGroup: OrderGroup): OrderGroupEntity {
   return {
     orderGroupNumber: orderGroup.orderGroupNumber,
     orderGroupName: orderGroup.orderGroupName,
+    paymentId: orderGroup.paymentId ?? undefined,
     originalAmount: orderGroup.originalAmount,
     discountAmount: orderGroup.discountAmount,
     ordererId: orderGroup.ordererId,
@@ -89,6 +91,7 @@ export function toOrderGroupResponseDto(orderGroup: OrderGroupEntity): OrderGrou
   return {
     orderGroupNumber: orderGroup.orderGroupNumber,
     orderGroupName: orderGroup.orderGroupName ?? null,
+    paymentId: orderGroup.paymentId ?? null,
     originalAmount: orderGroup.originalAmount ?? null,
     discountAmount: orderGroup.discountAmount ?? null,
     finalAmount: orderGroup.finalAmount ?? null,
