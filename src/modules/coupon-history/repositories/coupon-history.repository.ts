@@ -506,6 +506,27 @@ export class CouponHistoryRepository {
   }
 
   /**
+   * Reactivate CouponHistory (status EXPIRED -> ISSUED) for a coupon when coupon isActive turns true.
+   * Only records where startDate <= today <= endDate and status = EXPIRED are updated.
+   * Returns the number of records updated.
+   */
+  async reactivateExpiredByCouponId(couponId: string): Promise<number> {
+    const now = new Date();
+    const result = await this.prisma.couponHistory.updateMany({
+      where: {
+        couponId,
+        status: CouponHistoryStatus.EXPIRED,
+        startDate: { lte: now },
+        OR: [{ endDate: null }, { endDate: { gte: now } }],
+      },
+      data: {
+        status: CouponHistoryStatus.ISSUED,
+      },
+    });
+    return result.count;
+  }
+
+  /**
    * Expire old issued coupons that have passed their expiration date
    * Returns the number of expired coupons
    */

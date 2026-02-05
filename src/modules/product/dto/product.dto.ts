@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, Min, IsNotEmpty, MaxLength, ValidateIf, IsArray, IsUUID, ArrayMinSize, IsEnum, ValidateNested, IsBoolean, IsNumber, IsDate } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, IsNotEmpty, MaxLength, ValidateIf, IsArray, IsUUID, ArrayMinSize, IsEnum, ValidateNested, IsBoolean, IsNumber, IsDate, IsIn } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 // Enums for status fields
@@ -378,10 +378,16 @@ export class ProductListQueryDto {
   @IsInt()
   category?: number;
 
-  @ApiPropertyOptional({ description: 'Filter by brand', example: 'Juwangsan' })
+  @ApiPropertyOptional({
+    description: 'Filter by storage method',
+    example: 'frozen',
+    enum: ['frozen', 'refrigerated', 'room_temperature'],
+  })
   @IsOptional()
-  @IsString()
-  brand?: string;
+  @IsIn(['frozen', 'refrigerated', 'room_temperature'], {
+    message: 'storageMethod must be one of: frozen, refrigerated, room_temperature',
+  })
+  storageMethod?: 'frozen' | 'refrigerated' | 'room_temperature';
 
   @ApiPropertyOptional({ description: 'Filter by sale status', example: '판매중' })
   @IsOptional()
@@ -396,7 +402,7 @@ export class ProductListQueryDto {
   @ApiPropertyOptional({ 
     description: 'Sort field', 
     example: 'createdAt',
-    enum: ['createdAt', 'updatedAt', 'productName', 'salePrice', 'consumerPrice', 'brand']
+    enum: ['createdAt', 'updatedAt', 'productName', 'salePrice', 'consumerPrice', 'storageMethod']
   })
   @IsOptional()
   @IsString()
@@ -420,6 +426,8 @@ export class ProductListQueryDto {
   @Type(() => Boolean)
   @IsBoolean()
   includeProductReview?: boolean;
+
+  
 }
 
 export interface PaginationMeta {

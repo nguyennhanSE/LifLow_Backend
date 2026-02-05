@@ -19,6 +19,8 @@ export class RecipeEntity {
   isActive!: boolean; // @map("is_active")
   likes?: number | null; // @map("likes") - like count
   likedByMe?: boolean; // whether the current user has liked this recipe
+  numberOfLikes?: number; // count from RecipeLikes table
+  numberOfComments?: number; // count from RecipeComments table
 }
 
 export class RecipeEntityWithAuthor extends RecipeEntity {

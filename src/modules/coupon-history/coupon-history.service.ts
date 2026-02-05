@@ -365,6 +365,14 @@ export class CouponHistoryService {
   }
 
   /**
+   * Reactivate CouponHistory (status EXPIRED -> ISSUED) when coupon isActive turns from false to true.
+   * Only records where startDate <= today <= endDate and status = EXPIRED are updated.
+   */
+  async reactivateExpiredByCouponId(couponId: string): Promise<number> {
+    return await this.couponHistoryRepository.reactivateExpiredByCouponId(couponId);
+  }
+
+  /**
    * Expire old issued coupons (for batch jobs)
    */
   async expireOldCoupons(): Promise<number> {

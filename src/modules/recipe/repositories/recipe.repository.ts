@@ -4,7 +4,11 @@ import { Prisma, Recipe, User, Product } from '@prisma/client';
 import { RecipeListQueryDto } from '../dto/recipe-list-query.dto';
 import { ERecipeCategory } from '../enums/recipe.enum';
 
-export type RecipeWithAuthor = Recipe & { author?: User | null; product?: Product | null };
+export type RecipeWithAuthor = Recipe & {
+  author?: User | null;
+  product?: Product | null;
+  _count?: { recipeLikes: number; recipeComments: number };
+};
 
 export interface RecipeCountResult {
   total: number;
@@ -144,7 +148,13 @@ export class RecipeRepository {
     try {
       return await this.prisma.recipe.findUnique({
         where: { id },
-        include: includeAuthor ? { author: true, product: true } : undefined,
+        include: includeAuthor
+          ? {
+              author: true,
+              product: true,
+              _count: { select: { recipeLikes: true, recipeComments: true } },
+            }
+          : undefined,
       });
     } catch (error: any) {
       this.handlePrismaError(error, id);

@@ -172,9 +172,17 @@ export class CouponsService {
       await this.couponHistoryService.issueCouponToUsersByTargetGrades(id, targetGrades);
     }
 
-    // Khi isActive = false: đổi status tất cả CouponHistory (ISSUED) của coupon này thành EXPIRED
+    // Lấy isActive hiện tại của coupon
+    const currentIsActive = existingCoupon.isActive;
+
+    // Khi isActive chuyển sang false: đổi status tất cả CouponHistory (ISSUED) của coupon này thành EXPIRED
     if (updateCouponDto.isActive === false) {
       await this.couponHistoryService.expireAllByCouponId(id);
+    }
+
+    // Khi isActive chuyển từ false sang true: các CouponHistory có startDate <= today <= endDate và status = EXPIRED thì chuyển thành ISSUED
+    if (currentIsActive === false && updateCouponDto.isActive === true) {
+      await this.couponHistoryService.reactivateExpiredByCouponId(id);
     }
 
     return this.couponRepository.update(id, updateCouponDto);

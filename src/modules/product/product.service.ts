@@ -34,7 +34,7 @@ export class ProductService {
     const filters: ProductFilters = {
       search: query.search,
       category: query.category,
-      brand: query.brand,
+      storageMethod: query.storageMethod,
       saleStatus: query.saleStatus,
       displayStatus: query.displayStatus,
     };
@@ -1059,6 +1059,7 @@ export class ProductService {
     const limit = query.limit || 10;
     const sortBy = query.sortBy || 'createdAt';
     const sortOrder = query.sortOrder || 'desc';
+    const search = query.search || '';
 
     // Build pagination
     const pagination: ProductPagination = {
@@ -1067,12 +1068,13 @@ export class ProductService {
       sortBy,
       sortOrder,
       includeProductReview: query.includeProductReview ?? true,
+      search
     };
 
-    // Get products and count
+    // Get products and count (same search filter for list and total)
     const [products, total] = await Promise.all([
       this.productRepository.findManyWithSpecialOffer(pagination),
-      this.productRepository.countWithSpecialOffer(),
+      this.productRepository.countWithSpecialOffer(pagination),
     ]);
 
     // Calculate pagination metadata

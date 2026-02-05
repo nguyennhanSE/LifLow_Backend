@@ -605,7 +605,7 @@ export class ProductController {
     const filters = {
       search: query.search,
       category: query.category,
-      brand: query.brand,
+      storageMethod: query.storageMethod,
       saleStatus: query.saleStatus,
       displayStatus: query.displayStatus,
     };

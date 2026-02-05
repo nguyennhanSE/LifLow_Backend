@@ -1070,18 +1070,18 @@ export class UserRepository {
           name: name.trim(),
           email: email.trim(),
         },
-        include: {
-          userRole: {
-            include: {
-              role: true,
-            },
-          },
-          userMembership: {
-            include: {
-              membership: true,
-            },
-          },
-        },
+        // include: {
+        //   userRole: {
+        //     include: {
+        //       role: true,
+        //     },
+        //   },
+        //   userMembership: {
+        //     include: {
+        //       membership: true,
+        //     },
+        //   },
+        // },
       });
 
       if (!user) {

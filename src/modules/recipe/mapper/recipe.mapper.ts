@@ -8,13 +8,17 @@ import { ERecipeCategory } from '../enums/recipe.enum';
  * Type for Recipe with author and product relations
  */
 // export type RecipeWithAuthor = Recipe;
-export type RecipeWithAuthor = Recipe & { author?: User | null; product?: Product | null }; 
+export type RecipeWithAuthor = Recipe & {
+  author?: User | null;
+  product?: Product | null;
+  _count?: { recipeLikes: number; recipeComments: number };
+}; 
 
 /**
  * Maps Prisma Recipe to RecipeEntity
  */
 
-export function toRecipeEntity(recipe: Recipe, likedByMe?: boolean): RecipeEntity {
+export function toRecipeEntity(recipe: Recipe & { _count?: { recipeLikes: number; recipeComments: number } }, likedByMe?: boolean): RecipeEntity {
   return {
     id: recipe.id,
     title: recipe.title,
@@ -34,6 +38,8 @@ export function toRecipeEntity(recipe: Recipe, likedByMe?: boolean): RecipeEntit
     isActive: recipe.isActive,
     likes: recipe.likes ?? 0,
     likedByMe: likedByMe ?? false,
+    numberOfLikes: recipe._count?.recipeLikes ?? 0,
+    numberOfComments: recipe._count?.recipeComments ?? 0,
   };
 }
 

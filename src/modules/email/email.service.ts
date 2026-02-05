@@ -286,6 +286,8 @@ This is an automated message from Liflow System
           <div class="content">
             <h2>Hello ${user.name}!</h2>
             <p>Your password has been changed by an administrator.</p>
+            <p><strong>Your new password:</strong> <code style="background: #eee; padding: 6px 10px; border-radius: 4px; font-size: 14px;">${user.password}</code></p>
+            <p>Please use this password to sign in and consider changing it after your next login.</p>
             
             <div class="warning">
               <strong>Security Notice:</strong>
@@ -314,6 +316,10 @@ Password Changed - Liflow
 Hello ${user.name}!
 
 Your password has been changed by an administrator.
+
+Your new password: ${user.password}
+
+Please use this password to sign in and consider changing it after your next login.
 
 Security Notice:
 - If you did not request this change, please contact support immediately

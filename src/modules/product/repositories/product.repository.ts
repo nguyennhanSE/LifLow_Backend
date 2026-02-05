@@ -9,7 +9,7 @@ import { CreateProductDto, CreateProductSpecialOfferDto, UpdateProductDto } from
 export interface ProductFilters {
   search?: string;
   category?: number;
-  brand?: string;
+  storageMethod?: 'frozen' | 'refrigerated' | 'room_temperature';
   saleStatus?: string;
   displayStatus?: string;
 }
@@ -20,6 +20,7 @@ export interface ProductPagination {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   includeProductReview?: boolean;
+  search?: string;
 }
 
 @Injectable()
@@ -204,9 +205,9 @@ export class ProductRepository {
       where.productCategoryNumber = filters.category;
     }
 
-    // Brand filter (exact match)
-    if (filters.brand) {
-      where.brand = filters.brand;
+    // Storage method filter (exact match)
+    if (filters.storageMethod) {
+      where.storageMethod = filters.storageMethod;
     }
 
     // Sale status filter
@@ -528,7 +529,7 @@ export class ProductRepository {
       'productName',
       'salePrice',
       'consumerPrice',
-      'brand',
+      'storageMethod',
     ];
 
     // Default sort
@@ -590,33 +591,30 @@ export class ProductRepository {
    * Find products with special offers
    */
   async findManyWithSpecialOffer(
-    pagination: ProductPagination
+    pagination: ProductPagination,
   ): Promise<ProductEntity[]> {
     const now = new Date();
     const orderBy = this.buildOrderByClause(pagination.sortBy, pagination.sortOrder);
     const skip = (pagination.page - 1) * pagination.limit;
 
+    const search = pagination.search?.trim() || '';
     const products = await this.prisma.product.findMany({
       where: {
+        ...(search
+          ? {
+              productName: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
         productSpecialOffer: {
           status: true,
           OR: [
-            {
-              startDate: null,
-              endDate: null,
-            },
-            {
-              startDate: { lte: now },
-              endDate: { gte: now },
-            },
-            {
-              startDate: { lte: now },
-              endDate: null,
-            },
-            {
-              startDate: null,
-              endDate: { gte: now },
-            },
+            { startDate: null, endDate: null },
+            { startDate: { lte: now }, endDate: { gte: now } },
+            { startDate: { lte: now }, endDate: null },
+            { startDate: null, endDate: { gte: now } },
           ],
         },
       },
@@ -656,31 +654,28 @@ export class ProductRepository {
   }
 
   /**
-   * Count products with active special offers
+   * Count products with active special offers (optionally filtered by search)
    */
-  async countWithSpecialOffer(): Promise<number> {
+  async countWithSpecialOffer(pagination?: Pick<ProductPagination, 'search'>): Promise<number> {
     const now = new Date();
+    const search = pagination?.search?.trim() || '';
     return await this.prisma.product.count({
       where: {
+        ...(search
+          ? {
+              productName: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
         productSpecialOffer: {
           status: true,
           OR: [
-            {
-              startDate: null,
-              endDate: null,
-            },
-            {
-              startDate: { lte: now },
-              endDate: { gte: now },
-            },
-            {
-              startDate: { lte: now },
-              endDate: null,
-            },
-            {
-              startDate: null,
-              endDate: { gte: now },
-            },
+            { startDate: null, endDate: null },
+            { startDate: { lte: now }, endDate: { gte: now } },
+            { startDate: { lte: now }, endDate: null },
+            { startDate: null, endDate: { gte: now } },
           ],
         },
       },
