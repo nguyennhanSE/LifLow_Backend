@@ -201,6 +201,12 @@ export class CouponRepository {
     if (updateCouponDto.targetGrades !== undefined) {
       data.targetGrades = updateCouponDto.targetGrades || [];
     }
+    if (updateCouponDto.startDate !== undefined) {
+      data.startDate = updateCouponDto.startDate ? new Date(updateCouponDto.startDate) : null;
+    }
+    if (updateCouponDto.endDate !== undefined) {
+      data.endDate = updateCouponDto.endDate ? new Date(updateCouponDto.endDate) : null;
+    }
 
     const coupon = await this.prisma.coupon.update({
       where: { id },
