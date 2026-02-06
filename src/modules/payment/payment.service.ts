@@ -208,7 +208,7 @@ export class PaymentService {
       }
 
       // 8. Generate unique order group number
-      const orderGroupNumber = await this.ordersService.generateOrderGroupNumber();
+      const orderGroupNumber = await this.ordersService.generateOrderGroupNumberForTesting();
 
       // 9. Fetch cart, shipping address, membership for order creation
       const cart = await this.prisma.cart.findUnique({
@@ -1098,6 +1098,26 @@ export class PaymentService {
         });
         this.logger.log(`OrderGroup ${validatedDto.orderGroupNumber} situation updated to ORDER_PAYMENT_COMPLETED`);
 
+        // 2.10. Trừ product.origin theo số lượng đã thanh toán
+        const productQuantityMap = new Map<string, number>();
+        for (const order of existingOrders) {
+          if (order.productId && (order.quantity ?? 0) > 0) {
+            const prev = productQuantityMap.get(order.productId) ?? 0;
+            productQuantityMap.set(order.productId, prev + order.quantity!);
+          }
+        }
+        for (const [productId, totalQty] of productQuantityMap.entries()) {
+          await tx.product.updateMany({
+            where: { id: productId, origin: { not: null } },
+            data: { origin: { decrement: totalQty } },
+          });
+        }
+        if (productQuantityMap.size > 0) {
+          this.logger.log(
+            `Decremented product.origin for ${productQuantityMap.size} product(s) in order group ${validatedDto.orderGroupNumber}`,
+          );
+        }
+
         this.logger.log('Transaction completed successfully');
 
         return { payment: savedPayment, membershipLevelBeforePayment };
@@ -1385,6 +1405,7 @@ export class PaymentService {
               data.availablePoints = { increment: netRestore };
             }
             if (deduction > 0) {
+              
               data.totalUsedPoints = { decrement: deduction };
             }
             if (Object.keys(data).length > 0) {

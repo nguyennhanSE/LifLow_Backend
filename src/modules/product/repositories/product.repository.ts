@@ -12,6 +12,8 @@ export interface ProductFilters {
   storageMethod?: 'frozen' | 'refrigerated' | 'room_temperature';
   saleStatus?: string;
   displayStatus?: string;
+  minPrice?: number;
+  maxPrice?: number;
 }
 
 export interface ProductPagination {
@@ -52,7 +54,6 @@ export class ProductRepository {
         productReviews: pagination.includeProductReview ?? true,
       },
     });
-    console.log('products', products);
 
     const productsWithCategory = await Promise.all(
       products.map(async (product) => {
@@ -219,6 +220,17 @@ export class ProductRepository {
     // Only filter by 'Y' if explicitly requested, otherwise return both 'Y' and 'N'
     if (filters.displayStatus === 'Y') {
       where.displayStatus = 'Y';
+    }
+
+    // Price range filter: salePrice between minPrice and maxPrice
+    if (filters.minPrice != null || filters.maxPrice != null) {
+      where.salePrice = {};
+      if (filters.minPrice != null) {
+        (where.salePrice as Prisma.IntNullableFilter).gte = filters.minPrice;
+      }
+      if (filters.maxPrice != null) {
+        (where.salePrice as Prisma.IntNullableFilter).lte = filters.maxPrice;
+      }
     }
 
     return where;

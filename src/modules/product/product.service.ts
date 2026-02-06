@@ -37,6 +37,8 @@ export class ProductService {
       storageMethod: query.storageMethod,
       saleStatus: query.saleStatus,
       displayStatus: query.displayStatus,
+      minPrice: query.minPrice,
+      maxPrice: query.maxPrice,
     };
 
     // Build pagination

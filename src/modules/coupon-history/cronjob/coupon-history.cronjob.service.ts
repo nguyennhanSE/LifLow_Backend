@@ -4,6 +4,7 @@ import { CouponHistoryStatus } from '@prisma/client';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { EMembershipLevel } from '../../memberships/enums/membership.enum';
 import { getCurrentMonthDateRange } from '../../coupons/helpers/coupon.helper';
+import { CouponHistoryService } from '../coupon-history.service';
 
 @Injectable()
 export class CouponHistoryCronjobService {
@@ -119,6 +120,11 @@ export class CouponHistoryCronjobService {
           // startDate = start of the month, endDate = end of the month (current month)
           const { startDate: monthStart, endDate: monthEnd } = getCurrentMonthDateRange();
 
+          await tx.coupon.update({
+            where: { id: coupon.id },
+            data: { startDate: monthStart, endDate: monthEnd },
+          });
+
           if (existingIdsToUpdate.length > 0) {
             await tx.couponHistory.updateMany({
               where: { id: { in: existingIdsToUpdate } },
@@ -164,17 +170,54 @@ export class CouponHistoryCronjobService {
 export class CouponHistoryExpireCronjobService {
   private readonly logger = new Logger(CouponHistoryExpireCronjobService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly couponHistoryService: CouponHistoryService,
+  ) {}
 
   /**
-   * Xoá các coupon history có endDate < today (không quan tâm status).
-   * Dùng start of day Asia/Seoul để thống nhất với cron timeZone.
+   * Kiểm tra coupon còn trong thời hạn hiệu lực: startDate <= today <= endDate.
+   * startDate/endDate null được coi là không giới hạn (luôn thoả).
    */
-  async expireCouponHistories(): Promise<{ deleted: number }> {
+  isCouponInValidPeriod(coupon: {
+    startDate: Date | null;
+    endDate: Date | null;
+  }): boolean {
     const dateStr = new Date().toLocaleDateString('en-CA', {
       timeZone: 'Asia/Seoul',
     });
     const todayStart = new Date(`${dateStr}T00:00:00.000+09:00`);
+    if (coupon.endDate != null && coupon.endDate < todayStart) return false;
+    return true;
+  }
+
+  /**
+   * 1) Với từng coupon: nếu startDate <= today <= endDate không thoả thì expireAllByCouponId và set coupon isActive = false.
+   * 2) Xoá các coupon history có endDate < today (không quan tâm status).
+   * Dùng start of day Asia/Seoul để thống nhất với cron timeZone.
+   */
+  async expireCouponHistories(): Promise<{ expiredByCoupon: number; deleted: number }> {
+    const dateStr = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'Asia/Seoul',
+    });
+    const todayStart = new Date(`${dateStr}T00:00:00.000+09:00`);
+
+    const coupons = await this.prisma.coupon.findMany({
+      select: { id: true, code: true, startDate: true, endDate: true, isActive: true },
+    });
+
+    let expiredByCoupon = 0;
+    for (const coupon of coupons) {
+      if (!this.isCouponInValidPeriod(coupon)) {
+        const count = await this.couponHistoryService.expireAllByCouponId(coupon.id);
+        expiredByCoupon += count;
+        await this.prisma.coupon.update({
+          where: { id: coupon.id },
+          data: { isActive: false },
+        });
+        this.logger.log(`Coupon ${coupon.code} (id=${coupon.id}) outside valid period: isActive=false, expired ${count} histor(y/ies)`);
+      }
+    }
 
     const result = await this.prisma.couponHistory.deleteMany({
       where: {
@@ -183,9 +226,9 @@ export class CouponHistoryExpireCronjobService {
     });
 
     this.logger.log(
-      `Expired coupon histories: deleted ${result.count} record(s) with endDate < ${dateStr}`,
+      `Expired coupon histories: ${expiredByCoupon} expired by coupon period, ${result.count} deleted with endDate < ${dateStr}`,
     );
-    return { deleted: result.count };
+    return { expiredByCoupon, deleted: result.count };
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_1AM, {

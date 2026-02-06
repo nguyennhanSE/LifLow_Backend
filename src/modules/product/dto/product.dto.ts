@@ -408,26 +408,38 @@ export class ProductListQueryDto {
   @IsString()
   sortBy?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'Sort order', 
+  @ApiPropertyOptional({
+    description: 'Sort order',
     example: 'desc',
-    enum: ['asc', 'desc']
+    enum: ['asc', 'desc'],
   })
   @IsOptional()
   @IsString()
   sortOrder?: 'asc' | 'desc';
 
-  @ApiPropertyOptional({ 
-    description: 'Include product reviews in response', 
+  @ApiPropertyOptional({ description: 'Minimum price (salePrice >= minPrice)', example: 10000 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minPrice?: number;
+
+  @ApiPropertyOptional({ description: 'Maximum price (salePrice <= maxPrice)', example: 100000 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxPrice?: number;
+
+  @ApiPropertyOptional({
+    description: 'Include product reviews in response',
     example: false,
-    default: false
+    default: false,
   })
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
   includeProductReview?: boolean;
-
-  
 }
 
 export interface PaginationMeta {

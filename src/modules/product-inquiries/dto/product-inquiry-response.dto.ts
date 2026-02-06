@@ -33,8 +33,11 @@ export class InquiryProductInfoDto {
   @ApiPropertyOptional({ description: 'Product code', example: 'PROD001' })
   productCode?: string | null;
 
-  @ApiPropertyOptional({ description: 'Product image URL', example: 'https://example.com/image.jpg' })
+  @ApiPropertyOptional({ description: 'Product thumbnail image URL', example: 'https://example.com/thumb.jpg' })
   imageRegistrationThumbnail?: string | null;
+
+  @ApiPropertyOptional({ description: 'Product detail image URL', example: 'https://example.com/detail.jpg' })
+  imageRegistrationDetail?: string | null;
 
   @ApiPropertyOptional({ description: 'Current sale price', example: 29000 })
   salePrice?: number | null;

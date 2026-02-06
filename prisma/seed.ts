@@ -12,7 +12,7 @@ import { S3Client, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 
 // Load environment variables
-const NODE_ENV = process.env.NODE_ENV || 'production';
+const NODE_ENV = process.env.NODE_ENV ||'development';
 console.log('NODE_ENV', NODE_ENV);
 const envFileName = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 const envFilePath = path.resolve(__dirname, '..', envFileName);
@@ -2391,6 +2391,10 @@ async function seedCoupons() {
   oneMonthLater.setMonth(now.getMonth() + 1);
   const threeMonthsLater = new Date(now);
   threeMonthsLater.setMonth(now.getMonth() + 3);
+  // Ngày đầu tháng và cuối tháng (tháng hiện tại)
+  const firstDateOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDateOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
   
   const coupons = [
     // PERCENT type coupons
@@ -2417,6 +2421,8 @@ async function seedCoupons() {
       discountAmount: null,
       minPurchaseAmount: 0,
       maxDiscountAmount: null,
+      startDate: firstDateOfMonth,
+      endDate: lastDateOfMonth,
       imageUrl: null,
       isPermanent: true,
       isActive: true,
@@ -2431,6 +2437,8 @@ async function seedCoupons() {
       discountAmount: null,
       minPurchaseAmount: null,
       maxDiscountAmount: 10000,
+      startDate: firstDateOfMonth,
+      endDate: lastDateOfMonth,
       imageUrl: null,
       isPermanent: true,
       isActive: true,
@@ -2445,6 +2453,8 @@ async function seedCoupons() {
       discountAmount: null,
       minPurchaseAmount: null,
       maxDiscountAmount: 20000,
+      startDate: firstDateOfMonth,
+      endDate: lastDateOfMonth,
       imageUrl: null,
       isPermanent: true,
       isActive: true,
@@ -2459,6 +2469,8 @@ async function seedCoupons() {
       discountAmount: null,
       minPurchaseAmount: null,
       maxDiscountAmount: 30000,
+      startDate: firstDateOfMonth,
+      endDate: lastDateOfMonth,
       imageUrl: null,
       isPermanent: true,
       isActive: true,
@@ -2473,6 +2485,8 @@ async function seedCoupons() {
       discountAmount: null,
       minPurchaseAmount: null,
       maxDiscountAmount: 50000,
+      startDate: firstDateOfMonth,
+      endDate: lastDateOfMonth,
       imageUrl: null,
       isPermanent: true,
       isActive: true,
@@ -2587,6 +2601,8 @@ async function seedCoupons() {
         discountAmount: coupon.discountAmount ?? null,
         minPurchaseAmount: coupon.minPurchaseAmount ?? 0,
         maxDiscountAmount: coupon.maxDiscountAmount ?? null,
+        startDate: 'startDate' in coupon ? coupon.startDate ?? null : null,
+        endDate: 'endDate' in coupon ? coupon.endDate ?? null : null,
         imageUrl: coupon.imageUrl ?? null,
         isActive: coupon.isActive ?? true,
         isAutoIssue: coupon.isAutoIssue ?? false,

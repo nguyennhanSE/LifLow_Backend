@@ -199,18 +199,19 @@ export class ProductInquiryMapper {
     }
     
     // Map product if included
-    // if (prismaInquiry.product) {
-    //   entity.product = {
-    //     id: prismaInquiry.product.id,
-    //     productName: prismaInquiry.product.productName ?? null,
-    //     productCode: prismaInquiry.product.productCode ?? null,
-    //     imageRegistrationThumbnail: prismaInquiry.product.imageRegistrationThumbnail ?? null,
-    //     salePrice: prismaInquiry.product.salePrice ?? null,
-    //   } as any;
-    // } else {
-    //   entity.product = null;
-    // }
-    
+    if (prismaInquiry.product) {
+      entity.product = {
+        id: prismaInquiry.product.id,
+        productName: prismaInquiry.product.productName ?? null,
+        productCode: prismaInquiry.product.productCode ?? null,
+        imageRegistrationThumbnail: prismaInquiry.product.imageRegistrationThumbnail ?? null,
+        salePrice: prismaInquiry.product.salePrice ?? null,
+        imageRegistrationDetail: prismaInquiry.product.imageRegistrationDetail ?? null,
+      } as any;
+    } else {
+      entity.product = null;
+    }
+
     // Map answers if included
     if (prismaInquiry.productInquiryAnswers) {
       entity.productInquiryAnswers = prismaInquiry.productInquiryAnswers.map((answer) => {
@@ -278,6 +279,7 @@ export class ProductInquiryMapper {
       productInfo.productName = entity.product.productName ?? null;
       productInfo.productCode = entity.product.productCode ?? null;
       productInfo.imageRegistrationThumbnail = entity.product.imageRegistrationThumbnail ?? null;
+      productInfo.imageRegistrationDetail = entity.product.imageRegistrationDetail ?? null;
       productInfo.salePrice = entity.product.salePrice ?? null;
       dto.product = productInfo;
     } else {

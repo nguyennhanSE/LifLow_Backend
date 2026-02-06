@@ -24,6 +24,8 @@ export function toCouponEntity(coupon: Coupon): CouponEntity {
     isAutoIssue: coupon.isAutoIssue,
     autoIssueDayOfMonth: coupon.autoIssueDayOfMonth,
     targetGrades: coupon.targetGrades as CouponTargetGrade[],
+    startDate: coupon.startDate,
+    endDate: coupon.endDate,
     createdAt: coupon.createdAt,
     updatedAt: coupon.updatedAt,
   };

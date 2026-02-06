@@ -737,6 +737,9 @@ model Coupon {
 
   targetGrades String[] @default([]) @map("target_grades") // 발급 대상 등급 (VIP, VVIP)
 
+  startDate DateTime? @map("start_date") // 시작일
+  endDate DateTime? @map("end_date") // 종료일
+  
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

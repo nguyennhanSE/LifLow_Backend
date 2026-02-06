@@ -512,36 +512,24 @@ export class ProductDiscountCronjobService {
   }
 
   /**
-   * Determine if a discount should be active based on date range
-   * Returns true if:
-   * - Both dates are set and current date is within range
-   * - Only startDate is set and current date >= startDate
-   * - Only endDate is set and current date <= endDate
-   * Returns false if:
-   * - Both dates are null
-   * - Current date is outside the date range
+   * Determine if a discount should be active based on date range.
+   * Returns true only when both startDate and endDate are set and current date is within [startDate, endDate].
+   * If now() is not in [startDate, endDate], returns false (status will be set to false).
    */
   private shouldDiscountBeActive(
     startDate: Date | null,
     endDate: Date | null,
     currentDate: Date
   ): boolean {
-    // If both dates are null, discount should not be active
-    if (!startDate && !endDate) {
+    if (!startDate || !endDate) {
       return false;
     }
-
-    // Check start date
-    if (startDate && currentDate < startDate) {
+    if (currentDate < startDate) {
       return false;
     }
-
-    // Check end date
-    if (endDate && currentDate > endDate) {
+    if (currentDate > endDate) {
       return false;
     }
-
-    // If we get here, discount should be active
     return true;
   }
 
@@ -653,36 +641,24 @@ export class ProductDiscountCronjobService {
   }
 
   /**
-   * Determine if a special offer should be active based on date range
-   * Returns true if:
-   * - Both dates are set and current date is within range
-   * - Only startDate is set and current date >= startDate
-   * - Only endDate is set and current date <= endDate
-   * Returns false if:
-   * - Both dates are null
-   * - Current date is outside the date range
+   * Determine if a special offer should be active based on date range.
+   * Returns true only when both startDate and endDate are set and current date is within [startDate, endDate].
+   * If now() is not in [startDate, endDate], returns false (status will be set to false).
    */
   private shouldSpecialOfferBeActive(
     startDate: Date | null,
     endDate: Date | null,
     currentDate: Date
   ): boolean {
-    // If both dates are null, special offer should not be active
-    if (!startDate && !endDate) {
+    if (!startDate || !endDate) {
       return false;
     }
-
-    // Check start date
-    if (startDate && currentDate < startDate) {
+    if (currentDate < startDate) {
       return false;
     }
-
-    // Check end date
-    if (endDate && currentDate > endDate) {
+    if (currentDate > endDate) {
       return false;
     }
-
-    // If we get here, special offer should be active
     return true;
   }
 }
