@@ -212,7 +212,7 @@ export class PaymentService {
       }
 
       // 8. Generate unique order group number
-      const orderGroupNumber = await this.ordersService.generateOrderGroupNumberForTesting();
+      const orderGroupNumber = await this.ordersService.generateOrderGroupNumber();
 
       // 9. Fetch cart, shipping address, membership for order creation
       const cart = await this.prisma.cart.findUnique({
