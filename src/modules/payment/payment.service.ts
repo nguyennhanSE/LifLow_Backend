@@ -212,7 +212,7 @@ export class PaymentService {
       }
 
       // 8. Generate unique order group number
-      const orderGroupNumber = await this.ordersService.generateOrderGroupNumber();
+      const orderGroupNumber = await this.ordersService.generateOrderGroupNumberForTesting();
 
       // 9. Fetch cart, shipping address, membership for order creation
       const cart = await this.prisma.cart.findUnique({
@@ -1324,7 +1324,6 @@ export class PaymentService {
       }
       const allowedSituations = [
         EOrderSituation.ORDER_PAYMENT_COMPLETED,
-        EOrderSituation.ORDER_SHIPPED,
       ];
       if (!allowedSituations.includes(orderGroup.situation as EOrderSituation)) {
         throw new BadRequestException(
@@ -1567,6 +1566,264 @@ export class PaymentService {
       return this.mapToResponseDto(updatedPayment);
     } catch (error) {
       this.logger.error('Failed to cancel payment', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Return payment – partial refund excluding deliveryFee.
+   * Only allowed when orderGroup.situation === ORDER_SHIPPED.
+   * The customer bears the shipping cost; refundAmount = balanceAmount − deliveryFee.
+   */
+  async returnPayment(
+    dto: { paymentId: string; returnReason: string },
+  ): Promise<PaymentResponseDto> {
+    this.logger.log(`Processing return for payment: ${dto.paymentId}`);
+
+    try {
+      // 1. Get payment from database
+      const payment = await this.paymentRepository.findById(dto.paymentId);
+      if (!payment) {
+        throw new NotFoundException(`Payment with ID ${dto.paymentId} not found`);
+      }
+
+      // 2. Validate order group situation – must be ORDER_SHIPPED
+      const orderGroup = await this.prisma.orderGroup.findUnique({
+        where: { orderGroupNumber: payment.orderGroupNumber },
+        select: { situation: true, deliveryFee: true, finalAmount: true, ordererId: true },
+      });
+      if (!orderGroup) {
+        throw new NotFoundException(`Order group ${payment.orderGroupNumber} not found`);
+      }
+      if ((orderGroup.situation as EOrderSituation) !== EOrderSituation.ORDER_SHIPPED) {
+        throw new BadRequestException(
+          `Return is only allowed when order group situation is ${EOrderSituation.ORDER_SHIPPED}. Current: ${orderGroup.situation}`,
+        );
+      }
+
+      // 3. Validate payment can be refunded
+      if (payment.status !== PaymentStatus.SUCCESS) {
+        throw new BadRequestException('Only successful payments can be returned');
+      }
+      if (payment.balanceAmount <= 0) {
+        throw new BadRequestException('No balance available to refund');
+      }
+
+      // 4. Calculate refund amount (exclude delivery fee – customer pays shipping)
+      const deliveryFee = orderGroup.deliveryFee ?? 0;
+      const refundAmount = payment.balanceAmount - deliveryFee;
+
+      if (refundAmount <= 0) {
+        throw new BadRequestException(
+          `Refund amount after deducting delivery fee (${deliveryFee} KRW) is ${refundAmount} KRW. Nothing to refund.`,
+        );
+      }
+
+      this.logger.log(
+        `Return refund calculation: balanceAmount=${payment.balanceAmount}, deliveryFee=${deliveryFee}, refundAmount=${refundAmount}`,
+      );
+
+      // 5. Call Toss API to partially cancel (refund minus delivery fee)
+      const tossPayment = await this.tossApiService.cancelPayment(
+        payment.paymentKey,
+        {
+          cancelReason: dto.returnReason,
+          cancelAmount: refundAmount,
+        },
+      );
+
+      // 6. Single transaction: restore stock, update payment, restore points, recalculate membership
+      const updatedPayment = await this.prisma.$transaction(
+        async (tx) => {
+          // 6.1. Get all orders for this order group
+          const orders = await tx.order.findMany({
+            where: { orderGroupNumber: payment.orderGroupNumber },
+            select: { productId: true, quantity: true },
+          });
+
+          // 6.2. Restore product origin and stockQuantity
+          for (const order of orders) {
+            if (!order.productId) continue;
+            const qty = order.quantity ?? 0;
+            if (qty <= 0) continue;
+            await tx.product.update({
+              where: { id: order.productId },
+              data: {
+                origin: { increment: qty },
+                stockQuantity: { increment: qty },
+              },
+            });
+          }
+          this.logger.log(
+            `Restored quantity for ${orders.length} order(s) in order group ${payment.orderGroupNumber}`,
+          );
+
+          // 6.3. Update payment in database
+          const paymentUpdated = await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status:
+                tossPayment.balanceAmount === 0
+                  ? PaymentStatus.CANCELLED
+                  : PaymentStatus.SUCCESS,
+              balanceAmount: tossPayment.balanceAmount,
+              cancels: tossPayment.cancels as any,
+              canceledAmount: payment.totalAmount - tossPayment.balanceAmount,
+            },
+          });
+
+          // 6.4. Update order group situation to ORDER_RETURNED
+          await tx.orderGroup.update({
+            where: { orderGroupNumber: payment.orderGroupNumber },
+            data: {
+              situation: EOrderSituation.ORDER_RETURNED as OrderSituation,
+            },
+          });
+
+          // 6.5. Restore user points from Point records (reverse increase/deduction)
+          const points = await tx.point.findMany({
+            where: { orderGroupNumber: payment.orderGroupNumber },
+            select: {
+              userId: true,
+              availablePointsIncrease: true,
+              availablePointsDeduction: true,
+            },
+          });
+          const byUser = new Map<string, { increase: number; deduction: number }>();
+          for (const p of points) {
+            const uid = p.userId;
+            if (!uid) continue;
+            const cur = byUser.get(uid) ?? { increase: 0, deduction: 0 };
+            cur.increase += p.availablePointsIncrease ?? 0;
+            cur.deduction += p.availablePointsDeduction ?? 0;
+            byUser.set(uid, cur);
+          }
+          for (const [userId, { increase, deduction }] of byUser) {
+            const netRestore = deduction - increase;
+            const data: Prisma.UserUpdateInput = {};
+            if (netRestore !== 0) {
+              data.availablePoints = { increment: netRestore };
+            }
+            if (deduction > 0) {
+              data.totalUsedPoints = { decrement: deduction };
+            }
+            if (Object.keys(data).length > 0) {
+              await tx.user.update({ where: { id: userId }, data });
+              this.logger.log(
+                `Restored points for user ${userId}: availablePoints ${netRestore >= 0 ? '+' : ''}${netRestore}, totalUsedPoints -${deduction}`,
+              );
+            }
+          }
+
+          // 6.6. Decrease user's totalPurchaseAmount by finalAmount
+          if (orderGroup.ordererId && orderGroup.finalAmount > 0) {
+            await tx.user.update({
+              where: { id: orderGroup.ordererId },
+              data: {
+                totalPurchaseAmount: { decrement: orderGroup.finalAmount },
+              },
+            });
+            this.logger.log(
+              `Decreased totalPurchaseAmount by ${orderGroup.finalAmount} for user ${orderGroup.ordererId}`,
+            );
+          }
+
+          // 6.7. Delete coupon histories (ISSUED status only) issued by this payment
+          const deletedCouponResult = await tx.couponHistory.deleteMany({
+            where: {
+              paymentId: payment.id,
+              status: 'ISSUED',
+            },
+          });
+          this.logger.log(
+            `Deleted ${deletedCouponResult.count} coupon history record(s) for returned payment ${payment.id}`,
+          );
+
+          // 6.8. Recalculate membership level based on new totalPurchaseAmount
+          const userAfterDecrease = await tx.user.findUnique({
+            where: { id: payment.userId },
+            select: { totalPurchaseAmount: true, membershipLevel: true },
+          });
+
+          if (userAfterDecrease) {
+            const newTotalPurchaseAmount = userAfterDecrease.totalPurchaseAmount || 0;
+
+            const membershipTiers = await tx.membership.findMany({
+              select: { id: true, name: true, description: true, minPrice: true },
+              orderBy: { minPrice: 'desc' },
+            });
+
+            if (membershipTiers.length > 0) {
+              const validTiers = membershipTiers.filter(
+                (tier) => tier.name && tier.minPrice !== null && tier.minPrice !== undefined,
+              );
+
+              let appropriateTier: {
+                id: string;
+                name: string | null;
+                description: string | null;
+                minPrice: number | null;
+              } | null = null;
+              for (const tier of validTiers) {
+                if (newTotalPurchaseAmount >= (tier.minPrice || 0)) {
+                  appropriateTier = tier;
+                  break;
+                }
+              }
+
+              if (!appropriateTier && validTiers.length > 0) {
+                appropriateTier = validTiers[validTiers.length - 1];
+              }
+
+              if (appropriateTier) {
+                const now = new Date();
+                const oneYearFromNow = new Date();
+                oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+                await tx.userMembership.upsert({
+                  where: { userId: payment.userId },
+                  create: {
+                    userId: payment.userId,
+                    membershipId: appropriateTier.id,
+                    membershipName: appropriateTier.name || '',
+                    membershipDescription: appropriateTier.description || '',
+                    status: 'normal',
+                    startDate: now,
+                    endDate: oneYearFromNow,
+                  },
+                  update: {
+                    membershipId: appropriateTier.id,
+                    membershipName: appropriateTier.name || '',
+                    membershipDescription: appropriateTier.description || '',
+                    status: 'normal',
+                    startDate: now,
+                    endDate: oneYearFromNow,
+                    updatedAt: now,
+                  },
+                });
+
+                await tx.user.update({
+                  where: { id: payment.userId },
+                  data: { membershipLevel: appropriateTier.name || '' },
+                });
+
+                this.logger.log(
+                  `Recalculated membership for user ${payment.userId}: ${userAfterDecrease.membershipLevel} -> ${appropriateTier.name} (totalPurchaseAmount: ${newTotalPurchaseAmount})`,
+                );
+              }
+            }
+          }
+
+          return paymentUpdated;
+        },
+        { timeout: 20_000, maxWait: 8_000 },
+      );
+
+      this.logger.log(`Payment returned successfully: ${payment.id}, refunded ${refundAmount} KRW (deliveryFee ${deliveryFee} KRW kept)`);
+
+      return this.mapToResponseDto(updatedPayment);
+    } catch (error) {
+      this.logger.error('Failed to process return payment', error);
       throw error;
     }
   }

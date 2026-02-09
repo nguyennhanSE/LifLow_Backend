@@ -217,6 +217,17 @@ export class CancelPaymentRequestDto {
   cancelAmount?: number;
 }
 
+export class ReturnPaymentRequestDto {
+  @ApiProperty({ description: '결제 ID' })
+  @IsUUID()
+  paymentId: string;
+
+  @ApiProperty({ description: '반품 사유' })
+  @IsString()
+  @IsNotEmpty({ message: 'Return reason is required' })
+  returnReason: string;
+}
+
 export class PaymentWebhookDto {
   @ApiProperty()
   @IsString()

@@ -26,6 +26,7 @@ import {
   CreatePaymentDto,
   ConfirmPaymentRequestDto,
   CancelPaymentRequestDto,
+  ReturnPaymentRequestDto,
   GetPaymentDto,
   PaymentWebhookDto,
   InitiatePaymentRequestDto,
@@ -167,6 +168,21 @@ export class PaymentController {
     @Body() cancelDto: CancelPaymentRequestDto,
   ): Promise<PaymentResponseDto> {
     return this.paymentService.cancelPayment(cancelDto);
+  }
+
+  @Post('return')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Return payment (partial refund excluding delivery fee)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment returned successfully. Refund amount = totalAmount − deliveryFee.',
+    type: PaymentResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Return not allowed (wrong order status or insufficient balance)' })
+  async returnPayment(
+    @Body() returnDto: ReturnPaymentRequestDto,
+  ): Promise<PaymentResponseDto> {
+    return this.paymentService.returnPayment(returnDto);
   }
 
   @Get()
