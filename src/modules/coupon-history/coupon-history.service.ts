@@ -455,7 +455,7 @@ export class CouponHistoryService {
    * Issue free shipping coupons to user based on membership level.
    * 새싹 (Lv.2): 1, 열매 (Lv.3): 2, 나무 (Lv.4): 3, 정원 (Lv.5): 5.
    */
-  async issueFreeShipping(userId: string): Promise<{
+  async issueFreeShipping(userId: string, paymentId?: string): Promise<{
     message: string;
     count: number;
     coupon: { id: string; name: string; code: string; type: string } | null;
@@ -496,6 +496,9 @@ export class CouponHistoryService {
       coupon.id,
       userId,
       count,
+      null,
+      null,
+      paymentId,
     );
     return {
       message: `Successfully issued ${histories.length} free shipping coupon(s)`,
@@ -510,7 +513,7 @@ export class CouponHistoryService {
    * 새싹 (Lv.2): 1x 10% max 10,000 KRW | 열매 (Lv.3): 2x 10% max 20,000 KRW
    * 나무 (Lv.4): 3x 15% max 30,000 KRW | 정원 (Lv.5): 3x 20% max 50,000 KRW
    */
-  async issueShoppingSupport(userId: string): Promise<{
+  async issueShoppingSupport(userId: string, paymentId?: string): Promise<{
     message: string;
     count: number;
     coupon: { id: string; name: string; code: string; type: string } | null;
@@ -558,6 +561,9 @@ export class CouponHistoryService {
       coupon.id,
       userId,
       count,
+      null,
+      null,
+      paymentId,
     );
     return {
       message: `Successfully issued ${histories.length} shopping support coupon(s)`,
@@ -570,7 +576,7 @@ export class CouponHistoryService {
   /**
    * Issue SPECIAL_BENEFIT coupon to user if membership level is LV5.
    */
-  async issueSpecialBenefit(userId: string): Promise<{
+  async issueSpecialBenefit(userId: string, paymentId?: string): Promise<{
     message: string;
     count: number;
     coupon: { id: string; name: string; code: string; type: string } | null;
@@ -622,6 +628,9 @@ export class CouponHistoryService {
       coupon.id,
       userId,
       1,
+      null,
+      null,
+      paymentId,
     );
     return {
       message: 'Successfully issued 1 SPECIAL_BENEFIT coupon to user',
@@ -635,7 +644,7 @@ export class CouponHistoryService {
    * Issue coupons to user after payment: birthday, free shipping, and shopping support.
    * Calls issueBirthdayCoupon, issueFreeShipping, and issueShoppingSupport in parallel.
    */
-  async issueAfterUpdate(userId: string): Promise<{
+  async issueAfterUpdate(userId: string, paymentId?: string): Promise<{
     message: string;
     totalCount: number;
     freeShipping: { message: string; count: number; coupon: { id: string; name: string; code: string; type: string } | null; histories: any[] };
@@ -644,9 +653,9 @@ export class CouponHistoryService {
   }> {
 
     const [freeShipping, shoppingSupport, specialBenefit] = await Promise.all([
-      this.issueFreeShipping(userId),
-      this.issueShoppingSupport(userId),
-      this.issueSpecialBenefit(userId),
+      this.issueFreeShipping(userId, paymentId),
+      this.issueShoppingSupport(userId, paymentId),
+      this.issueSpecialBenefit(userId, paymentId),
     ]);
 
     const totalCount = freeShipping.count + shoppingSupport.count + specialBenefit.count;
@@ -663,6 +672,15 @@ export class CouponHistoryService {
       shoppingSupport,
       allHistories,
     };
+  }
+
+  /**
+   * Delete coupon histories associated with a cancelled payment.
+   * Only deletes ISSUED coupons (not used ones).
+   * Returns the number of deleted records.
+   */
+  async deleteCouponHistoriesByPaymentId(paymentId: string): Promise<number> {
+    return this.couponHistoryRepository.deleteByPaymentId(paymentId);
   }
 }
 

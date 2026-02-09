@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module, forwardRef, Global } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CouponHistoryService } from './coupon-history.service';
 import { CouponHistoryController } from './coupon-history.controller';
@@ -12,6 +12,7 @@ import { CouponsModule } from '../coupons/coupons.module';
 import { MembershipLevelNotifyListener } from './listeners/membershipLevel-notify.listener';
 import { LoggerModule } from 'src/libs/logger/logger.module';
 
+@Global()
 @Module({
   imports: [
     PrismaModule,
@@ -27,7 +28,7 @@ import { LoggerModule } from 'src/libs/logger/logger.module';
     CouponHistoryExpireCronjobService,
     MembershipLevelNotifyListener,
   ],
-  exports: [CouponHistoryService],
+  exports: [CouponHistoryService, CouponHistoryRepository],
 })
 export class CouponHistoryModule {}
 

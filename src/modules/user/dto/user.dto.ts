@@ -791,3 +791,27 @@ export class FindPasswordDto {
     @trim()
     email!: string;
 }
+
+export class UpdatePasswordWithOldDto {
+    @ApiProperty({
+        description: 'Current password',
+        example: 'oldPassword123',
+        type: String
+    })
+    @IsNotEmpty()
+    @IsString()
+    // @MinLength(8)
+    // @MaxLength(128)
+    oldPassword!: string;
+
+    @ApiProperty({
+        description: 'New password',
+        example: 'newPassword123',
+        type: String
+    })
+    @IsNotEmpty()
+    @IsString()
+    // @MinLength(10)
+    // @MaxLength(16)
+    newPassword!: string;
+}

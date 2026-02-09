@@ -2671,6 +2671,21 @@ async function updateBanner() {
 //     });
 //   }
 // }
+async function updateAdminPassword() {
+  const admin = await prisma.user.findUnique({
+    where: {
+      id: 'liflowadmin',
+    },
+  });
+  if (admin) {
+    await prisma.user.update({
+      where: { id: 'liflowadmin' },
+      data: {
+        password: await bcrypt.hash('123456', 10),
+      },
+    });
+  }
+}
 async function main() {
   // console.log('🚀 Starting complete database seeding process...\n');
   // return Promise.resolve().then(() => {
@@ -2686,10 +2701,11 @@ async function main() {
   // await seedUserMemberships(); // Seed memberships and user memberships
   // await seedBanners();         // Seed all 5 types of banners      
   // await seedRecipes();          // Seed recipes from CSV
-  await seedCoupons();          // Seed coupons from CSV
+  // await seedCoupons();          // Seed coupons from CSV
   // await updateAdmin();          // Update admin membership level
   // await updateBanner();          // Update banner
   // await updateOrderGroup();          // Update order group
+  await updateAdminPassword();          // Update admin password
   
   
   console.log('\n✨ All seed functions completed successfully!');

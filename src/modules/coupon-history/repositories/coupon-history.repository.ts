@@ -76,6 +76,7 @@ export class CouponHistoryRepository {
     quantity: number,
     startDate?: Date | null,
     endDate?: Date | null,
+    paymentId?: string,
   ): Promise<CouponHistoryEntity[]> {
     const now = new Date();
     startDate = startDate ?? now;
@@ -90,6 +91,7 @@ export class CouponHistoryRepository {
           quantity,
           startDate,
           endDate,
+          paymentId,
         },
         include: {
           coupon: true,
@@ -542,6 +544,22 @@ export class CouponHistoryRepository {
       },
       data: {
         status: CouponHistoryStatus.EXPIRED,
+      },
+    });
+
+    return result.count;
+  }
+
+  /**
+   * Delete all coupon histories associated with a payment ID.
+   * Used when payment is cancelled to remove issued coupons.
+   * Returns the number of deleted records.
+   */
+  async deleteByPaymentId(paymentId: string): Promise<number> {
+    const result = await this.prisma.couponHistory.deleteMany({
+      where: {
+        paymentId,
+        status: CouponHistoryStatus.ISSUED, // Only delete issued coupons, not used ones
       },
     });
 

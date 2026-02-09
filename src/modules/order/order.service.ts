@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Prisma, Order, OrderSituation, OrderGroup } from '@prisma/client';
 import {
   CreateOrderDto,
@@ -1169,6 +1169,17 @@ export class OrdersService {
         );
       }
 
+      // Do not allow updating order group that is already cancelled or returned
+      const situation = existing.situation as EOrderSituation | null | undefined;
+      const isFinalState =
+        situation === EOrderSituation.ORDER_CANCELLED ||
+        situation === EOrderSituation.ORDER_RETURNED;
+      if (isFinalState) {
+        throw new BadRequestException(
+          'Cannot update order group with situation ORDER_CANCELLED or ORDER_RETURNED',
+        );
+      }
+
       // Validate user if changing ordererId
       if (updateOrderGroupDto.ordererId) {
         const ordererId: string = updateOrderGroupDto.ordererId;
@@ -1221,6 +1232,26 @@ export class OrdersService {
         updateData.situation = updateOrderGroupDto.situation as OrderSituation;
       }
 
+      // When setting situation to ORDER_BEING_SHIPPED or ORDER_SHIPPED, OrderGroup must have courierCompany and invoiceNumber
+      const newSituation = (updateData.situation ?? existing.situation) as EOrderSituation | undefined;
+      if (
+        newSituation === EOrderSituation.ORDER_BEING_SHIPPED ||
+        newSituation === EOrderSituation.ORDER_SHIPPED
+      ) {
+        const courierCompany =
+          updateOrderGroupDto.courierCompany !== undefined
+            ? updateOrderGroupDto.courierCompany
+            : existing.courierCompany;
+        const invoiceNumber =
+          updateOrderGroupDto.invoiceNumber !== undefined
+            ? updateOrderGroupDto.invoiceNumber
+            : existing.invoiceNumber;
+        if (!courierCompany?.trim() || !invoiceNumber?.trim()) {
+          throw new BadRequestException(
+            'courierCompany and invoiceNumber are required when situation is ORDER_BEING_SHIPPED or ORDER_SHIPPED',
+          );
+        }
+      }
 
       const updated = await this.orderGroupRepository.update(
         orderGroupNumber,
@@ -1496,7 +1527,10 @@ export class OrdersService {
       }
     }
 
-    where.situation = { not: { in: [EOrderSituation.ORDER_PAYMENT_FAILED, EOrderSituation.ORDER_PAYMENT_PENDING] } };
+    // Default: exclude failed and pending only when user did NOT specify a situation filter
+    if (!filterDto.situation || filterDto.situation === 'ALL') {
+      where.situation = { not: { in: [EOrderSituation.ORDER_PAYMENT_FAILED, EOrderSituation.ORDER_PAYMENT_PENDING] } };
+    }
 
     return where;
   }

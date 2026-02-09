@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException, NotFoundException, BadRequestException, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto, UpdateUserProfileDto, CreateShippingAddressDto, UpdateShippingAddressDto, FindUserIdDto, FindPasswordDto } from './dto/user.dto';
+import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto, UpdateUserProfileDto, CreateShippingAddressDto, UpdateShippingAddressDto, FindUserIdDto, FindPasswordDto, UpdatePasswordWithOldDto } from './dto/user.dto';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { toResponse } from './mapper/user.mapper';
@@ -824,4 +824,65 @@ export class UserController {
 
     return responseModel;
   }
+
+  @Post('/me/update-password')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ 
+    summary: 'Update user password with old password verification',
+    description: 'Updates user password after verifying old password. Sends email notification with new password.'
+  })
+  @ApiBody({
+    type: UpdatePasswordWithOldDto,
+    description: 'Old password and new password'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Password updated successfully and email sent',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: { 
+          type: 'object',
+          properties: {
+            message: { type: 'string', example: 'Password updated successfully' }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid old password or new password same as old' })
+  @ApiResponse({ status: 401, description: 'User not authenticated' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async updatePassword(
+    @Req() req: Request & { user?: TokenPayload },
+    @Body() updatePasswordDto: UpdatePasswordWithOldDto,
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const userId = req.user?.sub;
+
+      if (!userId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+
+      const result = await this.userService.updatePasswordWithOldPassword(
+        userId,
+        updatePasswordDto.oldPassword,
+        updatePasswordDto.newPassword
+      );
+
+      responseModel.setData({ 
+        message: 'Password updated successfully',
+        emailSent: result 
+      });
+    } catch (error) {
+      console.error('Error in updatePassword:', error);
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+
 }

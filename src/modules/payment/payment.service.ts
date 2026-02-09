@@ -6,6 +6,8 @@ import {
   HttpException,
   HttpStatus,
   InternalServerErrorException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentStatus, PaymentType, Prisma, Coupon, OrderSituation } from '@prisma/client';
@@ -32,6 +34,7 @@ import { PointService } from '../point/point.service';
 import { JwtService } from '@nestjs/jwt';
 import { config } from '../../libs/config';
 import { CartItemService } from '../carts/services/cart-item.service';
+import { PaymentQueueService } from './queue/payment-queue.service';
 
 export interface PaymentTokenPayload {
   orderGroupNumber: string;
@@ -55,6 +58,7 @@ export class PaymentService {
     private readonly pointService: PointService,
     private readonly jwtService: JwtService,
     private readonly cartItemService: CartItemService,
+    private readonly paymentQueueService: PaymentQueueService,
   ) {}
 
   /**
@@ -1143,6 +1147,26 @@ export class PaymentService {
         // Do not throw: payment is already committed; points can be reconciled by a job if needed
       }
 
+      // 2.14. Enqueue job to recalculate membership level and issue coupons (async, non-blocking)
+      try {
+        await this.paymentQueueService.enqueueRecalculateMembershipAndIssueCoupons({
+          userId,
+          membershipLevelBeforePayment: membershipLevelBeforePayment ?? null,
+          paymentAmount: payment.totalAmount ?? 0,
+          orderGroupNumber: validatedDto.orderGroupNumber,
+          paymentId: payment.id,
+        });
+        this.logger.log(
+          `Enqueued membership recalculation job for user ${userId}, orderGroup ${validatedDto.orderGroupNumber}`,
+        );
+      } catch (queueError) {
+        this.logger.error(
+          `Payment succeeded but failed to enqueue membership recalculation for orderGroup ${validatedDto.orderGroupNumber}`,
+          queueError,
+        );
+        // Do not throw: payment is already committed; membership can be recalculated manually if needed
+      }
+
       this.logger.log(`Payment confirmation completed successfully: ${payment.id}`);
 
       return this.mapToResponseDto(payment);
@@ -1416,9 +1440,126 @@ export class PaymentService {
             }
           }
 
+          // 6. Get order group to find finalAmount and decrease user's totalPurchaseAmount
+          const orderGroupData = await tx.orderGroup.findUnique({
+            where: { orderGroupNumber: payment.orderGroupNumber },
+            select: { ordererId: true, finalAmount: true },
+          });
+          if (orderGroupData?.ordererId && orderGroupData.finalAmount > 0) {
+            await tx.user.update({
+              where: { id: orderGroupData.ordererId },
+              data: {
+                totalPurchaseAmount: { decrement: orderGroupData.finalAmount },
+              },
+            });
+            this.logger.log(
+              `Decreased totalPurchaseAmount by ${orderGroupData.finalAmount} for user ${orderGroupData.ordererId}`,
+            );
+          }
+
+          // 7. Delete coupon histories (ISSUED status only) issued by this payment
+          const deletedCouponResult = await tx.couponHistory.deleteMany({
+            where: {
+              paymentId: payment.id,
+              status: 'ISSUED',
+            },
+          });
+          this.logger.log(
+            `Deleted ${deletedCouponResult.count} coupon history record(s) for cancelled payment ${payment.id}`,
+          );
+
+          // 8. Recalculate membership level based on new totalPurchaseAmount
+          const userAfterDecrease = await tx.user.findUnique({
+            where: { id: payment.userId },
+            select: { totalPurchaseAmount: true, membershipLevel: true },
+          });
+
+          if (userAfterDecrease) {
+            const newTotalPurchaseAmount = userAfterDecrease.totalPurchaseAmount || 0;
+
+            // Get membership tiers sorted by minPrice descending
+            const membershipTiers = await tx.membership.findMany({
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                minPrice: true,
+              },
+              orderBy: {
+                minPrice: 'desc',
+              },
+            });
+
+            if (membershipTiers.length > 0) {
+              // Determine appropriate tier based on new totalPurchaseAmount
+              const validTiers = membershipTiers.filter(
+                (tier) => tier.name && tier.minPrice !== null && tier.minPrice !== undefined,
+              );
+
+              let appropriateTier: {
+                id: string;
+                name: string | null;
+                description: string | null;
+                minPrice: number | null;
+              } | null = null;
+              for (const tier of validTiers) {
+                if (newTotalPurchaseAmount >= (tier.minPrice || 0)) {
+                  appropriateTier = tier;
+                  break;
+                }
+              }
+
+              // If no tier matches, use the lowest tier
+              if (!appropriateTier && validTiers.length > 0) {
+                appropriateTier = validTiers[validTiers.length - 1];
+              }
+
+              if (appropriateTier) {
+                const now = new Date();
+                const oneYearFromNow = new Date();
+                oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+                // Update UserMembership
+                await tx.userMembership.upsert({
+                  where: {
+                    userId: payment.userId,
+                  },
+                  create: {
+                    userId: payment.userId,
+                    membershipId: appropriateTier.id,
+                    membershipName: appropriateTier.name || '',
+                    membershipDescription: appropriateTier.description || '',
+                    status: 'normal',
+                    startDate: now,
+                    endDate: oneYearFromNow,
+                  },
+                  update: {
+                    membershipId: appropriateTier.id,
+                    membershipName: appropriateTier.name || '',
+                    membershipDescription: appropriateTier.description || '',
+                    status: 'normal',
+                    startDate: now,
+                    endDate: oneYearFromNow,
+                    updatedAt: now,
+                  },
+                });
+
+                // Update User.membershipLevel field
+                await tx.user.update({
+                  where: { id: payment.userId },
+                  data: { membershipLevel: appropriateTier.name || '' },
+                });
+
+                this.logger.log(
+                  `Recalculated membership for user ${payment.userId}: ${userAfterDecrease.membershipLevel} -> ${appropriateTier.name} (totalPurchaseAmount: ${newTotalPurchaseAmount})`,
+                );
+              }
+            }
+          }
+
           return paymentUpdated;
         },
-        { timeout: 15_000, maxWait: 5_000 },
+        { timeout: 20_000, maxWait: 8_000 },
       );
 
       this.logger.log(`Payment canceled successfully: ${payment.id}`);

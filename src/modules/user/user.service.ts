@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { UserEntity } from './entities/user.entity';
 import { CreateUserDto, UpdateShippingAddressDto, UpdateUserDto, UserFilterDto } from './dto/user.dto';
 import { UserRepository } from './repositories/user.repository';
@@ -422,6 +422,66 @@ export class UserService {
       return true;
     } catch (error) {
       console.error('Error in resetPasswordByIdNameAndEmail:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update password with old password verification
+   * Sends email notification with new password
+   */
+  async updatePasswordWithOldPassword(
+    userId: string, 
+    oldPassword: string, 
+    newPassword: string
+  ): Promise<boolean> {
+    try {
+      // Get user with password
+      const user = await this.userRepository.getUserByAccount(userId);
+      if (!user) {
+        throw new NotFoundException(`User with id ${userId} not found`);
+      }
+
+      // Verify old password
+      const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+      if (!isOldPasswordValid) {
+        throw new BadRequestException('Current password is incorrect');
+      }
+
+      // Check if new password is different from old password
+      const isSamePassword = await bcrypt.compare(newPassword, user.password);
+      if (isSamePassword) {
+        throw new BadRequestException('New password must be different from current password');
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Send email notification with new password FIRST
+      const emailData: SendEmailDto = {
+        id: user.id,
+        name: user.name,
+        email: user.email || '',
+        phone: user.phoneNumber || null,
+        bankName: '',
+        bankAccountNumber: '',
+        password: newPassword,
+        createdAt: user.createdAt || new Date(),
+        avatarUrl: null,
+      };
+      
+      // Send email - if this fails, password won't be updated
+      const emailSent = await this.emailService.sendPasswordChangedEmail(emailData);
+      if (!emailSent) {
+        throw new InternalServerErrorException('Failed to send password change notification email. Password was not updated.');
+      }
+
+      // Only update password if email was sent successfully
+      await this.userRepository.updateUser(userId, { password: hashedPassword });
+
+      return true;
+    } catch (error) {
+      console.error('Error in updatePasswordWithOldPassword:', error);
       throw error;
     }
   }

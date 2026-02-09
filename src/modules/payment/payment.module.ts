@@ -7,12 +7,12 @@ import { TossPaymentApiService } from './services/toss-payment-api.service';
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { OrderModule } from '../order/order.module';
 import { OrdersService } from '../order/order.service';
-import { CouponHistoryModule } from '../coupon-history/coupon-history.module';
 import { PointModule } from '../point/point.module';
 import { CartsModule } from '../carts/carts.module';
+import { PaymentQueueModule } from './queue/payment-queue.module';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, OrderModule, CouponHistoryModule, PointModule, CartsModule],
+  imports: [ConfigModule, PrismaModule, OrderModule, PointModule, CartsModule, PaymentQueueModule],
   controllers: [PaymentController],
   providers: [PaymentService, PaymentRepository, TossPaymentApiService],
   exports: [PaymentService, PaymentRepository, TossPaymentApiService],

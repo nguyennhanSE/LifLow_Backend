@@ -767,6 +767,8 @@ model CouponHistory {
   startDate DateTime? @map("start_date") // 시작일
   endDate DateTime? @map("end_date") // 종료일
 
+  paymentId String? @map("payment_id") // 결제 아이디
+
   issuedAt DateTime @default(now()) @map("issued_at") // 발급일
   usedAt DateTime? @map("used_at") // 사용일
   expiredAt DateTime? @map("expired_at") // 만료 처리일(배치 처리 시)

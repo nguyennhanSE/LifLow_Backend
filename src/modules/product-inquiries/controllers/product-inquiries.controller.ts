@@ -179,6 +179,44 @@ export class ProductInquiriesController {
     return responseModel;
   }
 
+  @Get('/number-of-inquiries')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER)
+  @ApiOperation({ 
+    summary: 'Get total number of product inquiries',
+    description: 'Returns statistics about product inquiries including total count, pending (unanswered), and completed (answered) inquiries.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns inquiry statistics',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            total: { type: 'number', example: 150, description: 'Total number of inquiries' },
+            pending: { type: 'number', example: 25, description: 'Number of unanswered inquiries' },
+            completed: { type: 'number', example: 125, description: 'Number of answered inquiries' }
+          }
+        }
+      }
+    }
+  })
+  @HttpCode(HttpStatus.OK)
+  async getNumberOfInquiries() {
+    const responseModel = new ResponseModel();
+    
+    try {
+      const stats = await this.productInquiriesService.getDashboardStats();
+      responseModel.setData(stats);
+    } catch (error) {
+      throw error;
+    }
+    
+    return responseModel;
+  }
+
   /**
    * Get a single product inquiry by ID with all answers
    * Public endpoint
