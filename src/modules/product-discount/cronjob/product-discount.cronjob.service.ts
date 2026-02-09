@@ -12,7 +12,7 @@ export class ProductDiscountCronjobService {
    * Scheduled cron job that runs every hour to check and update product discount status
    */
   // @Cron(CronExpression.EVERY_DAY_AT_2AM)
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
   async handleScheduledProductDiscountStatusUpdate() {
     this.logger.log('Starting scheduled product discount and special offer status update...');
     await this.updateAllProductDiscountStatuses();
