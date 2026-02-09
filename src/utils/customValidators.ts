@@ -25,24 +25,24 @@ export function validatePriceHierarchy(data: {
   }
 
   // Validate: consumerPrice >= supplyPrice
-  if (consumerPrice !== undefined && consumerPrice !== null && 
-      supplyPrice !== undefined && supplyPrice !== null) {
-    if (consumerPrice < supplyPrice) {
-      throw new BadRequestException(
-        'Consumer price must be greater than or equal to supply price'
-      );
-    }
-  }
+  // if (consumerPrice !== undefined && consumerPrice !== null && 
+  //     supplyPrice !== undefined && supplyPrice !== null) {
+  //   if (consumerPrice < supplyPrice) {
+  //     throw new BadRequestException(
+  //       'Consumer price must be greater than or equal to supply price'
+  //     );
+  //   }
+  // }
 
   // Validate: supplyPrice >= productPrice
-  if (supplyPrice !== undefined && supplyPrice !== null && 
-      productPrice !== undefined && productPrice !== null) {
-    if (supplyPrice < productPrice) {
-      throw new BadRequestException(
-        'Supply price must be greater than or equal to product price'
-      );
-    }
-  }
+  // if (supplyPrice !== undefined && supplyPrice !== null && 
+  //     productPrice !== undefined && productPrice !== null) {
+  //   if (supplyPrice < productPrice) {
+  //     throw new BadRequestException(
+  //       'Supply price must be greater than or equal to product price'
+  //     );
+  //   }
+  // }
 
   // Validate: productPrice >= salePrice
   if (productPrice !== undefined && productPrice !== null && 
@@ -55,15 +55,15 @@ export function validatePriceHierarchy(data: {
   }
 
   // Validate: consumerPrice >= productPrice (if supplyPrice not provided)
-  if (consumerPrice !== undefined && consumerPrice !== null && 
-      productPrice !== undefined && productPrice !== null && 
-      (supplyPrice === undefined || supplyPrice === null)) {
-    if (consumerPrice < productPrice) {
-      throw new BadRequestException(
-        'Consumer price must be greater than or equal to product price'
-      );
-    }
-  }
+  // if (consumerPrice !== undefined && consumerPrice !== null && 
+  //     productPrice !== undefined && productPrice !== null && 
+  //     (supplyPrice === undefined || supplyPrice === null)) {
+  //   if (consumerPrice < productPrice) {
+  //     throw new BadRequestException(
+  //       'Consumer price must be greater than or equal to product price'
+  //     );
+  //   }
+  // }
 
   // Validate: consumerPrice >= salePrice (direct comparison)
   if (consumerPrice !== undefined && consumerPrice !== null && 
@@ -76,15 +76,15 @@ export function validatePriceHierarchy(data: {
   }
 
   // Validate: supplyPrice >= salePrice
-  if (supplyPrice !== undefined && supplyPrice !== null && 
-      salePrice !== undefined && salePrice !== null && 
-      (productPrice === undefined || productPrice === null)) {
-    if (supplyPrice < salePrice) {
-      throw new BadRequestException(
-        'Supply price must be greater than or equal to sale price'
-      );
-    }
-  }
+  // if (supplyPrice !== undefined && supplyPrice !== null && 
+  //     salePrice !== undefined && salePrice !== null && 
+  //     (productPrice === undefined || productPrice === null)) {
+  //   if (supplyPrice < salePrice) {
+  //     throw new BadRequestException(
+  //       'Supply price must be greater than or equal to sale price'
+  //     );
+  //   }
+  // }
 }
 
 /**

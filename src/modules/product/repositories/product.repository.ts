@@ -566,8 +566,11 @@ export class ProductRepository {
         status: data.status ?? false,
         discountAmount: data.discountAmount || 0,
         specialPriceApplied: data.specialPriceApplied ? data.specialPriceApplied : 0,
-        startDate: data.startDate ? new Date(data.startDate) : null,
-        endDate: data.endDate ? new Date(data.endDate) : null,
+        // Default start/end for quick testing: if not provided, set startDate=now and endDate=now+30s
+        startDate: new Date(Date.now() + 10_000),
+        endDate: new Date(Date.now() + 30_000),
+        // startDate: data.startDate ? new Date(data.startDate) : null,
+        // endDate: data.endDate ? new Date(data.endDate) : null,
         createdAt: new Date(),
         updatedAt: new Date()
       },

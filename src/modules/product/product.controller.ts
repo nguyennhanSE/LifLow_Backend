@@ -637,6 +637,23 @@ export class ProductController {
     }
   }
 
+  @Delete(':id/special-offer')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER)
+  @ApiOperation({ summary: 'Delete product special offer' })
+  @ApiResponse({ status: 200, description: 'Special offer deleted, product salePrice restored to origin' })
+  @ApiResponse({ status: 404, description: 'Product not found or has no special offer' })
+  async deleteProductSpecialOffer(@Param('id') id: string) {
+    const responseModel = new ResponseModel();
+
+    try {
+      const product = await this.productService.deleteProductSpecialOffer(id);
+      responseModel.setData(product);
+      return responseModel;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   @Get('brands/list')
   @Public()
   @ApiOperation({ summary: 'Get all brands' })

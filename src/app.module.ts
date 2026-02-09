@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
+import { BullModule } from '@nestjs/bullmq';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UserModule } from './modules/user/user.module';
@@ -33,10 +34,40 @@ import { PolicyModule } from './modules/policy/policy.module';
 import { AnnouncementsModule } from './modules/announcements/announcements.module';
 import { RecipeCommentModule } from './modules/recipe/recipe-comment/recipe-comment.module';
 import { ProductBadgesModule } from './modules/product-badges/product-badges.module';
+import { config } from './libs/config';
+import { CouponQueueProcessor } from './modules/coupons/queue/coupon-queue.processor';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(), // Enable scheduled tasks (cron jobs)
+    BullModule.forRootAsync({
+      useFactory: () => ({
+        connection: {
+          host: config.REDIS_HOST,
+          port: config.REDIS_PORT,
+
+          // Ubuntu/EC2 optimized settings with better Docker startup handling
+          connectTimeout: 30000, // Increased timeout for Docker startup
+          lazyConnect: true,
+          maxRetriesPerRequest: null, // Disable retry limit to prevent ECONNREFUSED
+          retryDelayOnFailover: 2000, // Longer delay between retries
+          enableReadyCheck: false,
+          // Connection pool settings for better performance on EC2
+          family: 4, // Use IPv4
+          keepAlive: true,
+        },
+        defaultJobOptions: {
+          removeOnComplete: 5,
+          removeOnFail: 4,
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        },
+      }),
+    }),
+    LoggerModule,
     AuthModule,
     UserModule,
     AnnouncementsModule,
@@ -48,7 +79,6 @@ import { ProductBadgesModule } from './modules/product-badges/product-badges.mod
     RecipeModule,
     RecipeCommentModule,
     GuardModule,
-    LoggerModule,
     RolesModule,
     EmailModule,
     OrderModule,
@@ -67,6 +97,7 @@ import { ProductBadgesModule } from './modules/product-badges/product-badges.mod
   controllers: [AppController],
   providers: [
     AppService,
+    CouponQueueProcessor,
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,

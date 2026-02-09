@@ -68,6 +68,10 @@ export const config = {
   TOSS_WEBHOOK_SECRET: process.env.TOSS_WEBHOOK_SECRET ?? '',
   TOSS_SUCCESS_URL: process.env.TOSS_SUCCESS_URL ?? '',
   TOSS_FAIL_URL: process.env.TOSS_FAIL_URL ?? '',
+
+  // Redis (BullMQ)
+  REDIS_HOST: process.env.REDIS_HOST ?? 'localhost',
+  REDIS_PORT: parseInt(process.env.REDIS_PORT ?? '6379', 10)
 };
 
 // TOSS Payments Helper Functions

@@ -10,8 +10,15 @@ import {
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { MembershipLevelNotifyListener } from './listeners/membershipLevel-notify.listener';
+import { LoggerModule } from 'src/libs/logger/logger.module';
+
 @Module({
-  imports: [PrismaModule, ScheduleModule.forRoot(), forwardRef(() => CouponsModule)],
+  imports: [
+    PrismaModule,
+    LoggerModule,
+    ScheduleModule.forRoot(),
+    forwardRef(() => CouponsModule),
+  ],
   controllers: [CouponHistoryController],
   providers: [
     CouponHistoryService,

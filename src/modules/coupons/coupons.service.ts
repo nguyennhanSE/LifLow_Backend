@@ -8,12 +8,14 @@ import { CouponEntity } from './entities/coupon.entity';
 import { AppLogger } from 'src/libs/logger/logger.service';
 import { getFirstDateOfNextMonth, getNextMonthDateRange } from './helpers/coupon.helper';
 import { CouponHistoryService } from '../coupon-history/coupon-history.service';
+import { CouponQueueService } from './queue/coupon-queue.service';
 
 @Injectable()
 export class CouponsService {
   constructor(
     private readonly couponRepository: CouponRepository,
     private readonly logger: AppLogger,
+    private readonly couponQueueService: CouponQueueService,
     @Inject(forwardRef(() => CouponHistoryService))
     private readonly couponHistoryService: CouponHistoryService,
   ) {}
@@ -67,12 +69,12 @@ export class CouponsService {
 
     // Khi không isAutoIssue: dùng targetGrades để tạo couponHistory cho user có membershipLevel trong targetGrades; targetGrades rỗng thì issue cho tất cả user
     if (!created.isAutoIssue) {
-      await this.couponHistoryService.issueCouponToUsersByTargetGrades(
-        created.id,
-        created.targetGrades?.length ? (created.targetGrades as string[]) : undefined,
-        startDate,
-        endDate,
-      );
+      await this.couponQueueService.enqueueIssueCouponToUsersByTargetGrades({
+        couponId: created.id,
+        targetGrades: created.targetGrades?.length ? (created.targetGrades as string[]) : undefined,
+        startDate: startDate ? startDate.toISOString() : null,
+        endDate: endDate ? endDate.toISOString() : null,
+      });
     }
 
     return created;

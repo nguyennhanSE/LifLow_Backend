@@ -11,7 +11,8 @@ export class ProductDiscountCronjobService {
   /**
    * Scheduled cron job that runs every hour to check and update product discount status
    */
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  // @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  @Cron(CronExpression.EVERY_MINUTE)
   async handleScheduledProductDiscountStatusUpdate() {
     this.logger.log('Starting scheduled product discount and special offer status update...');
     await this.updateAllProductDiscountStatuses();
@@ -363,6 +364,7 @@ export class ProductDiscountCronjobService {
     this.logger.log('Starting product sale price recalculation based on discount and special offer status');
 
     const startTime = Date.now();
+    const now = new Date();
     let totalProcessed = 0;
     let totalUpdated = 0;
     let errors = 0;
@@ -385,6 +387,7 @@ export class ProductDiscountCronjobService {
               id: true,
               status: true,
               discountRate: true,
+              discountEndDate: true,
             },
           },
           productSpecialOffer: {
@@ -393,6 +396,7 @@ export class ProductDiscountCronjobService {
               status: true,
               discountAmount: true,
               specialPriceApplied: true,
+              endDate: true,
             },
           },
         },
@@ -418,24 +422,98 @@ export class ProductDiscountCronjobService {
           const hasActiveDiscount = product.productDiscount?.status === true;
           const hasActiveSpecialOffer = product.productSpecialOffer?.status === true;
 
+          const isSpecialOfferExpired =
+            !!product.productSpecialOffer?.endDate && product.productSpecialOffer.endDate < now;
+          const isProductDiscountExpired =
+            !!product.productDiscount?.discountEndDate && product.productDiscount.discountEndDate < now;
+
+          // If either specialOffer or productDiscount is expired: restore salePrice and delete expired record(s)
+          if (isSpecialOfferExpired || isProductDiscountExpired) {
+            const effectiveHasActiveDiscount = hasActiveDiscount && !isProductDiscountExpired;
+            const effectiveHasActiveSpecialOffer = hasActiveSpecialOffer && !isSpecialOfferExpired;
+
+            // Recalculate salePrice using only effective (non-expired) promotions
+            let restoredSalePrice = consumerPrice;
+
+            if (
+              effectiveHasActiveDiscount &&
+              effectiveHasActiveSpecialOffer &&
+              product.productDiscount &&
+              product.productSpecialOffer
+            ) {
+              const specialPriceApplied = product.productSpecialOffer.specialPriceApplied ?? consumerPrice;
+              const discountRate = product.productDiscount.discountRate;
+
+              // Apply productDiscount on specialPriceApplied
+              restoredSalePrice = Math.floor(specialPriceApplied * (1 - discountRate / 100));
+              restoredSalePrice = Math.max(0, restoredSalePrice);
+            } else if (effectiveHasActiveDiscount && product.productDiscount) {
+              const discountRate = product.productDiscount.discountRate;
+              restoredSalePrice = Math.floor(consumerPrice * (1 - discountRate / 100));
+              restoredSalePrice = Math.max(0, restoredSalePrice);
+            } else if (effectiveHasActiveSpecialOffer && product.productSpecialOffer) {
+              const specialPriceApplied = product.productSpecialOffer.specialPriceApplied ?? consumerPrice;
+              // If specialOffer is still active, use specialPriceApplied
+              restoredSalePrice = Math.max(0, specialPriceApplied);
+            } else {
+              restoredSalePrice = consumerPrice;
+            }
+
+            await this.prisma.$transaction(async (tx) => {
+              if (product.salePrice !== restoredSalePrice) {
+                await tx.product.update({
+                  where: { id: product.id },
+                  data: { salePrice: restoredSalePrice },
+                });
+              }
+
+              if (isSpecialOfferExpired && product.productSpecialOffer) {
+                await tx.productSpecialOffer.delete({
+                  where: { id: product.productSpecialOffer.id },
+                });
+              }
+
+              if (isProductDiscountExpired && product.productDiscount) {
+                await tx.productDiscount.delete({
+                  where: { id: product.productDiscount.id },
+                });
+              }
+            });
+
+            if (product.salePrice !== restoredSalePrice) {
+              totalUpdated++;
+            }
+
+            if (isSpecialOfferExpired && product.productSpecialOffer) {
+              this.logger.debug(
+                `Deleted expired specialOffer ${product.productSpecialOffer.id} for product ${product.id} (endDate ${product.productSpecialOffer.endDate?.toISOString()})`,
+              );
+            }
+            if (isProductDiscountExpired && product.productDiscount) {
+              this.logger.debug(
+                `Deleted expired productDiscount ${product.productDiscount.id} for product ${product.id} (discountEndDate ${product.productDiscount.discountEndDate?.toISOString()})`,
+              );
+            }
+
+            totalProcessed++;
+            continue;
+          }
+
           // If both productDiscount and productSpecialOffer are active
           if (hasActiveDiscount && hasActiveSpecialOffer && product.productSpecialOffer && product.productDiscount) {
             const specialPriceApplied = product.productSpecialOffer.specialPriceApplied ?? consumerPrice;
-            const discountAmount = product.productSpecialOffer.discountAmount ?? 0;
             const discountRate = product.productDiscount.discountRate;
 
-            // Calculate: newSalePrice = specialPriceApplied + discountAmount
-            newSalePrice = specialPriceApplied + discountAmount;
-            
-            // Then apply discountRate
-            newSalePrice = Math.floor(newSalePrice * (1 - discountRate / 100));
+            // Apply productDiscount on top of specialPriceApplied
+            // newSalePrice = specialPriceApplied * (1 - discountRate/100)
+            newSalePrice = Math.floor(specialPriceApplied * (1 - discountRate / 100));
             newSalePrice = Math.max(0, newSalePrice); // Ensure price doesn't go below 0
 
             this.logger.debug(
               `Applied both productDiscount and specialOffer for product ${product.id}: ` +
-                `specialPriceApplied: ${specialPriceApplied}, discountAmount: ${discountAmount}, ` +
-                `intermediate: ${specialPriceApplied + discountAmount}, ` +
-                `after discountRate (${discountRate}%): ${newSalePrice}`
+                `specialPriceApplied: ${specialPriceApplied}, ` +
+                `discountRate: ${discountRate}%, ` +
+                `result: ${newSalePrice}`
             );
           }
           // If only productDiscount is active
@@ -451,11 +529,11 @@ export class ProductDiscountCronjobService {
           else if (hasActiveSpecialOffer && product.productSpecialOffer) {
             const specialOffer = product.productSpecialOffer;
             const specialPriceApplied = specialOffer.specialPriceApplied ?? consumerPrice;
-            const discountAmount = specialOffer.discountAmount ?? 0;
-            newSalePrice = Math.max(0, specialPriceApplied + discountAmount);
+            // When active, salePrice = specialPriceApplied (already discounted price)
+            newSalePrice = Math.max(0, specialPriceApplied);
             this.logger.debug(
               `Applied specialOffer for product ${product.id}: ` +
-                `specialPriceApplied: ${specialPriceApplied}, discountAmount: ${discountAmount}, ` +
+                `specialPriceApplied: ${specialPriceApplied}, ` +
                 `result: ${newSalePrice}`
             );
           }
@@ -567,6 +645,7 @@ export class ProductDiscountCronjobService {
               id: true,
               status: true,
               discountAmount: true,
+              specialPriceApplied: true,
             },
           },
         },
@@ -585,30 +664,43 @@ export class ProductDiscountCronjobService {
       const consumerPrice = product.consumerPrice;
       let newSalePrice: number = consumerPrice;
 
-      // Apply productDiscount first if active
-      if (product.productDiscount && product.productDiscount.status === true) {
+      const hasActiveDiscount = product.productDiscount?.status === true;
+      const hasActiveSpecialOffer = product.productSpecialOffer?.status === true;
+
+      // If both productDiscount and productSpecialOffer are active
+      if (hasActiveDiscount && hasActiveSpecialOffer && product.productDiscount && product.productSpecialOffer) {
+        const specialPriceApplied = product.productSpecialOffer.specialPriceApplied ?? consumerPrice;
+        const discountRate = product.productDiscount.discountRate;
+        
+        // Apply productDiscount on specialPriceApplied
+        newSalePrice = Math.floor(specialPriceApplied * (1 - discountRate / 100));
+        newSalePrice = Math.max(0, newSalePrice);
+        
+        this.logger.debug(
+          `Applied both for product ${productId}: ` +
+            `specialPriceApplied: ${specialPriceApplied}, discountRate: ${discountRate}%, result: ${newSalePrice}`
+        );
+      }
+      // If only productDiscount is active
+      else if (hasActiveDiscount && product.productDiscount) {
         const discountRate = product.productDiscount.discountRate;
         newSalePrice = Math.floor(consumerPrice * (1 - discountRate / 100));
         this.logger.debug(
-          `Calculating discounted price for product ${productId}: ` +
+          `Applied productDiscount for product ${productId}: ` +
             `${consumerPrice} * (1 - ${discountRate}%) = ${newSalePrice}`
         );
       }
-
-      // Then apply specialOffer if active (subtract discountAmount from already discounted price)
-      if (product.productSpecialOffer && product.productSpecialOffer.status === true) {
-        const discountAmount = product.productSpecialOffer.discountAmount;
-        newSalePrice = Math.max(0, newSalePrice - discountAmount); // Ensure price doesn't go below 0
+      // If only productSpecialOffer is active
+      else if (hasActiveSpecialOffer && product.productSpecialOffer) {
+        const specialPriceApplied = product.productSpecialOffer.specialPriceApplied ?? consumerPrice;
+        newSalePrice = Math.max(0, specialPriceApplied);
         this.logger.debug(
           `Applied specialOffer for product ${productId}: ` +
-            `price -> ${newSalePrice} (discountAmount: ${discountAmount})`
+            `specialPriceApplied: ${specialPriceApplied}, result: ${newSalePrice}`
         );
       }
-
       // If both discounts are inactive, reset to consumerPrice
-      const hasActiveDiscount = product.productDiscount?.status === true;
-      const hasActiveSpecialOffer = product.productSpecialOffer?.status === true;
-      if (!hasActiveDiscount && !hasActiveSpecialOffer) {
+      else {
         newSalePrice = consumerPrice;
         this.logger.debug(
           `No active discounts for product ${productId}, setting salePrice to consumerPrice: ${newSalePrice}`
