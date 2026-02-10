@@ -280,6 +280,23 @@ export class MembershipsService {
     return updatedMembership;
   }
 
+  /**
+   * Update only the status field of a user's membership.
+   * Called from UserService when admin updates user with membershipStatus.
+   */
+  async updateUserMembershipStatus(userId: string, status: string): Promise<void> {
+    const existing = await this.membershipRepository.getUserMembership(userId);
+    if (!existing) {
+      this.logger.warn(`No userMembership found for user ${userId}, skipping status update`);
+      return;
+    }
+    await this.membershipRepository.updateUserMembership(userId, {
+      status,
+      updatedAt: new Date(),
+    });
+    this.logger.log(`Updated userMembership status to "${status}" for user ${userId}`);
+  }
+
   async removeUserMembership(
     userId: string,
     membershipId: string

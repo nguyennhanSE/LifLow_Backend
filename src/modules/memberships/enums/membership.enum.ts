@@ -5,3 +5,9 @@ export enum EMembershipLevel {
     LV4 = 'LV4. 나무',
     LV5 = 'LV5. 정원',
 }
+
+export enum EMembershipStatus {
+    NORMAL = 'normal',
+    INACTIVE = 'inactive',
+    STOP = 'stop',
+}

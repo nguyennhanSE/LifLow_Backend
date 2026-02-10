@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException, NotFoundException } from "@nestjs/common";
+import { Injectable, BadRequestException, UnauthorizedException, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { LoginDto, LogoutDto, RefreshTokenRequestDto } from "./dto/auth.dto";
 import { comparePassword } from "src/utils/encrypt";
 import { TokenPayload } from "libs/constants/interface";
@@ -8,6 +8,8 @@ import { AppLogger } from "libs/logger";
 import { UserService } from "../user/user.service";
 import { RolesService } from "../roles/roles.service";
 import { AuthRepository } from "./repositories/auth.repository";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { EMembershipStatus } from "../memberships/enums/membership.enum";
 
 @Injectable()
 export class AuthService {
@@ -19,6 +21,7 @@ export class AuthService {
         private readonly userService: UserService,
         private readonly roleService: RolesService,
         private readonly logger: AppLogger,
+        private readonly prisma: PrismaService,
     ) {
         this.errorCode = this.context;
     }
@@ -49,6 +52,9 @@ export class AuthService {
                     throw new UnauthorizedException("Invalid credentials");
                 }
             }
+
+            // Check membership status – block inactive/stop users
+            await this.checkMembershipStatus(user.id);
 
             const roles = await this.roleService.getUserRoles(user.id);
 
@@ -249,6 +255,9 @@ export class AuthService {
                 throw new NotFoundException("User not found");
             }
 
+            // Check membership status – block inactive/stop users
+            await this.checkMembershipStatus(user.id);
+
             const roles = await this.roleService.getUserRoles(user.id);
 
             const accessTokenPayload: TokenPayload = {
@@ -299,6 +308,30 @@ export class AuthService {
         } catch (err) {
             this.logger.error(`[${this.context}] oauthLogin failed`, err);
             throw err;
+        }
+    }
+
+    /**
+     * Check user's membership status.
+     * Throws ForbiddenException if status is inactive or stop.
+     */
+    private async checkMembershipStatus(userId: string): Promise<void> {
+        const userMembership = await this.prisma.userMembership.findUnique({
+            where: { userId },
+            select: { status: true },
+        });
+
+        if (!userMembership) {
+            // No membership record – allow login
+            return;
+        }
+
+        const blockedStatuses: string[] = [EMembershipStatus.INACTIVE, EMembershipStatus.STOP];
+        if (blockedStatuses.includes(userMembership.status ?? '')) {
+            this.logger.warn(`[${this.context}] login blocked – membership status is "${userMembership.status}" for user ${userId}`);
+            throw new ForbiddenException(
+                `Your account is currently ${userMembership.status}. Please contact support.`,
+            );
         }
     }
 }

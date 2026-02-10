@@ -163,8 +163,8 @@ export class UserService {
       hashedPassword = await bcrypt.hash(updateUserDto.password, 10);
     }
 
-    // Prepare update data
-    const { password, ...otherData } = updateUserDto;
+    // Prepare update data (exclude membershipStatus – it's for userMembership table only)
+    const { password, membershipStatus, ...otherData } = updateUserDto;
     const updateData: Partial<UserEntity> & { role?: ERoleName; password?: string } = {
       ...otherData,
       ...(hashedPassword && { password: hashedPassword }),
@@ -175,6 +175,11 @@ export class UserService {
     // When membershipLevel is updated, sync UserMembership table
     if (updateUserDto.membershipLevel) {
       await this.membershipsService.syncUserMembershipByLevel(id, updateUserDto.membershipLevel);
+    }
+
+    // When membershipStatus is provided, update userMembership.status
+    if (updateUserDto.membershipStatus) {
+      await this.membershipsService.updateUserMembershipStatus(id, updateUserDto.membershipStatus);
     }
 
     return updatedUser;

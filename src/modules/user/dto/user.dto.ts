@@ -3,6 +3,7 @@ import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString,
 import { Transform } from "class-transformer";
 import { trim, toLower } from "../../../utils/helper";
 import { ERoleName } from "../../roles/enums/role.enum";
+import { EMembershipStatus } from "../../memberships/enums/membership.enum";
 
 // Role filter options including 'ALL' for filtering by any role
 const RoleFilterOptions = [...Object.values(ERoleName), 'ALL'] as const;
@@ -234,6 +235,15 @@ export class UpdateUserDto {
     @MaxLength(100)
     statusMessage?: string;
 
+    @ApiPropertyOptional({ description: 'User date of birth', example: '1990-01-01', format: 'date' })
+    @IsOptional()
+    @IsString()
+    dateOfBirth?: string;
+
+    @ApiPropertyOptional({ description: 'Membership status', enum: EMembershipStatus, example: EMembershipStatus.NORMAL })
+    @IsOptional()
+    @IsEnum(EMembershipStatus, { message: 'Status must be one of: normal, inactive, stop' })
+    membershipStatus?: EMembershipStatus;
 }
 
 
