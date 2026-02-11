@@ -52,6 +52,7 @@ export class NodemailerService implements IEmailService {
                 user: emailUser || '',
                 pass: emailPassword || '',
             },
+            
         };
 
         this.transporter = nodemailer.createTransport(emailConfig);

@@ -468,8 +468,9 @@ export class ProductDiscountCronjobService {
               }
 
               if (isSpecialOfferExpired && product.productSpecialOffer) {
-                await tx.productSpecialOffer.delete({
+                await tx.productSpecialOffer.update({
                   where: { id: product.productSpecialOffer.id },
+                  data: { isOutDated: true },
                 });
               }
 

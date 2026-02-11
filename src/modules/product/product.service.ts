@@ -353,7 +353,7 @@ export class ProductService {
     };
 
     // Validate business rules with merged data
-    validatePriceHierarchy(mergedData);
+    // validatePriceHierarchy(mergedData);
     validateOrderQuantity(mergedData);
 
     // Check for duplicate productCode (excluding current product)
@@ -997,13 +997,16 @@ export class ProductService {
       sortBy,
       sortOrder,
       includeProductReview: query.includeProductReview ?? true,
-      search
+      search,
+      isOutDated: query.isOutDated,
     };
 
-    // Get products and count (same search filter for list and total)
-    const [products, total] = await Promise.all([
+    // Get products, count, and summary counts in parallel
+    const [products, total, inProgressCount, outDatedCount] = await Promise.all([
       this.productRepository.findManyWithSpecialOffer(pagination),
       this.productRepository.countWithSpecialOffer(pagination),
+      this.productRepository.countInProgressSpecialOffers(search),
+      this.productRepository.countOutDatedSpecialOffers(search),
     ]);
 
     // Calculate pagination metadata
@@ -1023,6 +1026,8 @@ export class ProductService {
     return {
       products,
       pagination: paginationMeta,
+      inProgress: inProgressCount,
+      isOutDated: outDatedCount,
     };
   }
 

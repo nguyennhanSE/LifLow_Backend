@@ -45,14 +45,14 @@ export function validatePriceHierarchy(data: {
   // }
 
   // Validate: productPrice >= salePrice
-  if (productPrice !== undefined && productPrice !== null && 
-      salePrice !== undefined && salePrice !== null) {
-    if (productPrice < salePrice) {
-      throw new BadRequestException(
-        'Product price must be greater than or equal to sale price'
-      );
-    }
-  }
+  // if (productPrice !== undefined && productPrice !== null && 
+  //     salePrice !== undefined && salePrice !== null) {
+  //   if (productPrice < salePrice) {
+  //     throw new BadRequestException(
+  //       'Product price must be greater than or equal to sale price'
+  //     );
+  //   }
+  // }
 
   // Validate: consumerPrice >= productPrice (if supplyPrice not provided)
   // if (consumerPrice !== undefined && consumerPrice !== null && 

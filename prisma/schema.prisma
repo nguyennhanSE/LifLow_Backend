@@ -574,11 +574,12 @@ model ProductDiscount{
 model ProductSpecialOffer {
   id String @id @default(uuid())
   status Boolean @default(false) @map("status")
+  isOutDated Boolean @default(false) @map("is_out_dated")
   productId String @map("product_id") @unique 
 
   discountAmount Int @map("discount_amount")
   specialPriceApplied Int? @map("special_price_applied")
-
+  
   startDate DateTime? @map("start_date")
   endDate DateTime? @map("end_date")
   createdAt DateTime? @map("created_at")

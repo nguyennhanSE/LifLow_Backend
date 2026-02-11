@@ -19,6 +19,7 @@ export interface PaginatedResponse<T = any> {
   data: T[];
   pagination: PaginationMeta;
   message?: string;
+  [key: string]: any;
 }
 
 /**
@@ -53,7 +54,8 @@ export function paginationResponse<T>(
   total: number,
   page: number,
   limit: number,
-  message?: string
+  message?: string,
+  extra?: Record<string, any>,
 ): PaginatedResponse<T> {
   const totalPages = Math.ceil(total / limit);
   const hasNext = page < totalPages;
@@ -71,6 +73,7 @@ export function paginationResponse<T>(
       hasPrev,
     },
     ...(message && { message }),
+    ...(extra && extra),
   };
 }
 

@@ -4,7 +4,7 @@ import { CreateUserDto, UpdateShippingAddressDto, UpdateUserDto, UserFilterDto }
 import { UserRepository } from './repositories/user.repository';
 import { IPaginate, PaginateOptions } from '../../libs/models/paginate/pagimate.model';
 import { ERoleName } from '../roles/enums/role.enum';
-import { EMembershipLevel } from '../memberships/enums/membership.enum';
+import { EMembershipLevel, EMembershipStatus } from '../memberships/enums/membership.enum';
 import * as bcrypt from 'bcrypt';
 import { UserEmailService } from '../email/email.service';
 import { SendEmailDto } from '../email/dto/email.dto';
@@ -427,6 +427,19 @@ export class UserService {
       return true;
     } catch (error) {
       console.error('Error in resetPasswordByIdNameAndEmail:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel user membership (set status to inactive)
+   */
+  async cancelMembership(userId: string): Promise<void> {
+    try {
+      const user = await this.findOne(userId);
+      await this.membershipsService.updateUserMembershipStatus(userId, EMembershipStatus.INACTIVE);
+    } catch (error) {
+      console.error('Error in cancelMembership:', error);
       throw error;
     }
   }

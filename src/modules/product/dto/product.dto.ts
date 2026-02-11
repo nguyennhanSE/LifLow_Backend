@@ -445,6 +445,15 @@ export class ProductListQueryDto {
   @Type(() => Boolean)
   @IsBoolean()
   includeProductReview?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filter special offers by isOutDated status (true = expired, false = active)',
+    example: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  isOutDated?: boolean;
 }
 
 export interface PaginationMeta {
@@ -459,6 +468,8 @@ export interface PaginationMeta {
 export interface ProductListResponse {
   products: any[];
   pagination: PaginationMeta;
+  inProgress?: number;
+  isOutDated?: number;
 }
 
 // Bulk Delete DTO

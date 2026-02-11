@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException, NotFoundException, BadRequestException, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException, NotFoundException, BadRequestException, UploadedFiles, UseInterceptors, Put } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto, UpdateUserProfileDto, CreateShippingAddressDto, UpdateShippingAddressDto, FindUserIdDto, FindPasswordDto, UpdatePasswordWithOldDto } from './dto/user.dto';
 import { Roles } from '../../libs/decorator/roles.decorator';
@@ -884,5 +884,29 @@ export class UserController {
     return responseModel;
   }
 
+  @Put('/me/cancel-membership')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Cancel user membership' })
+  @ApiResponse({ status: 200, description: 'User membership cancelled successfully' })
+  async cancelMembership(@Req() req: Request & { user?: TokenPayload }) {
+    const responseModel = new ResponseModel();
+    try {
+      const userId = req.user?.sub;
+      if (!userId) {
+        throw new BadRequestException('User ID is required');
+      }
+
+      await this.userService.cancelMembership(userId);
+
+      responseModel.setData({
+        message: 'Membership cancelled successfully',
+      });
+    } catch (error) {
+      console.error('Error in cancelMembership:', error);
+      throw error;
+    }
+
+    return responseModel;
+  }
 
 }

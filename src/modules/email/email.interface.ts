@@ -6,6 +6,11 @@ export interface EmailConfig {
         user: string;
         pass: string;
     };
+    requireTLS?: boolean;
+    tls?: {
+        rejectUnauthorized?: boolean;
+        minVersion?: string;        
+    };
 }
 
 export interface EmailTemplate {

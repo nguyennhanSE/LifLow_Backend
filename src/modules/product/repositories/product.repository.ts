@@ -23,6 +23,7 @@ export interface ProductPagination {
   sortOrder?: 'asc' | 'desc';
   includeProductReview?: boolean;
   search?: string;
+  isOutDated?: boolean;
 }
 
 @Injectable()
@@ -613,6 +614,22 @@ export class ProductRepository {
     const skip = (pagination.page - 1) * pagination.limit;
 
     const search = pagination.search?.trim() || '';
+    const isOutDated = pagination.isOutDated;
+
+    // Build specialOffer filter based on isOutDated
+    const specialOfferFilter = isOutDated === true
+      ? { isOutDated: true }
+      : {
+          status: true,
+          isOutDated: false,
+          OR: [
+            { startDate: null, endDate: null },
+            { startDate: { lte: now }, endDate: { gte: now } },
+            { startDate: { lte: now }, endDate: null },
+            { startDate: null, endDate: { gte: now } },
+          ],
+        };
+
     const products = await this.prisma.product.findMany({
       where: {
         ...(search
@@ -623,15 +640,8 @@ export class ProductRepository {
               },
             }
           : {}),
-        productSpecialOffer: {
-          status: true,
-          OR: [
-            { startDate: null, endDate: null },
-            { startDate: { lte: now }, endDate: { gte: now } },
-            { startDate: { lte: now }, endDate: null },
-            { startDate: null, endDate: { gte: now } },
-          ],
-        },
+        displayStatus: 'Y',
+        productSpecialOffer: specialOfferFilter,
       },
       orderBy,
       skip,
@@ -669,11 +679,26 @@ export class ProductRepository {
   }
 
   /**
-   * Count products with active special offers (optionally filtered by search)
+   * Count products with special offers (optionally filtered by search and isOutDated)
    */
-  async countWithSpecialOffer(pagination?: Pick<ProductPagination, 'search'>): Promise<number> {
+  async countWithSpecialOffer(pagination?: Pick<ProductPagination, 'search' | 'isOutDated'>): Promise<number> {
     const now = new Date();
     const search = pagination?.search?.trim() || '';
+    const isOutDated = pagination?.isOutDated;
+
+    const specialOfferFilter = isOutDated === true
+      ? { isOutDated: true }
+      : {
+          status: true,
+          isOutDated: false,
+          OR: [
+            { startDate: null, endDate: null },
+            { startDate: { lte: now }, endDate: { gte: now } },
+            { startDate: { lte: now }, endDate: null },
+            { startDate: null, endDate: { gte: now } },
+          ],
+        };
+
     return await this.prisma.product.count({
       where: {
         ...(search
@@ -684,14 +709,58 @@ export class ProductRepository {
               },
             }
           : {}),
+        productSpecialOffer: specialOfferFilter,
+      },
+    });
+  }
+
+  /**
+   * Count in-progress special offers (active, not outdated)
+   */
+  async countInProgressSpecialOffers(search?: string): Promise<number> {
+    const now = new Date();
+    const trimmedSearch = search?.trim() || '';
+    return await this.prisma.product.count({
+      where: {
+        ...(trimmedSearch
+          ? {
+              productName: {
+                contains: trimmedSearch,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
         productSpecialOffer: {
           status: true,
+          isOutDated: false,
           OR: [
             { startDate: null, endDate: null },
             { startDate: { lte: now }, endDate: { gte: now } },
             { startDate: { lte: now }, endDate: null },
             { startDate: null, endDate: { gte: now } },
           ],
+        },
+      },
+    });
+  }
+
+  /**
+   * Count outdated special offers
+   */
+  async countOutDatedSpecialOffers(search?: string): Promise<number> {
+    const trimmedSearch = search?.trim() || '';
+    return await this.prisma.product.count({
+      where: {
+        ...(trimmedSearch
+          ? {
+              productName: {
+                contains: trimmedSearch,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
+        productSpecialOffer: {
+          isOutDated: true,
         },
       },
     });

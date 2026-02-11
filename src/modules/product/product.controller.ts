@@ -59,7 +59,11 @@ export class ProductController {
         result.pagination.total,
         result.pagination.page,
         result.pagination.limit,
-        'Special offers retrieved successfully'
+        'Special offers retrieved successfully',
+        {
+          inProgress: result.inProgress,
+          isOutDated: result.isOutDated,
+        },
       );
       responseModel.setData(data);
     } catch (error) {
