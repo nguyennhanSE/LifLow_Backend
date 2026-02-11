@@ -12,7 +12,7 @@ export class UserEmailService {
     try {
       this.logger.log(`Sending welcome email to ${user.email}`, { userId: user.id, name: user.name });
 
-      const subject = 'Welcome to Liflow - Your Account Has Been Created';
+      const subject = '라이플로우 서비스 가입 안내';
       const html = this.getWelcomeEmailTemplate(user, plainPassword);
       const text = this.getWelcomeEmailText(user, plainPassword);
 
@@ -40,7 +40,7 @@ export class UserEmailService {
     try {
       this.logger.log(`Sending user updated email to ${user.email}`, { userId: user.id, changes });
 
-      const subject = 'Your Account Has Been Updated - Liflow';
+      const subject = '계정 정보 변경 안내 – 라이플로우';
       const html = this.getUserUpdatedEmailTemplate(user, changes);
       const text = this.getUserUpdatedEmailText(user, changes);
 
@@ -68,7 +68,7 @@ export class UserEmailService {
     try {
       this.logger.log(`Sending password changed email to ${user.email}`, { userId: user.id });
 
-      const subject = 'Your Password Has Been Changed - Liflow';
+      const subject = '비밀번호 변경 안내 – 라이플로우';
       const html = this.getPasswordChangedEmailTemplate(user);
       const text = this.getPasswordChangedEmailText(user);
 
@@ -125,9 +125,9 @@ export class UserEmailService {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Welcome to Liflow</title>
+        <title>라이플로우 서비스 가입 안내</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
           .content { padding: 20px; background-color: #f9f9f9; }
@@ -139,33 +139,32 @@ export class UserEmailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>Welcome to Liflow!</h1>
+            <h1>라이플로우 서비스 가입 안내</h1>
           </div>
           <div class="content">
-            <h2>Hello ${user.name}!</h2>
-            <p>Your account has been successfully created by an administrator. Below are your login credentials:</p>
+            <p>안녕하세요 ${user.name} 님, 회원님의 Liflow 계정이 생성되었습니다.</p>
+            <p>아래의 계정 정보를 확인하신 후 로그인해 주시기 바랍니다.</p>
             
             <div class="credentials">
-              <h3>Account Information</h3>
-              <p><strong>Email:</strong> ${user.email}</p>
-              <p><strong>Password:</strong> ${plainPassword}</p>
+              <h3>계정 정보</h3>
+              <p><strong>이메일:</strong> ${user.email}</p>
+              <p><strong>비밀번호:</strong> ${plainPassword}</p>
             </div>
 
             <div class="warning">
-              <strong>Important Security Notice:</strong>
+              <strong>보안 안내</strong>
               <ul>
-                <li>Please change your password after your first login</li>
-                <li>Keep your credentials secure and do not share them</li>
-                <li>If you did not request this account, please contact support immediately</li>
+                <li>최초 로그인 후 반드시 비밀번호를 변경해 주시기 바랍니다.</li>
+                <li>계정 정보는 타인에게 공유하지 마시고 안전하게 관리해 주십시오.</li>
+                <li>본 계정 생성에 대해 인지하지 못하신 경우, 즉시 고객 지원팀으로 문의해 주시기 바랍니다.</li>
               </ul>
             </div>
 
-            <p>You can now log in to the system using the credentials above.</p>
-            <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+            <p>위 계정 정보를 통해 라이플로우 서비스 이용이 가능합니다.</p>
+            <p>서비스 이용 중 문의사항이 있으신 경우, 주왕산가든 채널톡 CS문의하기로 연락해 주시기 바랍니다.</p>
           </div>
           <div class="footer">
-            <p>This is an automated message from Liflow System</p>
-            <p>Please do not reply to this email</p>
+            <p>본 메일은 라이플로우 시스템에서 자동 발송된 메일로, 회신이 불가합니다.</p>
           </div>
         </div>
       </body>
@@ -175,27 +174,24 @@ export class UserEmailService {
 
   private getWelcomeEmailText(user: SendEmailDto, plainPassword: string): string {
     return `
-Welcome to Liflow!
+라이플로우 서비스 가입 안내
 
-Hello ${user.name}!
+안녕하세요 ${user.name} 님, 회원님의 Liflow 계정이 생성되었습니다.
+아래의 계정 정보를 확인하신 후 로그인해 주시기 바랍니다.
 
-Your account has been successfully created by an administrator. Below are your login credentials:
+계정 정보
+이메일: ${user.email}
+비밀번호: ${plainPassword}
 
-Account Information:
-Email: ${user.email}
-Password: ${plainPassword}
+보안 안내
+- 최초 로그인 후 반드시 비밀번호를 변경해 주시기 바랍니다.
+- 계정 정보는 타인에게 공유하지 마시고 안전하게 관리해 주십시오.
+- 본 계정 생성에 대해 인지하지 못하신 경우, 즉시 고객 지원팀으로 문의해 주시기 바랍니다.
 
-Important Security Notice:
-- Please change your password after your first login
-- Keep your credentials secure and do not share them
-- If you did not request this account, please contact support immediately
+위 계정 정보를 통해 라이플로우 서비스 이용이 가능합니다.
+서비스 이용 중 문의사항이 있으신 경우, 주왕산가든 채널톡 CS문의하기로 연락해 주시기 바랍니다.
 
-You can now log in to the system using the credentials above.
-
-If you have any questions or need assistance, please don't hesitate to contact our support team.
-
-This is an automated message from Liflow System
-Please do not reply to this email
+본 메일은 라이플로우 시스템에서 자동 발송된 메일로, 회신이 불가합니다.
     `;
   }
 
@@ -205,9 +201,9 @@ Please do not reply to this email
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Account Updated</title>
+        <title>계정 정보 변경 안내 – 라이플로우</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background-color: #2196F3; color: white; padding: 20px; text-align: center; }
           .content { padding: 20px; background-color: #f9f9f9; }
@@ -218,24 +214,23 @@ Please do not reply to this email
       <body>
         <div class="container">
           <div class="header">
-            <h1>Account Updated</h1>
+            <h1>계정 정보 변경 안내</h1>
           </div>
           <div class="content">
-            <h2>Hello ${user.name}!</h2>
-            <p>Your account information has been updated by an administrator. The following changes were made:</p>
+            <p>안녕하세요 ${user.name} 님, 회원님의 라이플로우 계정 정보가 변경되었습니다.</p>
+            <p>변경된 내용은 아래와 같습니다.</p>
             
             <div class="changes">
-              <h3>Changes Made:</h3>
               <ul>
                 ${changes.map(change => `<li>${change}</li>`).join('')}
               </ul>
             </div>
 
-            <p>If you did not request these changes or if you have any concerns, please contact our support team immediately.</p>
-            <p>Best regards,<br>Liflow Team</p>
+            <p>해당 변경 사항을 요청한 적이 없거나 이상이 있다고 판단되시는 경우, 즉시 주왕산가든 채널톡 CS문의하기로 문의해 주시기 바랍니다.</p>
+            <p>감사합니다.</p>
           </div>
           <div class="footer">
-            <p>This is an automated message from Liflow System</p>
+            <p>본 메일은 라이플로우 시스템에서 자동으로 발송된 메일입니다.</p>
           </div>
         </div>
       </body>
@@ -245,20 +240,18 @@ Please do not reply to this email
 
   private getUserUpdatedEmailText(user: SendEmailDto, changes: string[]): string {
     return `
-Account Updated - Liflow
+계정 정보 변경 안내 – 라이플로우
 
-Hello ${user.name}!
+안녕하세요 ${user.name} 님, 회원님의 라이플로우 계정 정보가 변경되었습니다.
 
-Your account information has been updated by an administrator. The following changes were made:
-
+변경된 내용은 아래와 같습니다.
 ${changes.map(change => `• ${change}`).join('\n')}
 
-If you did not request these changes or if you have any concerns, please contact our support team immediately.
+해당 변경 사항을 요청한 적이 없거나 이상이 있다고 판단되시는 경우, 즉시 주왕산가든 채널톡 CS문의하기로 문의해 주시기 바랍니다.
 
-Best regards,
-Liflow Team
+감사합니다.
 
-This is an automated message from Liflow System
+본 메일은 라이플로우 시스템에서 자동으로 발송된 메일입니다.
     `;
   }
 
@@ -268,40 +261,45 @@ This is an automated message from Liflow System
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Password Changed</title>
+        <title>비밀번호 변경 안내 – 라이플로우</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background-color: #FF9800; color: white; padding: 20px; text-align: center; }
           .content { padding: 20px; background-color: #f9f9f9; }
           .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+          .password { background-color: #fff; padding: 15px; border-left: 4px solid #FF9800; margin: 20px 0; }
           .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; margin: 15px 0; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Password Changed</h1>
+            <h1>비밀번호 변경 안내</h1>
           </div>
           <div class="content">
-            <h2>Hello ${user.name}!</h2>
-            <p>Your password has been changed by an administrator.</p>
-            <p><strong>Your new password:</strong> <code style="background: #eee; padding: 6px 10px; border-radius: 4px; font-size: 14px;">${user.password}</code></p>
-            <p>Please use this password to sign in and consider changing it after your next login.</p>
+            <p>안녕하세요 ${user.name} 님, 회원님의 라이플로우 계정 비밀번호가 변경되었습니다.</p>
+
+            <div class="password">
+              <h3>새 비밀번호</h3>
+              <p><code style="background: #eee; padding: 6px 10px; border-radius: 4px; font-size: 14px;">${user.password}</code></p>
+            </div>
+
+            <p>위 비밀번호로 로그인하신 후, 보안을 위해 반드시 비밀번호를 다시 변경해 주시기 바랍니다.</p>
             
             <div class="warning">
-              <strong>Security Notice:</strong>
+              <strong>보안 안내</strong>
               <ul>
-                <li>If you did not request this change, please contact support immediately</li>
-                <li>For security reasons, we recommend that you change your password again after your next login</li>
-                <li>Keep your account credentials secure</li>
+                <li>본 비밀번호 변경을 요청한 적이 없으신 경우, 즉시 주왕산가든 채널톡 CS문의하기로 문의해 주시기 바랍니다.</li>
+                <li>계정 보안을 위해 다음 로그인 후 비밀번호를 재설정하시기를 권장드립니다.</li>
+                <li>계정 정보는 타인에게 공유하지 마시고 안전하게 관리해 주십시오.</li>
               </ul>
             </div>
 
-            <p>Best regards,<br>Liflow Team</p>
+            <p>감사합니다.</p>
           </div>
           <div class="footer">
-            <p>This is an automated message from Liflow System</p>
+            <p>본 메일은 라이플로우 시스템에서 자동으로 발송된 메일입니다.</p>
           </div>
         </div>
       </body>
@@ -311,25 +309,23 @@ This is an automated message from Liflow System
 
   private getPasswordChangedEmailText(user: SendEmailDto): string {
     return `
-Password Changed - Liflow
+비밀번호 변경 안내 – 라이플로우
 
-Hello ${user.name}!
+안녕하세요 ${user.name} 님, 회원님의 라이플로우 계정 비밀번호가 변경되었습니다.
 
-Your password has been changed by an administrator.
+새 비밀번호
+${user.password}
 
-Your new password: ${user.password}
+위 비밀번호로 로그인하신 후, 보안을 위해 반드시 비밀번호를 다시 변경해 주시기 바랍니다.
 
-Please use this password to sign in and consider changing it after your next login.
+보안 안내
+- 본 비밀번호 변경을 요청한 적이 없으신 경우, 즉시 주왕산가든 채널톡 CS문의하기로 문의해 주시기 바랍니다.
+- 계정 보안을 위해 다음 로그인 후 비밀번호를 재설정하시기를 권장드립니다.
+- 계정 정보는 타인에게 공유하지 마시고 안전하게 관리해 주십시오.
 
-Security Notice:
-- If you did not request this change, please contact support immediately
-- For security reasons, we recommend that you change your password again after your next login
-- Keep your account credentials secure
+감사합니다.
 
-Best regards,
-Liflow Team
-
-This is an automated message from Liflow System
+본 메일은 라이플로우 시스템에서 자동으로 발송된 메일입니다.
     `;
   }
 
