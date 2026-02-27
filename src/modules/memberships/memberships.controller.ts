@@ -10,6 +10,7 @@ import {
   Put,
 } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
+import { MembershipQueueService } from './queue/membership-queue.service';
 import {
   CreateMembershipDto,
   UpdateMembershipDto,
@@ -34,7 +35,10 @@ import { ERoleName } from '../roles/enums/role.enum';
 @ApiBearerAuth()
 @Controller('memberships')
 export class MembershipsController {
-  constructor(private readonly membershipsService: MembershipsService) {}
+  constructor(
+    private readonly membershipsService: MembershipsService,
+    private readonly membershipQueueService: MembershipQueueService,
+  ) {}
 
   // ============= MEMBERSHIP CRUD =============
 
@@ -255,14 +259,12 @@ export class MembershipsController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Recalculation completed',
+    description: 'Recalculation job enqueued',
     schema: {
       example: {
         data: {
-          totalUsersProcessed: 150,
-          totalUpdated: 45,
-          totalCreated: 12,
-          errors: 0,
+          jobId: '42',
+          message: 'Membership recalculation job has been queued and will run in the background.',
         },
       },
     },
@@ -270,8 +272,11 @@ export class MembershipsController {
   async recalculateAllMemberships() {
     const responseModel = new ResponseModel();
     try {
-      const result = await this.membershipsService.recalculateAllMemberships();
-      responseModel.setData(result);
+      const job = await this.membershipQueueService.enqueueRecalculateAllMemberships();
+      responseModel.setData({
+        jobId: job.id,
+        message: 'Membership recalculation job has been queued and will run in the background.',
+      });
     } catch (error) {
       throw error;
     }

@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../../prisma/prisma.service';
 
 interface MembershipTier {
@@ -7,6 +6,7 @@ interface MembershipTier {
   name: string | null;
   description: string | null;
   minPrice: number | null;
+  basePeriod: number | null;
 }
 
 @Injectable()
@@ -16,24 +16,12 @@ export class MembershipRecalculationService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Scheduled cron job that runs daily at 2 AM to recalculate user memberships
-   * DISABLED: Uncomment @Cron decorator to enable
-   */
-  @Cron(CronExpression.EVERY_DAY_AT_2AM, {
-    name: 'membership-recalculation',
-    timeZone: 'Asia/Seoul',
-  }) // every day at 2 AM
-  async handleScheduledMembershipRecalculation() {
-    this.logger.log('Starting scheduled membership recalculation...');
-    await this.recalculateAllUserMemberships();
-    this.logger.log('Completed scheduled membership recalculation');
-  }
-
-  /**
-   * Main method to recalculate all user memberships based on their purchase history
+   * Main method to recalculate all user memberships based on their purchase history.
+   * Calculates totalPurchaseAmount per user using only payments with status SUCCESS
+   * within the last basePeriod months, then assigns the appropriate membership tier.
    * This should be called when:
    * 1. Admin updates membership minPrice
-   * 2. Scheduled cron job runs
+   * 2. Any external trigger requires recalculation
    */
   async recalculateAllUserMemberships(): Promise<{
     totalUsersProcessed: number;
@@ -58,18 +46,22 @@ export class MembershipRecalculationService {
         return { totalUsersProcessed: 0, totalUpdated: 0, totalCreated: 0, errors: 0 };
       }
 
-      this.logger.log(`Found ${membershipTiers.length} membership tiers`);
+      // Use the basePeriod from the lowest tier as the common window for all users.
+      // The lowest tier (last in descending sort) defines the minimum qualifying period.
+      const basePeriod = membershipTiers[membershipTiers.length - 1]?.basePeriod ?? 3;
 
-      // 2. Get all users with their total purchase amounts
-      const users = await this.getUsersWithPurchaseAmounts();
+      this.logger.log(`Found ${membershipTiers.length} membership tiers, basePeriod=${basePeriod} months`);
+
+      // 2. Calculate totalPurchaseAmount per user from SUCCESS payments within basePeriod months
+      const users = await this.getUsersWithPurchaseAmounts(basePeriod);
       
       this.logger.log(`Processing ${users.length} users`);
 
       // 3. Process each user
       for (const user of users) {
         try {
-          // Update user's totalPurchaseAmount field to match calculated amount
-          // await this.syncUserTotalPurchaseAmount(user.id, user.totalPurchaseAmount);
+          // Sync the period-based purchase amount back to the user record
+          await this.syncUserTotalPurchaseAmount(user.id, user.totalPurchaseAmount);
 
           const result = await this.recalculateUserMembership(
             user.id,
@@ -216,7 +208,7 @@ export class MembershipRecalculationService {
   }
 
   /**
-   * Sync the totalPurchaseAmount field in the User model with calculated order totals
+   * Sync the period-based totalPurchaseAmount back to the User record
    */
   private async syncUserTotalPurchaseAmount(
     userId: string,
@@ -238,6 +230,7 @@ export class MembershipRecalculationService {
         name: true,
         description: true,
         minPrice: true,
+        basePeriod: true,
       },
       orderBy: {
         minPrice: 'desc',
@@ -246,19 +239,25 @@ export class MembershipRecalculationService {
   }
 
   /**
-   * Get all users with their total purchase amounts from users table
+   * Get all users with their total purchase amounts calculated from SUCCESS payments
+   * within the last basePeriod months.
+   * Users who have no qualifying payments are still included with amount = 0.
    */
-  private async getUsersWithPurchaseAmounts(): Promise<
+  private async getUsersWithPurchaseAmounts(basePeriod: number): Promise<
     Array<{ id: string; totalPurchaseAmount: number }>
   > {
-    // Get total purchase amount directly from users table
     const result = await this.prisma.$queryRaw<
       Array<{ id: string; total_purchase_amount: string }>
     >`
-      SELECT 
+      SELECT
         u.id,
-        COALESCE(u.total_purchase_amount, 0) as total_purchase_amount
+        COALESCE(SUM(p.total_amount - p.canceled_amount), 0) AS total_purchase_amount
       FROM users u
+      LEFT JOIN payments p
+        ON p.user_id = u.id
+        AND p.status = 'SUCCESS'
+        AND p.approved_at >= NOW() - (${basePeriod}::int || ' months')::INTERVAL
+      GROUP BY u.id
     `;
 
     return result.map((row) => ({

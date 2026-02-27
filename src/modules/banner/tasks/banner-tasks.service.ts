@@ -28,7 +28,7 @@ export class BannerTasksService {
    * Auto-activate scheduled banners
    * Runs every hour by default
    */
-  @Cron(CronExpression.EVERY_HOUR, {
+  @Cron(CronExpression.EVERY_DAY_AT_1AM, {
     name: 'activate-scheduled-banners',
     timeZone: 'Asia/Seoul', // Adjust to your timezone
   })
