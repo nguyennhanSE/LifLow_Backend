@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "prisma/prisma.service";
-import { UserEntity } from "../entities/user.entity";
+import { UserEntity, UserInfoEntity } from "../entities/user.entity";
 import { CreateUserDto, UpdateShippingAddressDto, UserFilterDto } from "../dto/user.dto";
-import { toUserEntity, toPrismaUserCreateInput, toUserEntityWithRelations, toUserInfoResponse } from "../mapper/user.mapper";
+import { toUserEntity, toPrismaUserCreateInput, toUserEntityWithRelations, toUserInfoResponse, toUserInfoEntity } from "../mapper/user.mapper";
 import { IPaginate, PaginateOptions } from "../../../libs/models/paginate/pagimate.model";
 import { Prisma, User } from "@prisma/client";
 import { ERoleName } from "../../roles/enums/role.enum";
@@ -672,7 +672,7 @@ export class UserRepository {
     includeProductInquiries?: boolean;
     includeCouponHistories?: boolean;
     includeRecipes?: boolean;
-  }): Promise<UserEntity> {
+  }): Promise<UserInfoEntity> {
     try {
       const include: Prisma.UserInclude = {};
 
@@ -731,21 +731,24 @@ export class UserRepository {
         }
       }
 
+      include._count = {
+        select: {
+          orderGroups: true,
+          recipes: true,
+        },
+      };
+
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        include: Object.keys(include).length > 0 ? include : undefined,
+        include,
       });
 
       if (!user) {
         throw new NotFoundException(`User with id ${userId} not found`);
       }
 
-      // Normalize data: ensure included relations return null/[] if no data exists
-      // Prisma already returns null for one-to-one and [] for one-to-many when no data,
-      // but we ensure it's explicitly set for consistency
       const userWithRelations = user as any;
 
-      // Normalize one-to-one relations (should be null if no data)
       if (options.includeMembership) {
         if (!userWithRelations.userMembership) {
           userWithRelations.userMembership = null;
@@ -758,7 +761,6 @@ export class UserRepository {
         }
       }
 
-      // Normalize one-to-many relations (should be [] if no data)
       if (options.includePermissions) {
         userWithRelations.userRole = userWithRelations.userRole ?? [];
       }
@@ -795,7 +797,13 @@ export class UserRepository {
         userWithRelations.recipes = userWithRelations.recipes ?? [];
       }
 
-      return toUserInfoResponse(userWithRelations);
+      const cleaned = toUserInfoResponse(userWithRelations);
+      const infoEntity = toUserInfoEntity(cleaned as Record<string, any>);
+      infoEntity.numberOfOrdergroups = userWithRelations._count?.orderGroups ?? 0;
+      infoEntity.numberOfRecipes = userWithRelations._count?.recipes ?? 0;
+      delete (infoEntity as any)._count;
+
+      return infoEntity;
     } catch (error) {
       console.error('Prisma error in getUserInfo:', error);
       throw error;

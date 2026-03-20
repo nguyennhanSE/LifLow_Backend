@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
-import { UserEntity } from './entities/user.entity';
+import { UserEntity, UserInfoEntity } from './entities/user.entity';
 import { CreateUserDto, UpdateShippingAddressDto, UpdateUserDto, UserFilterDto } from './dto/user.dto';
 import { UserRepository } from './repositories/user.repository';
 import { IPaginate, PaginateOptions } from '../../libs/models/paginate/pagimate.model';
@@ -222,7 +222,7 @@ export class UserService {
     includeProductInquiries?: boolean;
     includeCouponHistories?: boolean;
     includeRecipes?: boolean;
-  }): Promise<UserEntity> {
+  }): Promise<UserInfoEntity> {
     try {
       return await this.userRepository.getUserInfo(userId, options);
     } catch (error) {

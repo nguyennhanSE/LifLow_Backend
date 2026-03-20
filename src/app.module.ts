@@ -34,6 +34,7 @@ import { PolicyModule } from './modules/policy/policy.module';
 import { AnnouncementsModule } from './modules/announcements/announcements.module';
 import { RecipeCommentModule } from './modules/recipe/recipe-comment/recipe-comment.module';
 import { ProductBadgesModule } from './modules/product-badges/product-badges.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { config } from './libs/config';
 import { CouponQueueProcessor } from './modules/coupons/queue/coupon-queue.processor';
 
@@ -93,6 +94,7 @@ import { CouponQueueProcessor } from './modules/coupons/queue/coupon-queue.proce
     PaymentModule,
     PolicyModule,
     ProductBadgesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

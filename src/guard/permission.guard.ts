@@ -30,9 +30,9 @@ export class PermissionsGuard implements CanActivate {
     ]);
 
     if (!requiredPermissions || requiredPermissions.length === 0) {
-      this.logger.debug(
-        `[${this.context}] No permissions required for this route`,
-      );
+      // this.logger.debug(
+      //   `[${this.context}] No permissions required for this route`,
+      // );
       return true;
     }
 
@@ -64,17 +64,17 @@ export class PermissionsGuard implements CanActivate {
       );
 
       if (!hasPermission) {
-        this.logger.warn(`[${this.context}] User does not have required permissions`, {
-          userId: user.sub,
-          requiredPermissions,
-        });
+        // this.logger.warn(`[${this.context}] User does not have required permissions`, {
+        //   userId: user.sub,
+        //   requiredPermissions,
+        // });
         throw new ForbiddenException('User does not have required permissions');
       }
 
-      this.logger.debug(`[${this.context}] User has required permissions`, {
-        userId: user.sub,
-        requiredPermissions,
-      });
+      // this.logger.debug(`[${this.context}] User has required permissions`, {
+      //   userId: user.sub,
+      //   requiredPermissions,
+      // });
 
       return true;
     } catch (error) {

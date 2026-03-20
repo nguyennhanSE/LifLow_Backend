@@ -66,6 +66,8 @@ model User {
   orderGroups OrderGroup[]
   productReviewLikes ProductReviewLikes[]
   recipeLikes RecipeLikes[]
+  fcmTokens FcmToken[]
+  notifications Notification[]
   @@map("users")
 }
 
@@ -977,4 +979,51 @@ model Announcement {
   @@index([status])
   @@index([type])
   @@map("announcements")
+}
+
+// FCM (Firebase Cloud Messaging) - Device tokens for push notifications
+model FcmToken {
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  token String @unique @map("token") // FCM registration token
+  deviceId String? @map("device_id") // Optional device identifier
+  platform String? @map("platform") // android | ios | web
+  isActive Boolean @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("fcm_tokens")
+}
+
+enum NotificationType {
+  ORDER_STATUS // 주문 상태 변경
+  DELIVERY // 배송 알림
+  COUPON // 쿠폰 발급/만료
+  PROMOTION // 프로모션/이벤트
+  RECIPE // 레시피 관련
+  GENERAL // 일반 공지
+}
+
+model Notification {
+  id String @id @default(uuid())
+  userId String @map("user_id")
+  title String @map("title")
+  body String @map("body")
+  type NotificationType @default(GENERAL) @map("type")
+  data Json? @map("data") // Custom payload: { orderGroupNumber?, productId?, deepLink?, etc. }
+  isRead Boolean @default(false) @map("is_read")
+  sentAt DateTime? @map("sent_at") // When FCM was actually sent
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
 }

@@ -35,6 +35,7 @@ import { JwtService } from '@nestjs/jwt';
 import { config } from '../../libs/config';
 import { CartItemService } from '../carts/services/cart-item.service';
 import { PaymentQueueService } from './queue/payment-queue.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface PaymentTokenPayload {
   orderGroupNumber: string;
@@ -59,6 +60,7 @@ export class PaymentService {
     private readonly jwtService: JwtService,
     private readonly cartItemService: CartItemService,
     private readonly paymentQueueService: PaymentQueueService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -212,7 +214,7 @@ export class PaymentService {
       }
 
       // 8. Generate unique order group number
-      const orderGroupNumber = await this.ordersService.generateOrderGroupNumber();
+      const orderGroupNumber = await this.ordersService.generateOrderGroupNumberForTesting ();
 
       // 9. Fetch cart, shipping address, membership for order creation
       const cart = await this.prisma.cart.findUnique({
@@ -1167,6 +1169,19 @@ export class PaymentService {
         // Do not throw: payment is already committed; membership can be recalculated manually if needed
       }
 
+      // 2.15. Gửi push notification: thanh toán thành công (tiếng Hàn)
+      this.notificationsService
+        .sendToUser(
+          userId,
+          '결제가 완료되었습니다',
+          `주문번호 ${validatedDto.orderGroupNumber} 결제가 성공적으로 완료되었습니다. 감사합니다!`,
+          'ORDER_STATUS',
+          { orderGroupNumber: validatedDto.orderGroupNumber },
+        )
+        .catch((err) => {
+          this.logger.warn('Failed to send payment success notification:', err?.message ?? err);
+        });
+
       this.logger.log(`Payment confirmation completed successfully: ${payment.id}`);
 
       return this.mapToResponseDto(payment);
@@ -1226,6 +1241,19 @@ export class PaymentService {
       } catch (saveError) {
         this.logger.error('Failed to save failed payment record', saveError);
       }
+
+      // Gửi push notification: thanh toán thất bại (tiếng Hàn)
+      this.notificationsService
+        .sendToUser(
+          userId,
+          '결제 실패',
+          `주문번호 ${validatedDto.orderGroupNumber} 결제에 실패했습니다. 다시 시도해 주세요.`,
+          'ORDER_STATUS',
+          { orderGroupNumber: validatedDto.orderGroupNumber },
+        )
+        .catch((err) => {
+          this.logger.warn('Failed to send payment failure notification:', err?.message ?? err);
+        });
 
       throw error;
     }
@@ -1563,6 +1591,21 @@ export class PaymentService {
 
       this.logger.log(`Payment canceled successfully: ${payment.id}`);
 
+      // Push: 결제 취소 완료
+      if (payment.userId) {
+        this.notificationsService
+          .sendToUser(
+            payment.userId,
+            '결제 취소 완료',
+            `주문번호 ${payment.orderGroupNumber} 결제가 취소되었습니다.`,
+            'ORDER_STATUS',
+            { orderGroupNumber: payment.orderGroupNumber, paymentId: payment.id },
+          )
+          .catch((err) => {
+            this.logger.warn('Failed to send payment cancel notification:', err?.message ?? err);
+          });
+      }
+
       return this.mapToResponseDto(updatedPayment);
     } catch (error) {
       this.logger.error('Failed to cancel payment', error);
@@ -1820,6 +1863,21 @@ export class PaymentService {
       );
 
       this.logger.log(`Payment returned successfully: ${payment.id}, refunded ${refundAmount} KRW (deliveryFee ${deliveryFee} KRW kept)`);
+
+      // Push: 환불 처리 완료
+      if (payment.userId) {
+        this.notificationsService
+          .sendToUser(
+            payment.userId,
+            '환불 완료',
+            `주문번호 ${payment.orderGroupNumber} 환불이 처리되었습니다. (${refundAmount.toLocaleString('ko-KR')}원)`,
+            'ORDER_STATUS',
+            { orderGroupNumber: payment.orderGroupNumber, paymentId: payment.id },
+          )
+          .catch((err) => {
+            this.logger.warn('Failed to send payment return/refund notification:', err?.message ?? err);
+          });
+      }
 
       return this.mapToResponseDto(updatedPayment);
     } catch (error) {

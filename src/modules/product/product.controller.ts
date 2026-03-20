@@ -1,7 +1,12 @@
-import { Controller, Get, Post, Patch, Delete, Query, Param, Body, UseInterceptors, UploadedFiles, Res, Put, UploadedFile } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiConsumes, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Delete, Query, Param, Body, UseInterceptors, UploadedFiles, Res, Put, UploadedFile, Logger, Req } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiConsumes, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+
+/** JWT user on @Public() routes when Bearer token is valid (AuthGuard) */
+interface AuthenticatedRequest extends Request {
+  user?: { sub: string; email?: string; roles?: string[] };
+}
 import { ProductService } from './product.service';
 import { ProductListQueryDto, CreateProductDto, UpdateProductDto, BulkDeleteProductDto, UpdateProductStatusDto, ProductBulkUpdateStatusDto,CreateProductSpecialOfferDto } from './dto/product.dto';
 import { paginationResponse } from '../../utils/responseFormatter';
@@ -10,12 +15,18 @@ import { Public } from '../../libs/decorator/public.decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { uploadProductImages } from '../../middlewares/uploadMiddleware';
 import { ResponseModel } from '../../libs/models/response/response.model';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @ApiTags('Product Management')
 @Controller('products')
 @ApiBearerAuth()
 export class ProductController {
-  constructor(private readonly productService: ProductService) {}
+  private readonly logger = new Logger(ProductController.name);
+
+  constructor(
+    private readonly productService: ProductService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   @Get('/list')
   @Public()
@@ -76,14 +87,50 @@ export class ProductController {
   @Get(':id')
   @Public()
   @ApiOperation({ summary: 'Get product by ID' })
+  @ApiQuery({
+    name: 'notifyTest',
+    required: false,
+    description:
+      'FCM test only: use notifyTest=1 or true. Requires Authorization: Bearer; userId = JWT sub. No push if omitted.',
+  })
   @ApiResponse({ status: 200, description: 'Product retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Product not found' })
-  async getProductById(@Param('id') id: string) {
+  async getProductById(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
     const responseModel = new ResponseModel();
 
     try {
       const product = await this.productService.getProductById(id);
       responseModel.setData(product);
+
+      if (req.user?.sub) {
+        const name = product.productName ?? id;
+        this.logger.log(
+          `[getProductById] FCM test → userId=${req.user?.sub}, productId=${id}`,
+        );
+        void this.notificationsService
+          .sendToUser(
+            req.user?.sub,
+            '상품 조회 테스트',
+            `상품 "${name}" 조회 알림 (FCM 테스트)`,
+            'GENERAL',
+            { productId: id },
+          )
+          .then((result) => {
+            this.logger.log(`[getProductById] FCM test done: ${JSON.stringify(result)}`);
+          })
+          .catch((err: unknown) => {
+            this.logger.warn(
+              `[getProductById] FCM test failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
+      } else if (!req.user?.sub) {
+        this.logger.debug(
+          `[getProductById] no JWT — add Authorization: Bearer`,
+        );
+      }
     } catch (error) {
       throw error;
     }

@@ -8,11 +8,8 @@ export class ProductDiscountCronjobService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Scheduled cron job that runs every hour to check and update product discount status
-   */
-  // @Cron(CronExpression.EVERY_DAY_AT_2AM)
-  @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
+  /** Chạy mỗi ngày lúc 1:00 (server local time) — cập nhật discount, special offer, salePrice. */
+  @Cron(CronExpression.EVERY_DAY_AT_1AM)
   async handleScheduledProductDiscountStatusUpdate() {
     this.logger.log('Starting scheduled product discount and special offer status update...');
     await this.updateAllProductDiscountStatuses();
@@ -467,13 +464,6 @@ export class ProductDiscountCronjobService {
                 });
               }
 
-              if (isSpecialOfferExpired && product.productSpecialOffer) {
-                await tx.productSpecialOffer.update({
-                  where: { id: product.productSpecialOffer.id },
-                  data: { isOutDated: true },
-                });
-              }
-
               if (isProductDiscountExpired && product.productDiscount) {
                 await tx.productDiscount.delete({
                   where: { id: product.productDiscount.id },
@@ -487,7 +477,7 @@ export class ProductDiscountCronjobService {
 
             if (isSpecialOfferExpired && product.productSpecialOffer) {
               this.logger.debug(
-                `Deleted expired specialOffer ${product.productSpecialOffer.id} for product ${product.id} (endDate ${product.productSpecialOffer.endDate?.toISOString()})`,
+                `Special offer past endDate for product ${product.id} (offer ${product.productSpecialOffer.id}, endDate ${product.productSpecialOffer.endDate?.toISOString()})`,
               );
             }
             if (isProductDiscountExpired && product.productDiscount) {

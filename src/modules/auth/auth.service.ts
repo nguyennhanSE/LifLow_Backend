@@ -102,6 +102,7 @@ export class AuthService {
             }
 
             this.logger.debug(`[${this.context}] login done`, { account });
+
             return { 
                 user: { 
                     email: user.email, 

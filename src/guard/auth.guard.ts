@@ -49,10 +49,10 @@ export class AuthGuard implements CanActivate {
               tokenType: payload.tokenType,
               roles: payload.roles,
             };
-            this.logger.debug(
-              `[${this.context}] Public route with valid token, user attached`,
-              { sub: payload.sub },
-            );
+            // this.logger.debug(
+            //   `[${this.context}] Public route with valid token, user attached`,
+            //   { sub: payload.sub },
+            // );
           }
         } catch {
           // Token invalid on public route - just ignore
@@ -61,9 +61,9 @@ export class AuthGuard implements CanActivate {
           );
         }
       } else {
-        this.logger.debug(
-          `[${this.context}] Public route without token, continuing`,
-        );
+        // this.logger.debug(
+        //   `[${this.context}] Public route without token, continuing`,
+        // );
       }
       return true;
     }
@@ -94,14 +94,14 @@ export class AuthGuard implements CanActivate {
         roles: payload.roles,
       };
 
-      this.logger.debug(
-        `[${this.context}] User authenticated successfully`,
-        {
-          sub: payload.sub,
-          email: payload.email,
-          roles: payload.roles,
-        },
-      );
+      // this.logger.debug(
+      //   `[${this.context}] User authenticated successfully`,
+      //   {
+      //     sub: payload.sub,
+      //     email: payload.email,
+      //     roles: payload.roles,
+      //   },
+      // );
 
       return true;
     } catch (error) {

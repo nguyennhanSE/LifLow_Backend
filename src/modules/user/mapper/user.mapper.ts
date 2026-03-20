@@ -1,4 +1,4 @@
-import { UserEntity, RoleInfo, PermissionInfo, MembershipInfo } from '../entities/user.entity';
+import { UserEntity, UserInfoEntity, RoleInfo, PermissionInfo, MembershipInfo } from '../entities/user.entity';
 import { User, UserRole, Role,  Membership, UserMembership } from '@prisma/client';
 import { CreateUserDto } from '../dto/user.dto';
 import { EPermissions } from '../../permissions/enum/permissions.enum';
@@ -260,5 +260,17 @@ export function stripNullsAndTimestamps<T>(obj: T): T {
  */
 export function toUserInfoResponse<T>(userWithRelations: T): T {
   return stripNullsAndTimestamps(userWithRelations);
+}
+
+/**
+ * Maps a raw Prisma user (with optional orderGroups/recipes relations) to UserInfoEntity,
+ * counting the number of orderGroups and recipes belonging to the user.
+ */
+export function toUserInfoEntity(userRaw: Record<string, any>): UserInfoEntity {
+  const entity = new UserInfoEntity();
+  Object.assign(entity, userRaw);
+  entity.numberOfOrdergroups = Array.isArray(userRaw.orderGroups) ? userRaw.orderGroups.length : 0;
+  entity.numberOfRecipes = Array.isArray(userRaw.recipes) ? userRaw.recipes.length : 0;
+  return entity;
 }
 

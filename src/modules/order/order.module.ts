@@ -11,9 +11,10 @@ import { LoggerModule } from 'src/libs/logger/logger.module';
 import { PointModule } from '../point/point.module';
 import { PointService } from '../point/point.service';
 import { MembershipsModule } from '../memberships/memberships.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [LoggerModule, MembershipsModule, PointModule],
+  imports: [LoggerModule, MembershipsModule, PointModule, NotificationsModule],
   controllers: [OrdersController],
   providers: [
     OrdersService,

@@ -45,3 +45,8 @@ export class MembershipInfo {
   description?: string | null;
 }
 
+export class UserInfoEntity extends UserEntity {
+  numberOfRecipes!: number;
+  numberOfOrdergroups!: number;
+}
+

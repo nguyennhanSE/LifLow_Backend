@@ -1,10 +1,12 @@
 import * as dotenv from 'dotenv';
 
+// Load .env first so NODE_ENV is available when choosing env file
+dotenv.config();
+
 export const NODE_ENV = process.env.NODE_ENV || 'development';
 const envFile = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 // Load env-specific file with override: true so .env.dev/.env.prod wins over .env
 dotenv.config({ path: envFile, override: true });
-dotenv.config(); // fallback: load .env for any vars not in envFile
 
 export const config = {
   // App Configuration
@@ -71,7 +73,12 @@ export const config = {
 
   // Redis (BullMQ)
   REDIS_HOST: process.env.REDIS_HOST ?? 'localhost',
-  REDIS_PORT: parseInt(process.env.REDIS_PORT ?? '6379', 10)
+  REDIS_PORT: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+
+  // Firebase (FCM)
+  FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ?? '',
+  FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL ?? '',
+  FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY ?? '',
 };
 
 // TOSS Payments Helper Functions

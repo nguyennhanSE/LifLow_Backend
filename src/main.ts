@@ -12,7 +12,7 @@ import { TransformInterceptor } from './libs/interceptor/response.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  console.log('NODE_ENVVVVVVVVVVVVVVV', NODE_ENV);
   let swaggerConfig;
 
   if (NODE_ENV === 'development') {

@@ -10,9 +10,10 @@ import { OrdersService } from '../order/order.service';
 import { PointModule } from '../point/point.module';
 import { CartsModule } from '../carts/carts.module';
 import { PaymentQueueModule } from './queue/payment-queue.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, OrderModule, PointModule, CartsModule, PaymentQueueModule],
+  imports: [ConfigModule, PrismaModule, OrderModule, PointModule, CartsModule, PaymentQueueModule, NotificationsModule],
   controllers: [PaymentController],
   providers: [PaymentService, PaymentRepository, TossPaymentApiService],
   exports: [PaymentService, PaymentRepository, TossPaymentApiService],

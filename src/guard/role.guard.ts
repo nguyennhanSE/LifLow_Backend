@@ -27,9 +27,9 @@ export class RolesGuard implements CanActivate {
     ]);
 
     if (isPublic) {
-      this.logger.debug(
-        `[${this.context}] Route is public, skipping role check`,
-      );
+      // this.logger.debug(
+      //   `[${this.context}] Route is public, skipping role check`,
+      // );
       return true;
     }
 

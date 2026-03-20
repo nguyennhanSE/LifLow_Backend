@@ -6,9 +6,10 @@ import { ProductRepository } from './repositories/product.repository';
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { ProductDiscountModule } from '../product-discount/product-discount.module';
 import { AwsModule } from 'src/libs/integration/aws/aws.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, ProductDiscountModule, AwsModule, ScheduleModule.forRoot()],
+  imports: [PrismaModule, ProductDiscountModule, AwsModule, ScheduleModule.forRoot(), NotificationsModule],
   controllers: [ProductController],
   providers: [
     ProductService,
