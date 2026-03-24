@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
@@ -19,13 +20,17 @@ import { toRecipeEntityWithAuthor } from './mapper/recipe.mapper';
 import { AwsService } from 'src/libs/integration/aws/aws.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ERecipeCategory } from './enums/recipe.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class RecipeService {
+  private readonly logger = new Logger(RecipeService.name);
+
   constructor(
     private readonly recipeRepository: RecipeRepository,
     private readonly awsService: AwsService,
     private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -653,7 +658,21 @@ export class RecipeService {
         return updatedRecipe;
       });
 
-      return toRecipeEntityWithAuthor(result);
+      const entity = toRecipeEntityWithAuthor(result);
+      if (result.authorId) {
+        void this.notificationsService
+          .sendToUser(
+            result.authorId,
+            '레시피가 승인되었습니다',
+            `"${result.title}" 레시피가 승인되었습니다.`,
+            'RECIPE',
+            { recipeId: result.id, status: 'approved' },
+          )
+          .catch((err) => {
+            this.logger.warn('Failed to send recipe approval notification:', err?.message ?? err);
+          });
+      }
+      return entity;
     } catch (error: any) {
       this.handleError(error, `Failed to approve recipe ${id}`);
     }
@@ -683,7 +702,21 @@ export class RecipeService {
         status: 'rejected',
       });
 
-      return toRecipeEntityWithAuthor(updatedRecipe);
+      const entity = toRecipeEntityWithAuthor(updatedRecipe);
+      if (updatedRecipe.authorId) {
+        void this.notificationsService
+          .sendToUser(
+            updatedRecipe.authorId,
+            '레시피가 반려되었습니다',
+            `"${updatedRecipe.title}" 레시피가 반려되었습니다.`,
+            'RECIPE',
+            { recipeId: updatedRecipe.id, status: 'rejected' },
+          )
+          .catch((err) => {
+            this.logger.warn('Failed to send recipe rejection notification:', err?.message ?? err);
+          });
+      }
+      return entity;
     } catch (error: any) {
       this.handleError(error, `Failed to reject recipe ${id}`);
     }

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { CouponHistoryRepository } from './repositories/coupon-history.repository';
 import { CouponsService } from '../coupons/coupons.service';
 import { IssueCouponDto } from './dto/issue-coupon.dto';
@@ -18,13 +18,17 @@ import { CouponHistoryStatus } from '@prisma/client';
 import { CouponEntity } from '../coupons/entities/coupon.entity';
 import { CouponInfo } from './entities/coupon-history.entity';
 import { EMembershipLevel } from '../memberships/enums/membership.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CouponHistoryService {
+  private readonly logger = new Logger(CouponHistoryService.name);
+
   constructor(
     private readonly couponHistoryRepository: CouponHistoryRepository,
     @Inject(forwardRef(() => CouponsService))
     private readonly couponsService: CouponsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -665,8 +669,28 @@ export class CouponHistoryService {
       ...specialBenefit.histories,
     ];
 
+    if (totalCount > 0) {
+      void this.notificationsService
+        .sendToUser(
+          userId,
+          '쿠폰이 발급되었습니다',
+          `결제 완료 후 쿠폰 ${totalCount}장이 지급되었습니다. (무료배송 ${freeShipping.count}, 쇼핑지원 ${shoppingSupport.count}, 특별혜택 ${specialBenefit.count})`,
+          'COUPON',
+          {
+            paymentId: paymentId ?? undefined,
+            totalCount,
+            freeShippingCount: freeShipping.count,
+            shoppingSupportCount: shoppingSupport.count,
+            specialBenefitCount: specialBenefit.count,
+          },
+        )
+        .catch((err) => {
+          this.logger.warn('Failed to send coupon issuance notification:', err?.message ?? err);
+        });
+    }
+
     return {
-      message: `After payment: issued ${totalCount} coupon(s) (free shipping: ${freeShipping.count}, shopping support: ${shoppingSupport.count})`,
+      message: `After payment: issued ${totalCount} coupon(s) (free shipping: ${freeShipping.count}, shopping support: ${shoppingSupport.count}, special benefit: ${specialBenefit.count})`,
       totalCount,
       freeShipping,
       shoppingSupport,

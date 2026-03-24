@@ -252,7 +252,7 @@ export class ProductReviewsService {
               : false;
             dto.likes = reviewEntity.likes ?? 0;
             dto.likedByMe = reviewEntity.likedByMe ?? false;
-            dto.review = ProductReviewMapper.toResponseDto(reviewEntity);
+            dto.review = ProductReviewMapper.toResponseDtoForMergedList(reviewEntity);
           } else {
             const r = item.data;
             const recipeDto = new RecipeSummaryDto();
@@ -269,13 +269,11 @@ export class ProductReviewsService {
                 ? [r.thumbnailUrl]
                 : [];
             recipeDto.status = r.status;
-            recipeDto.likes = r.likes ?? 0;
-            recipeDto.likedByMe = userId
+
+            dto.likes = r.likes ?? 0;
+            dto.likedByMe = userId
               ? await this.recipeRepository.hasUserLikedRecipe(r.id, userId)
               : false;
-
-            dto.likes = recipeDto.likes;
-            dto.likedByMe = recipeDto.likedByMe;
             dto.recipe = recipeDto;
           }
           return dto;

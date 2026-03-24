@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { Prisma, Order, OrderSituation, OrderGroup } from '@prisma/client';
 import {
   CreateOrderDto,
@@ -34,18 +39,22 @@ import { OrderEntity, OrderGroupEntity } from './entities/order.entity';
 import { PointService } from '../point/point.service';
 import { PrismaService } from 'prisma/prisma.service';
 import { MembershipsService } from '../memberships/memberships.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 
 type SalesByDayPoint = { date: string; totalPaymentAmount: number };
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly orderRepository: OrderRepository,
     private readonly orderGroupRepository: OrderGroupRepository,
     private readonly pointService: PointService,
     private readonly prisma: PrismaService,
     private readonly membershipService: MembershipsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private formatLocalYyyyMmDd(d: Date): string {
@@ -66,6 +75,26 @@ export class OrdersService {
       }
     }
     return null;
+  }
+
+  private orderSituationNotificationKo(
+    orderGroupNumber: string,
+    situation: EOrderSituation,
+  ): { title: string; body: string } {
+    const labels: Record<EOrderSituation, string> = {
+      [EOrderSituation.ORDER_PAYMENT_FAILED]: '결제 실패',
+      [EOrderSituation.ORDER_PAYMENT_PENDING]: '결제 대기',
+      [EOrderSituation.ORDER_PAYMENT_COMPLETED]: '결제 완료',
+      [EOrderSituation.ORDER_BEING_SHIPPED]: '배송 중',
+      [EOrderSituation.ORDER_SHIPPED]: '배송 완료',
+      [EOrderSituation.ORDER_CANCELLED]: '주문 취소',
+      [EOrderSituation.ORDER_RETURNED]: '반품 완료',
+    };
+    const label = labels[situation] ?? situation;
+    return {
+      title: '주문 상태가 변경되었습니다',
+      body: `주문번호 ${orderGroupNumber} 상태가 "${label}"(으)로 변경되었습니다.`,
+    };
   }
 
   /**
@@ -1253,11 +1282,32 @@ export class OrdersService {
         }
       }
 
+      const prevSituation = existing.situation as EOrderSituation;
+      const nextSituation = (updateData.situation ?? existing.situation) as EOrderSituation;
+      const situationChanged = nextSituation !== prevSituation;
+
       const updated = await this.orderGroupRepository.update(
         orderGroupNumber,
         updateData,
         true,
       );
+
+      if (
+        situationChanged &&
+        updated.ordererId &&
+        (nextSituation === EOrderSituation.ORDER_BEING_SHIPPED ||
+          nextSituation === EOrderSituation.ORDER_SHIPPED)
+      ) {
+        const { title, body } = this.orderSituationNotificationKo(orderGroupNumber, nextSituation);
+        void this.notificationsService
+          .sendToUser(updated.ordererId, title, body, 'ORDER_STATUS', {
+            orderGroupNumber,
+            situation: nextSituation,
+          })
+          .catch((err) => {
+            this.logger.warn('Failed to send order situation notification:', err?.message ?? err);
+          });
+      }
 
       return updated;
     } catch (error) {

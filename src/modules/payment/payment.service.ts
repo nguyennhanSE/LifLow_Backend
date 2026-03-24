@@ -1591,15 +1591,19 @@ export class PaymentService {
 
       this.logger.log(`Payment canceled successfully: ${payment.id}`);
 
-      // Push: 결제 취소 완료
+      // Push: 결제 취소 완료 (ORDER_STATUS + orderGroupNumber)
       if (payment.userId) {
-        this.notificationsService
+        void this.notificationsService
           .sendToUser(
             payment.userId,
             '결제 취소 완료',
             `주문번호 ${payment.orderGroupNumber} 결제가 취소되었습니다.`,
             'ORDER_STATUS',
-            { orderGroupNumber: payment.orderGroupNumber, paymentId: payment.id },
+            {
+              orderGroupNumber: payment.orderGroupNumber,
+              paymentId: payment.id,
+              situation: EOrderSituation.ORDER_CANCELLED,
+            },
           )
           .catch((err) => {
             this.logger.warn('Failed to send payment cancel notification:', err?.message ?? err);
@@ -1864,15 +1868,19 @@ export class PaymentService {
 
       this.logger.log(`Payment returned successfully: ${payment.id}, refunded ${refundAmount} KRW (deliveryFee ${deliveryFee} KRW kept)`);
 
-      // Push: 환불 처리 완료
+      // Push: 환불 처리 완료 (ORDER_STATUS + orderGroupNumber)
       if (payment.userId) {
-        this.notificationsService
+        void this.notificationsService
           .sendToUser(
             payment.userId,
             '환불 완료',
             `주문번호 ${payment.orderGroupNumber} 환불이 처리되었습니다. (${refundAmount.toLocaleString('ko-KR')}원)`,
             'ORDER_STATUS',
-            { orderGroupNumber: payment.orderGroupNumber, paymentId: payment.id },
+            {
+              orderGroupNumber: payment.orderGroupNumber,
+              paymentId: payment.id,
+              situation: EOrderSituation.ORDER_RETURNED,
+            },
           )
           .catch((err) => {
             this.logger.warn('Failed to send payment return/refund notification:', err?.message ?? err);

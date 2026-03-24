@@ -11,6 +11,7 @@ import { PrismaModule } from '../../../prisma/prisma.module';
 import { CouponsModule } from '../coupons/coupons.module';
 import { MembershipLevelNotifyListener } from './listeners/membershipLevel-notify.listener';
 import { LoggerModule } from 'src/libs/logger/logger.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Global()
 @Module({
@@ -19,6 +20,7 @@ import { LoggerModule } from 'src/libs/logger/logger.module';
     LoggerModule,
     ScheduleModule.forRoot(),
     forwardRef(() => CouponsModule),
+    NotificationsModule,
   ],
   controllers: [CouponHistoryController],
   providers: [

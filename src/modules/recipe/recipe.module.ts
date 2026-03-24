@@ -7,9 +7,10 @@ import { UserModule } from '../user/user.module';
 import { LoggerModule } from 'src/libs/logger/logger.module';
 import { AwsModule } from 'src/libs/integration/aws/aws.module';
 import { RecipeUserInterceptor } from './interceptors/recipe.interceptor';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, UserModule, LoggerModule, AwsModule],
+  imports: [PrismaModule, UserModule, LoggerModule, AwsModule, NotificationsModule],
   controllers: [RecipeController],
   providers: [RecipeService, RecipeRepository, RecipeUserInterceptor],
   exports: [RecipeService, RecipeRepository],

@@ -64,6 +64,18 @@ export class NotificationsController {
     responseModel.setData(result);
     return responseModel;
   }
+  
+  @Get()
+  @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER)
+  @ApiOperation({ summary: 'List notifications for current user' })
+  @ApiResponse({ status: 200, description: 'Notifications list' })
+  async list(@Req() req: AuthenticatedRequest, @Query() query: QueryNotificationsDto) {
+    const responseModel = new ResponseModel();
+    const result = await this.notificationsService.list(req.user.sub, query);
+    responseModel.setData(result);
+    return responseModel;
+  }
+
 
   @Post('send')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.CS_MANAGER)
@@ -74,17 +86,6 @@ export class NotificationsController {
   async sendNotification(@Body() dto: SendNotificationDto) {
     const responseModel = new ResponseModel();
     const result = await this.notificationsService.sendNotification(dto);
-    responseModel.setData(result);
-    return responseModel;
-  }
-
-  @Get()
-  @Roles(ERoleName.USER, ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER)
-  @ApiOperation({ summary: 'List notifications for current user' })
-  @ApiResponse({ status: 200, description: 'Notifications list' })
-  async list(@Req() req: AuthenticatedRequest, @Query() query: QueryNotificationsDto) {
-    const responseModel = new ResponseModel();
-    const result = await this.notificationsService.list(req.user.sub, query);
     responseModel.setData(result);
     return responseModel;
   }

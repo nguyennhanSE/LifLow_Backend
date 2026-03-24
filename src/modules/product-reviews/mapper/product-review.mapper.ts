@@ -5,6 +5,7 @@ import {
   ReviewUserInfoDto,
   ReviewProductInfoDto,
 } from '../dto/product-review-response.dto';
+import { ProductReviewNestedInMergedListDto } from '../dto/product-reviews-by-product-response.dto';
 import { createPaginatedResponse, PaginatedResponseDto } from '../../../libs/models/response/paginated-response.dto';
 
 /**
@@ -210,6 +211,18 @@ export class ProductReviewMapper {
     }
     
     return dto;
+  }
+
+  /**
+   * Same as {@link toResponseDto} but omits likes / likedByMe (used when parent item exposes them).
+   */
+  static toResponseDtoForMergedList(entity: ProductReviewEntity): ProductReviewNestedInMergedListDto {
+    const full = this.toResponseDto(entity);
+    const nested = new ProductReviewNestedInMergedListDto();
+    Object.assign(nested, full);
+    delete (nested as Partial<ProductReviewResponseDto>).likes;
+    delete (nested as Partial<ProductReviewResponseDto>).likedByMe;
+    return nested;
   }
 
   /**

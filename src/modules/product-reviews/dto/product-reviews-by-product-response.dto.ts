@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { ProductReviewResponseDto } from './product-review-response.dto';
 import { ERecipeCategory } from '../../recipe/enums/recipe.enum';
 import { PaginationMeta } from '../../../libs/models/response/paginated-response.dto';
@@ -37,13 +37,15 @@ export class RecipeSummaryDto {
 
   @ApiProperty({ description: 'Recipe status', example: 'approved' })
   status!: string;
-
-  @ApiProperty({ description: 'Like count', example: 10 })
-  likes!: number;
-
-  @ApiProperty({ description: 'Whether the current user has liked this recipe', example: false })
-  likedByMe!: boolean;
 }
+
+/**
+ * Review payload in merged list — likes / likedByMe appear only on {@link ProductReviewOrRecipeItemDto}.
+ */
+export class ProductReviewNestedInMergedListDto extends OmitType(ProductReviewResponseDto, [
+  'likes',
+  'likedByMe',
+] as const) {}
 
 /**
  * Single item in the merged list: either a review or a recipe (sorted by createdAt)
@@ -63,9 +65,9 @@ export class ProductReviewOrRecipeItemDto {
 
   @ApiPropertyOptional({
     description: 'Present when type is "review"',
-    type: ProductReviewResponseDto,
+    type: ProductReviewNestedInMergedListDto,
   })
-  review?: ProductReviewResponseDto;
+  review?: ProductReviewNestedInMergedListDto;
 
   @ApiPropertyOptional({
     description: 'Present when type is "recipe"',
