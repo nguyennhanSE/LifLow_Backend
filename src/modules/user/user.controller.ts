@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException, NotFoundException, BadRequestException, UploadedFiles, UseInterceptors, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseUUIDPipe, Req, ForbiddenException, NotFoundException, BadRequestException, UploadedFiles, UploadedFile, UseInterceptors, Put } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, GetAdminListQueryDto, GetUserInfoDto, GetUsersQueryDto, UpdateUserDto, UpdateUserProfileDto, CreateShippingAddressDto, UpdateShippingAddressDto, FindUserIdDto, FindPasswordDto, UpdatePasswordWithOldDto } from './dto/user.dto';
 import { Roles } from '../../libs/decorator/roles.decorator';
@@ -17,7 +17,7 @@ import { QueryUserMembershipsDto } from '../memberships/dto/membership.dto';
 import { OrderRepository } from '../order/repositories/order.repository';
 import { Public } from 'src/libs/decorator/public.decorator';
 import { AwsService } from '../../libs/integration/aws/aws.service';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('User Management')
 @ApiBearerAuth()
@@ -138,6 +138,81 @@ export class UserController {
       const result = toResponse(user);
       responseModel.setData(result);
     } catch (error) {
+      throw error;
+    }
+
+    return responseModel;
+  }
+
+  /** Static /me routes must be declared before any `:userId/...` or `:id` routes or Express may return 404. */
+  @Patch('me/avatar')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @UseInterceptors(FileInterceptor('avatarImage'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Update current user avatar (upload to S3)' })
+  @ApiBody({
+    description: 'Multipart form with avatar image',
+    schema: {
+      type: 'object',
+      properties: {
+        avatarImage: {
+          type: 'string',
+          format: 'binary',
+          description: 'Avatar image (jpg/jpeg/png/webp)',
+        },
+      },
+      required: ['avatarImage'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Avatar updated successfully' })
+  @ApiResponse({ status: 400, description: 'Missing or invalid file' })
+  async updateMyAvatar(
+    @Req() req: Request & { user?: TokenPayload },
+    @UploadedFile() avatarImage: Express.Multer.File,
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+      if (!requestingUserId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+      if (!avatarImage?.buffer) {
+        throw new BadRequestException('Avatar image is required');
+      }
+      const avatarURL = await this.awsService.uploadFile('users', requestingUserId, avatarImage);
+      if (!avatarURL) {
+        throw new BadRequestException('Failed to upload avatar');
+      }
+      const updatedUser = await this.userService.updateAvatarUrl(requestingUserId, avatarURL);
+      responseModel.setData(toResponse(updatedUser));
+    } catch (error) {
+      console.error('Error in updateMyAvatar:', error);
+      throw error;
+    }
+    return responseModel;
+  }
+
+  @Patch('me')
+  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
+  @ApiOperation({ summary: 'Update user profile (basic info)' })
+  @ApiResponse({ status: 200, description: 'User profile updated successfully' })
+  async updateUserProfile(
+    @Req() req: Request & { user?: TokenPayload },
+    @Body() updateProfileDto: UpdateUserProfileDto,
+  ) {
+    const responseModel = new ResponseModel();
+    try {
+      const requestingUserId = req.user?.sub;
+
+      if (!requestingUserId) {
+        throw new ForbiddenException('User not authenticated');
+      }
+
+      const updatedUser = await this.userService.updateUserProfile(requestingUserId, updateProfileDto);
+      const result = toResponse(updatedUser);
+      responseModel.setData(result);
+    } catch (error) {
+      console.error('Error in updateUserProfile:', error);
       throw error;
     }
 
@@ -605,33 +680,6 @@ export class UserController {
     return responseModel;
   }
 
-  @Patch('/me')
-  @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER, ERoleName.MD, ERoleName.CS_MANAGER, ERoleName.USER)
-  @ApiOperation({ summary: 'Update user profile (basic info)' })
-  @ApiResponse({ status: 200, description: 'User profile updated successfully' })
-  async updateUserProfile(
-    @Req() req: Request & { user?: TokenPayload },
-    @Body() updateProfileDto: UpdateUserProfileDto,
-  ) {
-    const responseModel = new ResponseModel();
-    try {
-      const requestingUserId = req.user?.sub;
-      
-      if (!requestingUserId) {
-        throw new ForbiddenException('User not authenticated');
-      }
-
-      const updatedUser = await this.userService.updateUserProfile(requestingUserId, updateProfileDto);
-      const result = toResponse(updatedUser);
-      responseModel.setData(result);
-    } catch (error) {
-      console.error('Error in updateUserProfile:', error);
-      throw error;
-    }
-
-    return responseModel;
-  }
-  
   @Patch(':id')
   @Roles(ERoleName.ADMIN, ERoleName.GENERAL_MANAGER, ERoleName.MANAGER)
   @ApiOperation({ summary: 'Update user information' })

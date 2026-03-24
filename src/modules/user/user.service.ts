@@ -298,6 +298,17 @@ export class UserService {
   }
 
   /**
+   * Update user avatar URL (caller uploads to S3 and passes the public URL)
+   */
+  async updateAvatarUrl(userId: string, avatarURL: string): Promise<UserEntity> {
+    await this.findOne(userId);
+    if (!avatarURL?.trim()) {
+      throw new BadRequestException('Avatar URL is required');
+    }
+    return await this.userRepository.updateUser(userId, { avatarURL: avatarURL.trim() });
+  }
+
+  /**
    * Get user shipping addresses (array of addresses)
    */
   async getUserShippingAddresses(userId: string): Promise<any[]> {

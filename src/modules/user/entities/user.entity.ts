@@ -25,6 +25,7 @@ export class UserEntity {
   orderNumber?: number; // Order number from order table
   nickName?: string | null; // @map("nick_name")
   statusMessage?: string | null; // @map("status_message")
+  avatarURL?: string | null; // @map("avatar_url")
 }
 
 export class RoleInfo {

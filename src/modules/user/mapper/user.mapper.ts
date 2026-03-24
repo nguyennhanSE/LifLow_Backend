@@ -63,6 +63,7 @@ export function toUserEntity(user: User): UserEntity {
     totalPurchaseAmount: user.totalPurchaseAmount,
     nickName: user.nickName ?? undefined,
     statusMessage: user.statusMessage ?? undefined,
+    avatarURL: user.avatarURL ?? undefined,
   };
 }
 
@@ -173,6 +174,7 @@ export function toUserEntityWithRelations(user: UserWithRelations): UserEntity {
     totalPurchaseAmount: user.totalPurchaseAmount ?? 0,
     nickName: user.nickName ?? undefined,
     statusMessage: user.statusMessage ?? undefined,
+    avatarURL: user.avatarURL ?? undefined,
   };
 }
 
