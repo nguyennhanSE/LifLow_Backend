@@ -1,5 +1,5 @@
 import { createHash } from "crypto"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 import { HASH_SALT_LENGTH } from "src/common/constants/index"
 
 export const hashPassword = async (password: string): Promise<string> => {

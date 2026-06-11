@@ -79,6 +79,26 @@ export const config = {
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ?? '',
   FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL ?? '',
   FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY ?? '',
+
+  // Node Exporter Configuration
+  NODE_EXPORTER_HOST: process.env.NODE_EXPORTER_HOST ?? 'localhost',
+  NODE_EXPORTER_PORT: process.env.NODE_EXPORTER_PORT ?? 9100,
+
+  // #Prometheus
+  PROMETHEUS_HOST: process.env.PROMETHEUS_HOST ?? 'localhost',
+  PROMETHEUS_PORT: process.env.PROMETHEUS_PORT ?? 9090,
+  PROMETHEUS_BASE_URL: process.env.PROMETHEUS_BASE_URL ?? 'http://prometheus:9090',
+  PROMETHEUS_SCRAPE_INTERVAL: process.env.PROMETHEUS_SCRAPE_INTERVAL ?? '15s',
+  PROMETHEUS_SCRAPE_TIMEOUT: process.env.PROMETHEUS_SCRAPE_TIMEOUT ?? '10s',
+  PROMETHEUS_SCRAPE_TARGETS: process.env.PROMETHEUS_SCRAPE_TARGETS ?? 'node-exporter:9100',
+
+  // @Grafana
+  GRAFANA_HOST: process.env.GRAFANA_HOST ?? 'localhost',
+  GRAFANA_PORT: process.env.GRAFANA_PORT ?? 3000,
+  GF_SECURITY_ADMIN_USER: process.env.GF_SECURITY_ADMIN_USER ?? 'admin',
+  GF_SECURITY_ADMIN_PASSWORD: process.env.GF_SECURITY_ADMIN_PASSWORD ?? 'admin',
+  GRAFANA_BASE_URL: process.env.GRAFANA_BASE_URL ?? 'http://grafana:3000',  
+  GRAFANA_DATASOURCE : process.env.GRAFANA_DATASOURCE ?? 'http://prometheus:9090',
 };
 
 // TOSS Payments Helper Functions

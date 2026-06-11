@@ -1,0 +1,9 @@
+# Production override: pull image from GHCR instead of building locally.
+# Usage on server:
+#   export IMAGE=ghcr.io/<owner>/<repo>:latest
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  app:
+    image: ${IMAGE:-ghcr.io/owner/liflow_be:latest}
+    pull_policy: always

@@ -3,7 +3,7 @@ import { catchError } from 'rxjs';
 import { PrismaClient, CouponType, OrderSituation } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';

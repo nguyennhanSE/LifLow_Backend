@@ -5,7 +5,7 @@ import { UserRepository } from './repositories/user.repository';
 import { IPaginate, PaginateOptions } from '../../libs/models/paginate/pagimate.model';
 import { ERoleName } from '../roles/enums/role.enum';
 import { EMembershipLevel, EMembershipStatus } from '../memberships/enums/membership.enum';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { UserEmailService } from '../email/email.service';
 import { SendEmailDto } from '../email/dto/email.dto';
 import { CouponHistoryService } from '../coupon-history/coupon-history.service';
@@ -469,6 +469,10 @@ export class UserService {
       const user = await this.userRepository.getUserByAccount(userId);
       if (!user) {
         throw new NotFoundException(`User with id ${userId} not found`);
+      }
+
+      if (!user.password) {
+        throw new InternalServerErrorException('User password is missing');
       }
 
       // Verify old password

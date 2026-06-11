@@ -1,36 +1,47 @@
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: liflow-backend-image
-    pull_policy: never
-    env_file:
-      - .env.prod
-    environment:
-      # Override DATABASE_HOST to use Docker service name instead of localhost
-      - DATABASE_HOST=postgres
-      # DATABASE_URL will be constructed by wait-for-postgres.sh script
-      # Override REDIS_HOST to use Docker service name
-      - REDIS_HOST=redis
-    ports:
-      - "3500:3500"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    restart: unless-stopped
-    networks:
-      - liflow-network
-    # volumes:
-    #   - .:/usr/src/app
-    #   - /usr/src/app/node_modules
-    # command: npm run start:dev
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   image: liflow-backend-image
+  #   pull_policy: never
+  #   env_file:
+  #     - .env.prod
+  #   environment:
+  #     # Use the postgres service on liflow-network
+  #     - DATABASE_HOST=postgres
+  #     - DATABASE_URL=postgresql://postgres:123456@postgres:5432/postgres?schema=public
+  #     # Override REDIS_HOST to use Docker service name
+  #     - REDIS_HOST=redis
+  #   ports:
+  #     - "3500:3500"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_started
+  #   # healthcheck:
+  #   #   test:
+  #   #     [
+  #   #       'CMD-SHELL',
+  #   #       'node -e "require(''http'').get(''http://localhost:3500/api/v1/health/ready'', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on(''error'', () => process.exit(1))"',
+  #   #     ]
+  #   #   interval: 30s
+  #   #   timeout: 10s
+  #   #   retries: 3
+  #   #   start_period: 90s
+  #   restart: unless-stopped
+  #   networks:
+  #     - liflow-network
+  #   # volumes:
+  #   #   - .:/usr/src/app
+  #   #   - /usr/src/app/node_modules
+  #   # command: npm run start:dev
 
   postgres:
     image: postgres
+    container_name: postgres
     env_file:
       - .env.prod 
     environment:
@@ -46,7 +57,7 @@ services:
     volumes:
       - postgres:/data/postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     networks:
       - liflow-network
     healthcheck:
@@ -56,6 +67,7 @@ services:
       retries: 5
   redis: 
     image: redis:7-alpine
+    container_name: redis
     ports:
       - "6379:6379"
     restart: unless-stopped
@@ -70,8 +82,50 @@ services:
     #   memlock: -1
     # environment:
     #   - REDIS_REPLICATION_MODE=master
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    networks:
+      - liflow-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - liflow-network
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    restart: unless-stopped
+    networks:
+      - liflow-network
+
+  redisinsight:
+    image: redislabs/redisinsight:latest
+    container_name: redisinsight
+    ports:
+      - "5540:5540" 
+    restart: unless-stopped
+    networks:
+      - liflow-network
+      
   backup:
     image: prodrigestivill/postgres-backup-local
+    container_name: backup
     env_file:
       - .env.prod
     restart: unless-stopped

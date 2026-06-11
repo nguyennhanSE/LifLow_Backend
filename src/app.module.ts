@@ -35,8 +35,12 @@ import { AnnouncementsModule } from './modules/announcements/announcements.modul
 import { RecipeCommentModule } from './modules/recipe/recipe-comment/recipe-comment.module';
 import { ProductBadgesModule } from './modules/product-badges/product-badges.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { HealthModule } from './modules/health/health.module';
+import { PrometheusModule } from './modules/ec2/prometheus/prometheus.module';
 import { config } from './libs/config';
 import { CouponQueueProcessor } from './modules/coupons/queue/coupon-queue.processor';
+import { NodeExporterModule } from './modules/ec2/node-exporter/node-exporter.module';
+import { GrafanaModule } from './modules/ec2/grafana/grafana.module';
 
 @Module({
   imports: [
@@ -95,6 +99,10 @@ import { CouponQueueProcessor } from './modules/coupons/queue/coupon-queue.proce
     PolicyModule,
     ProductBadgesModule,
     NotificationsModule,
+    HealthModule,
+    NodeExporterModule,
+    PrometheusModule,
+    GrafanaModule,
   ],
   controllers: [AppController],
   providers: [
