@@ -435,4 +435,8 @@ export class MembershipsService {
     
     return summary;
   }
+
+  async getMembershipTiers(): Promise<MembershipEntity[]> {
+    return this.membershipRepository.getAllMemberships();
+  }
 }

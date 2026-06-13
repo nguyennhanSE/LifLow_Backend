@@ -24,7 +24,7 @@ import { GRAFANA_QUEUE_NAME } from "./job/grafana.job.index";
             }),
         }),
     ],
-    providers: [GrafanaService, GrafanaCronJobService, GrafanaProcessor],
+    providers: [GrafanaService],
     exports: [GrafanaService],
 })
 export class GrafanaModule {}

@@ -55,7 +55,7 @@ services:
       POSTGRES_DB: ${DATABASE_NAME:-postgres}
       PGDATA: /data/postgres
     volumes:
-      - postgres:/data/postgres
+      - postgres:/var/lib/postgresql/data
     ports:
       - "5433:5432"
     networks:
@@ -91,7 +91,16 @@ services:
     restart: unless-stopped
     networks:
       - liflow-network
-
+    pid: host                          # Xem processes của host
+    volumes:
+      - /proc:/host/proc:ro            # CPU, RAM, processes
+      - /sys:/host/sys:ro              # Hardware info
+      - /:/rootfs:ro                   # Filesystem
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -99,6 +108,7 @@ services:
       - "9090:9090"
     restart: unless-stopped
     volumes:
+      - prometheus_data:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - liflow-network
@@ -110,6 +120,9 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
     restart: unless-stopped
     networks:
       - liflow-network
@@ -120,6 +133,8 @@ services:
     ports:
       - "5540:5540" 
     restart: unless-stopped
+    volumes:
+      - redisinsight_data:/data
     networks:
       - liflow-network
       
@@ -130,7 +145,7 @@ services:
       - .env.prod
     restart: unless-stopped
     volumes:
-      - ./backups:/backups
+      - backup_data:/backups
     environment:
       # Use Docker service name for postgres connection
       - POSTGRES_HOST=postgres
@@ -142,6 +157,42 @@ services:
       - EXTRA_OPTS=--schema=public
     networks:
       - liflow-network
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    networks:
+      - liflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    volumes:
+      - kibana_data:/usr/share/kibana/data
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - liflow-network
     
 networks:
   liflow-network:
@@ -149,7 +200,12 @@ networks:
 
 volumes:
   postgres:
-  pgadmin:
   redis_data:
+  prometheus_data:
+  grafana_data:
+  redisinsight_data:
+  backup_data:
+  elasticsearch_data:
+  kibana_data:
 
 

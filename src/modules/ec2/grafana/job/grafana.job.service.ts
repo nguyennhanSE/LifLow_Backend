@@ -15,23 +15,23 @@ export class GrafanaCronJobService implements OnApplicationBootstrap {
         @InjectQueue(GRAFANA_QUEUE_NAME) private readonly grafanaQueue: Queue
     ) {}
 
-    async onApplicationBootstrap() {
+    onApplicationBootstrap() {
         this.logger.log('=== GRAFANA BOOTSTRAP START ===');
-        try {
-            this.logger.log('Adding Grafana initialization job to queue...');
-            await this.grafanaQueue.add('setup-grafana', {}, {
-                priority: 1,
-                attempts: 3,
-                backoff: {
-                    type: 'exponential',
-                    delay: 2000,
-                },
-            });
-            this.logger.log('✓ Grafana job added to queue');
-            this.logger.log('=== GRAFANA BOOTSTRAP SUCCESS ===');
-        } catch (error) {
-            this.logger.error('=== GRAFANA BOOTSTRAP FAILED ===', error);
-        }
+        // try {
+        //     this.logger.log('Adding Grafana initialization job to queue...');
+        //     await this.grafanaQueue.add('setup-grafana', {}, {
+        //         priority: 1,
+        //         attempts: 3,
+        //         backoff: {
+        //             type: 'exponential',
+        //             delay: 2000,
+        //         },
+        //     });
+        //     this.logger.log('✓ Grafana job added to queue');
+        //     this.logger.log('=== GRAFANA BOOTSTRAP SUCCESS ===');
+        // } catch (error) {
+        //     this.logger.error('=== GRAFANA BOOTSTRAP FAILED ===', error);
+        // }
     }
 
     // Hàm này sẽ được gọi bởi Processor

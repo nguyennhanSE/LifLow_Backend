@@ -506,5 +506,14 @@ export class MembershipRepository {
     });
     return userMembership ? toUserMembershipEntity(userMembership) : null;
   }
+
+  async getAllMemberships(): Promise<MembershipEntity[]> {
+    const memberships = await this.prisma.membership.findMany({
+      orderBy: {
+        name: 'asc',
+      },
+    });
+    return memberships.map(toMembershipEntity);
+}
 }
 
