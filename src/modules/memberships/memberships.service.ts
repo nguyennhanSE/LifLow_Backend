@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger, OnModuleInit } from '@nestjs/common';
 import { MembershipRepository } from './repositories/membership.repository';
 import { MembershipRecalculationService } from './cronjob/membership-cronjob.service';
 import {
@@ -15,15 +15,32 @@ import { IPaginate } from '../../libs/models/paginate/pagimate.model';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 
+import { AppEventEmitterService } from 'src/libs/event-emitter/event-emitter.service';
+import { CacheService } from 'src/libs/cache/cache.service';
+
 @Injectable()
-export class MembershipsService {
+export class MembershipsService implements OnModuleInit {
   private readonly logger = new Logger(MembershipsService.name);
 
   constructor(
     private readonly membershipRepository: MembershipRepository,
     private readonly membershipRecalculationService: MembershipRecalculationService,
+    private readonly cacheService: CacheService,
+    private readonly appEventEmitter: AppEventEmitterService,
     private readonly prisma: PrismaService,
   ) {}
+
+  async onModuleInit() {
+    try {
+        // get all membership tiers and cache them on startup
+        const tiers = await this.getMembershipTiers();
+        // cache until app down
+        await this.cacheService.set('membership_tiers', tiers);
+        console.log('CacheService initialized: membership tiers cached');
+    }catch (err) {
+      console.error('CacheService initialization failed:', err);
+    }
+  }
 
   // ============= MEMBERSHIP CRUD =============
 
@@ -201,22 +218,37 @@ export class MembershipsService {
    * Looks up membership by name and upserts UserMembership for the user.
    */
   async syncUserMembershipByLevel(userId: string, membershipLevel: string): Promise<UserMembershipEntity> {
-    const membership = await this.membershipRepository.getMembershipByName(membershipLevel);
+    const membershipTiers : MembershipEntity[] | null = await this.cacheService.get('membership_tiers');
+    const membership = membershipTiers?.find((tier) => tier.name === membershipLevel);
     if (!membership) {
       throw new NotFoundException(`Membership with name "${membershipLevel}" not found`);
     }
+    // 1.Fetch user's existing membership and only upsert if it differs
+    const existing = await this.membershipRepository.getUserMembership(userId);
+    if (!existing) {
+      this.logger.log(`No existing membership for user ${userId}, creating new one with level "${membershipLevel}"`);
+      throw new NotFoundException(`No existing membership for user "${userId}", cannot sync by level "${membershipLevel}"`);
+    }
+    if (existing && existing.membershipId === membership.id) {
+      this.logger.log(`User ${userId} already has membership "${membershipLevel}", no update needed`);
+      return existing;
+    }
+    // 2. Upsert user membership with new level and default 1 year duration (or you can adjust as needed)
     const now = new Date();
     const oneYearFromNow = new Date(now);
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+    this.appEventEmitter.emit('userMembership.sync.1', { userId, membership : UserMembershipEntity });
     return this.membershipRepository.upsertUserMembership(userId, {
       membershipId: membership.id,
       membershipName: membership.name ?? membershipLevel,
       membershipDescription: membership.description ?? '',
-      startDate: now,
-      endDate: oneYearFromNow,
+      startDate: existing.startDate ? existing.startDate : now, // If existing start date is in future, keep it. Otherwise, use now.
+      endDate: existing.endDate > now ? existing.endDate : oneYearFromNow, // If existing end date is more than 1 year from now, keep it. Otherwise, set to 1 year from now.
       status: 'normal',
     });
   }
+  
 
   async updateUserMembership(
     userId: string,

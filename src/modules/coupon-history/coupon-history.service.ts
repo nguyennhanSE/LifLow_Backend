@@ -19,6 +19,9 @@ import { CouponEntity } from '../coupons/entities/coupon.entity';
 import { CouponInfo } from './entities/coupon-history.entity';
 import { EMembershipLevel } from '../memberships/enums/membership.enum';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AppEventEmitterService } from 'src/libs/event-emitter/event-emitter.service';
+import { OnEvent } from '@nestjs/event-emitter';
+import { MembershipEntity, UserMembershipEntity } from '../memberships/entities/membership.entity';
 
 @Injectable()
 export class CouponHistoryService {
@@ -459,13 +462,13 @@ export class CouponHistoryService {
    * Issue free shipping coupons to user based on membership level.
    * 새싹 (Lv.2): 1, 열매 (Lv.3): 2, 나무 (Lv.4): 3, 정원 (Lv.5): 5.
    */
-  async issueFreeShipping(userId: string, paymentId?: string): Promise<{
+  async issueFreeShipping(userId: string, paymentId?: string, membership?: UserMembershipEntity): Promise<{
     message: string;
     count: number;
     coupon: { id: string; name: string; code: string; type: string } | null;
     histories: any[];
   }> {
-    const membershipLevel = await this.couponHistoryRepository.getMembershipLevelByUserId(userId);
+    const membershipLevel = membership ? membership.membershipName : await this.couponHistoryRepository.getMembershipLevelByUserId(userId);
     const count = membershipLevel
       ? CouponHistoryService.FREE_SHIPPING_COUNT_BY_LEVEL[membershipLevel] ?? 0
       : 0;
@@ -517,13 +520,13 @@ export class CouponHistoryService {
    * 새싹 (Lv.2): 1x 10% max 10,000 KRW | 열매 (Lv.3): 2x 10% max 20,000 KRW
    * 나무 (Lv.4): 3x 15% max 30,000 KRW | 정원 (Lv.5): 3x 20% max 50,000 KRW
    */
-  async issueShoppingSupport(userId: string, paymentId?: string): Promise<{
+  async issueShoppingSupport(userId: string, paymentId?: string, membership?: UserMembershipEntity): Promise<{
     message: string;
     count: number;
     coupon: { id: string; name: string; code: string; type: string } | null;
     histories: any[];
   }> {
-    const membershipLevel = await this.couponHistoryRepository.getMembershipLevelByUserId(userId);
+    const membershipLevel = membership ? membership.membershipName : await this.couponHistoryRepository.getMembershipLevelByUserId(userId);
     if (!membershipLevel || !CouponHistoryService.SHOPPING_SUPPORT_CODES[membershipLevel]) {
       return {
         message: 'User has no eligible membership level for shopping support coupons (Lv.2~5 only)',
@@ -580,13 +583,13 @@ export class CouponHistoryService {
   /**
    * Issue SPECIAL_BENEFIT coupon to user if membership level is LV5.
    */
-  async issueSpecialBenefit(userId: string, paymentId?: string): Promise<{
+  async issueSpecialBenefit(userId: string, paymentId?: string, membership?: UserMembershipEntity): Promise<{
     message: string;
     count: number;
     coupon: { id: string; name: string; code: string; type: string } | null;
     histories: any[];
   }> {
-    const membershipLevel = await this.couponHistoryRepository.getMembershipLevelByUserId(userId);
+    const membershipLevel = membership ? membership.membershipName : await this.couponHistoryRepository.getMembershipLevelByUserId(userId);
     if (membershipLevel !== EMembershipLevel.LV5) {
       return {
         message: 'User is not LV5; SPECIAL_BENEFIT coupon is only for LV5 members',
@@ -648,7 +651,7 @@ export class CouponHistoryService {
    * Issue coupons to user after payment: birthday, free shipping, and shopping support.
    * Calls issueBirthdayCoupon, issueFreeShipping, and issueShoppingSupport in parallel.
    */
-  async issueAfterUpdate(userId: string, paymentId?: string): Promise<{
+  async issueAfterUpdate(userId: string, paymentId?: string, membership?: UserMembershipEntity): Promise<{
     message: string;
     totalCount: number;
     freeShipping: { message: string; count: number; coupon: { id: string; name: string; code: string; type: string } | null; histories: any[] };
@@ -657,9 +660,9 @@ export class CouponHistoryService {
   }> {
 
     const [freeShipping, shoppingSupport, specialBenefit] = await Promise.all([
-      this.issueFreeShipping(userId, paymentId),
-      this.issueShoppingSupport(userId, paymentId),
-      this.issueSpecialBenefit(userId, paymentId),
+      this.issueFreeShipping(userId, paymentId, membership),
+      this.issueShoppingSupport(userId, paymentId, membership),
+      this.issueSpecialBenefit(userId, paymentId, membership),
     ]);
 
     const totalCount = freeShipping.count + shoppingSupport.count + specialBenefit.count;
@@ -705,6 +708,24 @@ export class CouponHistoryService {
    */
   async deleteCouponHistoriesByPaymentId(paymentId: string): Promise<number> {
     return this.couponHistoryRepository.deleteByPaymentId(paymentId);
+  }
+
+  @OnEvent('userMembership.sync.1')
+  async handleUserMembershipSync1(payload: { userId: string; membership: UserMembershipEntity }): Promise<void> {
+    const { userId, membership } = payload;
+    
+    await this.issueAfterUpdate(userId, undefined, membership).catch((err) => {
+      this.logger.error(`Failed to issue coupons after user membership sync for user ${userId}:`, err?.message ?? err);
+    });
+  }
+
+  @OnEvent('userMembership.sync.2')
+  async handleUserMembershipSync2(payload: { userId: string; paymentId: string; membership: UserMembershipEntity }): Promise<void> {
+    const { userId, paymentId, membership } = payload;
+    
+    await this.issueAfterUpdate(userId, paymentId, membership).catch((err) => {
+      this.logger.error(`Failed to issue coupons after user membership sync for user ${userId}:`, err?.message ?? err);
+    });
   }
 }
 

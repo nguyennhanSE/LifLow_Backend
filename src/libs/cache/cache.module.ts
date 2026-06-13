@@ -1,15 +1,15 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-ioredis-yet';
 import { CacheService } from './cache.service';
 import {config} from 'libs/config';
-import { MembershipsModule } from '../memberships/memberships.module';
+
 
 @Module({
   imports: [
     NestCacheModule.registerAsync({
       isGlobal: true,
-      useFactory: async (config) => ({
+      useFactory: async () => ({
         store: await redisStore({
           socket: {
             host: config.REDIS_HOST,
@@ -19,7 +19,6 @@ import { MembershipsModule } from '../memberships/memberships.module';
         }),
       }),
     }),
-    MembershipsModule
   ],
   providers: [CacheService],
   exports: [CacheService],

@@ -9,7 +9,7 @@ import {
 } from './cronjob/coupon-history.cronjob.service';
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { CouponsModule } from '../coupons/coupons.module';
-import { MembershipLevelNotifyListener } from './listeners/membershipLevel-notify.listener';
+// import { MembershipLevelNotifyListener } from './listeners/membershipLevel-notify.listener';
 import { LoggerModule } from 'src/libs/logger/logger.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -28,7 +28,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     CouponHistoryRepository,
     CouponHistoryCronjobService,
     CouponHistoryExpireCronjobService,
-    MembershipLevelNotifyListener,
+    // MembershipLevelNotifyListener,
   ],
   exports: [CouponHistoryService, CouponHistoryRepository],
 })

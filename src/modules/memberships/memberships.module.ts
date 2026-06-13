@@ -8,12 +8,17 @@ import { PrismaModule } from '../../../prisma/prisma.module';
 import { GuardModule } from '../../guard/guard.module';
 import { LoggerModule } from '../../libs/logger/logger.module';
 
+import { AppEventEmitterModule } from 'src/libs/event-emitter/event-emitter.module';
+import { CacheModule } from 'src/libs/cache/cache.module';
+
 @Module({
   imports: [
     PrismaModule,
     GuardModule,
     LoggerModule,
     MembershipQueueModule,
+    CacheModule,
+    AppEventEmitterModule,
   ],
   controllers: [MembershipsController],
   providers: [

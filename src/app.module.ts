@@ -42,6 +42,10 @@ import { CouponQueueProcessor } from './modules/coupons/queue/coupon-queue.proce
 import { NodeExporterModule } from './modules/ec2/node-exporter/node-exporter.module';
 import { GrafanaModule } from './modules/ec2/grafana/grafana.module';
 
+import { AppEventEmitterModule } from './libs/event-emitter/event-emitter.module';
+import { CacheModule } from './libs/cache/cache.module';
+
+
 @Module({
   imports: [
     ScheduleModule.forRoot(), // Enable scheduled tasks (cron jobs)
@@ -72,6 +76,8 @@ import { GrafanaModule } from './modules/ec2/grafana/grafana.module';
         },
       }),
     }),
+    CacheModule,
+    AppEventEmitterModule,
     LoggerModule,
     AuthModule,
     UserModule,

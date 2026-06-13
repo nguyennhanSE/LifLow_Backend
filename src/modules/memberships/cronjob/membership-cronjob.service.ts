@@ -76,10 +76,12 @@ export class MembershipRecalculationService {
           }
 
           totalUsersProcessed++;
-        } catch (error) {
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          const stack = error instanceof Error ? error.stack : undefined;
           this.logger.error(
-            `Error processing user ${user.id}: ${error.message}`,
-            error.stack
+            `Error processing user ${user.id}: ${message}`,
+            stack
           );
           errors++;
         }
@@ -93,8 +95,8 @@ export class MembershipRecalculationService {
       );
 
       return { totalUsersProcessed, totalUpdated, totalCreated, errors };
-    } catch (error) {
-      this.logger.error('Failed to recalculate memberships', error.stack);
+    } catch (error : unknown) {
+      this.logger.error('Failed to recalculate memberships', error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }

@@ -1185,7 +1185,7 @@ export class PaymentService {
       this.logger.log(`Payment confirmation completed successfully: ${payment.id}`);
 
       return this.mapToResponseDto(payment);
-    } catch (error) {
+    } catch (error : any) {
       this.logger.error('Failed to confirm payment', error);
 
       if (!directPay) {

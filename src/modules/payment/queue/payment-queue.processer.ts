@@ -2,13 +2,13 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { AppLogger } from 'src/libs/logger/logger.service';
 import { MembershipRecalculationService } from '../../memberships/cronjob/membership-cronjob.service';
-import { CouponHistoryService } from '../../coupon-history/coupon-history.service';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
   PAYMENT_MEMBERSHIP_RECALCULATION_JOB,
   PAYMENT_QUEUE_NAME,
 } from './payment-queue.constants';
 import { RecalculateMembershipAndIssueCouponsJobData } from './payment-queue.service';
+import { CouponHistoryService } from 'src/modules/coupon-history/coupon-history.service';
 
 @Processor(PAYMENT_QUEUE_NAME)
 export class PaymentQueueProcessor extends WorkerHost {
@@ -81,12 +81,6 @@ export class PaymentQueueProcessor extends WorkerHost {
 
           // Step 4: Check if membership level changed
           const membershipChanged = membershipLevelBeforePayment !== membershipLevelAfterPayment;
-
-          this.logger.log(
-            `User ${userId} membership level: before=${membershipLevelBeforePayment || 'none'}, ` +
-              `after=${membershipLevelAfterPayment || 'none'}, ` +
-              `changed=${membershipChanged}`,
-          );
 
           // Step 5: If membership level changed (upgraded), issue coupons
           let couponResult: {
