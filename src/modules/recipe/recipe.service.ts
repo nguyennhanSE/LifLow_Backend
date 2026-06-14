@@ -21,6 +21,7 @@ import { AwsService } from 'src/libs/integration/aws/aws.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ERecipeCategory } from './enums/recipe.enum';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SseService } from 'src/libs/sse/sse.service';
 
 @Injectable()
 export class RecipeService {
@@ -31,6 +32,7 @@ export class RecipeService {
     private readonly awsService: AwsService,
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly sseService: SseService,
   ) {}
 
   /**
@@ -672,6 +674,15 @@ export class RecipeService {
             this.logger.warn('Failed to send recipe approval notification:', err?.message ?? err);
           });
       }
+
+      // Send real-time update to clients subscribed to this author's recipes
+      if (result.authorId) {
+        this.sseService.emit(result.authorId, {
+          type: 'RECIPE_APPROVED',
+          title: 'Recipe Approved',
+          message: `Your recipe "${result.title}" was approved.`, recipeId: result.id });
+      }
+
       return entity;
     } catch (error: any) {
       this.handleError(error, `Failed to approve recipe ${id}`);

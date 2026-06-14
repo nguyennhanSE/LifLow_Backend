@@ -8,9 +8,10 @@ import { LoggerModule } from 'src/libs/logger/logger.module';
 import { AwsModule } from 'src/libs/integration/aws/aws.module';
 import { RecipeUserInterceptor } from './interceptors/recipe.interceptor';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SseModule } from 'src/libs/sse/sse.module';
 
 @Module({
-  imports: [PrismaModule, UserModule, LoggerModule, AwsModule, NotificationsModule],
+  imports: [PrismaModule, UserModule, LoggerModule, AwsModule, NotificationsModule, SseModule],
   controllers: [RecipeController],
   providers: [RecipeService, RecipeRepository, RecipeUserInterceptor],
   exports: [RecipeService, RecipeRepository],

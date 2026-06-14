@@ -335,4 +335,16 @@ export class AuthService {
             );
         }
     }
+
+    async validateToken(token: string): Promise<TokenPayload> {
+        try {
+            const decoded = await this.authRepository.decodeToken(token, {
+                secret: config.JWT_SECRET_ACCESS_TOKEN,
+            });
+            return decoded;
+        } catch (err) {
+            this.logger.error(`[${this.context}] validateToken failed`, err);
+            throw new UnauthorizedException("Invalid or expired token");
+        }
+    }
 }

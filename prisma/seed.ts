@@ -951,7 +951,7 @@ async function seedRecipes() {
           category: r.category as any,
           dateOfWriting: r.dateOfWriting,
           views: 0,
-          status: 'active',
+          status: 'approved',
           thumbnailUrl: r.thumbnailUrl,
           content: r.content,
           ingredients: r.ingredients,

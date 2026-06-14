@@ -38,7 +38,7 @@ export class ProductController {
 
     try {
       const result = await this.productService.getProducts(query);
-      
+      // this.logger.debug(`getProducts query: ${JSON.stringify(query)}, result count: ${result.products.length}`);
       const data = paginationResponse(
         result.products,
         result.pagination.total,

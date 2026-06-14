@@ -44,6 +44,7 @@ import { GrafanaModule } from './modules/ec2/grafana/grafana.module';
 
 import { AppEventEmitterModule } from './libs/event-emitter/event-emitter.module';
 import { CacheModule } from './libs/cache/cache.module';
+import { SseModule } from './libs/sse/sse.module';
 
 
 @Module({
@@ -80,6 +81,7 @@ import { CacheModule } from './libs/cache/cache.module';
     AppEventEmitterModule,
     LoggerModule,
     AuthModule,
+    SseModule,
     UserModule,
     AnnouncementsModule,
     PointModule,

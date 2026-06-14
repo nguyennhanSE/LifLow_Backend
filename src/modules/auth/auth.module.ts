@@ -17,5 +17,6 @@ import { NaverOAuthService } from './naver-oauth.service';
   imports: [JwtModule, PrismaModule, LoggerModule, UserModule, RolesModule, HttpModule],
   controllers: [AuthController, KakaoController, NaverController],
   providers: [AuthService, AuthRepository, KakaoOAuthService, NaverOAuthService],
+  exports: [AuthService, AuthRepository],
 })
 export class AuthModule {}

@@ -53,9 +53,8 @@ services:
       POSTGRES_USER: ${DATABASE_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-123456}
       POSTGRES_DB: ${DATABASE_NAME:-postgres}
-      PGDATA: /data/postgres
     volumes:
-      - postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     ports:
       - "5433:5432"
     networks:
@@ -199,7 +198,7 @@ networks:
     driver: bridge
 
 volumes:
-  postgres:
+  postgres_data:
   redis_data:
   prometheus_data:
   grafana_data:

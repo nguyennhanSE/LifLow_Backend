@@ -159,30 +159,30 @@ export class ProductRepository {
     // Filter products that have at least one valid S3 image URL
     // Check if any of the image fields contains S3 URL indicators (amazonaws.com)
     // This condition is always applied to ensure products have valid S3 images
-    const s3UrlCondition: Prisma.ProductWhereInput = {
-      OR: [
-        {
-          imageRegistrationDetail: {
-            contains: 'amazonaws.com',
-          },
-        },
-        {
-          imageRegistrationList: {
-            contains: 'amazonaws.com',
-          },
-        },
-        {
-          imageRegistrationSmallList: {
-            contains: 'amazonaws.com',
-          },
-        },
-        {
-          imageRegistrationThumbnail: {
-            contains: 'amazonaws.com',
-          },
-        },
-      ],
-    };
+    // const s3UrlCondition: Prisma.ProductWhereInput = {
+    //   OR: [
+    //     {
+    //       imageRegistrationDetail: {
+    //         contains: 'amazonaws.com',
+    //       },
+    //     },
+    //     {
+    //       imageRegistrationList: {
+    //         contains: 'amazonaws.com',
+    //       },
+    //     },
+    //     {
+    //       imageRegistrationSmallList: {
+    //         contains: 'amazonaws.com',
+    //       },
+    //     },
+    //     {
+    //       imageRegistrationThumbnail: {
+    //         contains: 'amazonaws.com',
+    //       },
+    //     },
+    //   ],
+    // };
 
     // Build AND conditions: search (if exists) AND S3 URL condition
     const andConditions: Prisma.ProductWhereInput[] = [];
@@ -195,7 +195,7 @@ export class ProductRepository {
     }
     
     // Always add S3 URL condition
-    andConditions.push(s3UrlCondition);
+    // andConditions.push(s3UrlCondition);
 
     // Combine all AND conditions
     if (andConditions.length > 0) {
