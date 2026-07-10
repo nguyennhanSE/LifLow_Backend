@@ -45,6 +45,8 @@ import { GrafanaModule } from './modules/ec2/grafana/grafana.module';
 import { AppEventEmitterModule } from './libs/event-emitter/event-emitter.module';
 import { CacheModule } from './libs/cache/cache.module';
 import { SseModule } from './libs/sse/sse.module';
+import { ElasticsearchClientModule } from './libs/elasticsearch/elasticsearch.module';
+import { WebsocketModule } from './modules/websockets/websocket.module';
 
 
 @Module({
@@ -77,11 +79,13 @@ import { SseModule } from './libs/sse/sse.module';
         },
       }),
     }),
+    ElasticsearchClientModule,
     CacheModule,
     AppEventEmitterModule,
     LoggerModule,
     AuthModule,
     SseModule,
+    WebsocketModule,
     UserModule,
     AnnouncementsModule,
     PointModule,

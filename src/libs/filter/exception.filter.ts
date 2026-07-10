@@ -29,6 +29,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const responseModel = new ResponseModel();
     responseModel.setError(errorPayload as any);
 
+
     httpAdapter.reply(response, responseModel, httpStatus);
   }
 
@@ -123,3 +124,4 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
   }
 }
+

@@ -3,9 +3,9 @@ dist
 coverage
 .git
 .github
-.env
-.env.*
-!.env.example
+# .env
+# .env.*
+# !.env.example
 *.md
 *.log
 backups

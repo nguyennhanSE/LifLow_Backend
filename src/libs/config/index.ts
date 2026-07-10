@@ -99,6 +99,9 @@ export const config = {
   GF_SECURITY_ADMIN_PASSWORD: process.env.GF_SECURITY_ADMIN_PASSWORD ?? 'admin',
   GRAFANA_BASE_URL: process.env.GRAFANA_BASE_URL ?? 'http://grafana:3000',  
   GRAFANA_DATASOURCE : process.env.GRAFANA_DATASOURCE ?? 'http://prometheus:9090',
+
+  // Elasticsearch:
+  ELASTICSEARCH_NODE: process.env.ELASTICSEARCH_NODE ?? 'http://elasticsearch:9200',
 };
 
 // TOSS Payments Helper Functions

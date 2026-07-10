@@ -45,12 +45,12 @@ export class AuthRepository {
     async decodeToken(token: string, options: JwtVerifyOptions): Promise<TokenPayload> {
         const meta = { opts: options, token };
         try {
-            this.logger.debug(`[${this.context}] decodeToken start`, meta);
+            // this.logger.debug(`[${this.context}] decodeToken start`, meta);
             const payload = await this.jwtService.verifyAsync<TokenPayload>(token, options);
-            this.logger.debug(
-                `[${this.context}] decodeToken done`,
-                { ...meta, sub: payload?.sub, exp: payload?.exp }
-            );
+            // this.logger.debug(
+            //     `[${this.context}] decodeToken done`,
+            //     { ...meta, sub: payload?.sub, exp: payload?.exp }
+            // );
             return payload;
         } catch (err) {
             this.logger.error(`[${this.context}] decodeToken failed`, { ...meta, err });

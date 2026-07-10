@@ -84,6 +84,30 @@ export class ProductController {
     return responseModel;
   }
 
+  @Get(':id/similar')
+  @Public()
+  @ApiOperation({ summary: 'Get similar products by product ID' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Maximum number of similar products to return. Defaults to 10, max 25.',
+    example: 10,
+  })
+  @ApiResponse({ status: 200, description: 'Similar products retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  async getSimilarProducts(
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const responseModel = new ResponseModel();
+    const parsedLimit = limit === undefined ? 10 : Number(limit);
+    const products = await this.productService.getSimilarProducts(id, parsedLimit);
+
+    responseModel.setData(products);
+
+    return responseModel;
+  }
+
   @Get(':id')
   @Public()
   @ApiOperation({ summary: 'Get product by ID' })

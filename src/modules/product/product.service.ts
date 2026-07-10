@@ -8,8 +8,10 @@ import { ProductDiscountService } from '../product-discount/product-discount.ser
 import { CreateProductDiscountDto } from '../product-discount/dto/create-product-discount.dto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { toProductEntity } from './mapper/product.mapper';
+import { toProductEntity, toProductEntitySummary } from './mapper/product.mapper';
 import { AwsService } from 'src/libs/integration/aws/aws.service';
+import { ElasticsearchProductsService } from 'src/libs/elasticsearch/products/elasticsearch.products.service';
+import { queryParams } from 'src/libs/elasticsearch/elasticsearch.dto';
 
 @Injectable()
 export class ProductService {
@@ -18,19 +20,18 @@ export class ProductService {
     private readonly productDiscountService: ProductDiscountService,
     private readonly prisma: PrismaService,
     private readonly awsService: AwsService,
+    private readonly elasticsearchProductsService: ElasticsearchProductsService,
   ) {}
 
   /**
    * Get products with filtering, pagination, and sorting
    */
   async getProducts(query: ProductListQueryDto): Promise<ProductListResponse> {
-    // Process query parameters
     const page = query.page || 1;
     const limit = query.limit || 10;
     const sortBy = query.sortBy || 'createdAt';
     const sortOrder = query.sortOrder || 'desc';
 
-    // Build filters
     const filters: ProductFilters = {
       search: query.search,
       category: query.category,
@@ -41,7 +42,6 @@ export class ProductService {
       maxPrice: query.maxPrice,
     };
 
-    // Build pagination
     const pagination: ProductPagination = {
       page,
       limit,
@@ -50,29 +50,63 @@ export class ProductService {
       includeProductReview: query.includeProductReview ?? true,
     };
 
-    // Get products and count
+    if (query.search) {
+      // 1. ES chỉ dùng để lấy IDs + total
+      const { data: esHits, meta } =
+        await this.elasticsearchProductsService.searchProducts({
+          search: query.search,
+          page,
+          limit,
+          sortBy,
+          sortOrder,
+        });
+      console.log('ES search results:', esHits.length, 'hits, total:', meta.total);
+      const productIds = esHits.map((hit) => hit.id as string) as string[];
+
+      // 2. Fetch full product entities từ DB theo IDs
+      const products =
+        productIds.length > 0
+          ? await this.productRepository.findManyByIdsAndPagination(productIds, filters, pagination)
+          : [];
+
+      // 3. Giữ thứ tự theo ES score
+      const ordered = productIds
+        .map((id) => products.find((p) => p.id === id))
+        .filter(Boolean);
+
+      const totalPages = Math.ceil(meta.total / limit);
+
+      return {
+        products: ordered,
+        pagination: {
+          total: meta.total,
+          page,
+          limit,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      };
+    }
+
+    // Fallback: DB query bình thường
     const [products, total] = await Promise.all([
       this.productRepository.findMany(filters, pagination),
       this.productRepository.count(filters),
     ]);
 
-    // Calculate pagination metadata
     const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
-    const hasPrev = page > 1;
-
-    const paginationMeta: PaginationMeta = {
-      total,
-      page,
-      limit,
-      totalPages,
-      hasNext,
-      hasPrev,
-    };
 
     return {
       products,
-      pagination: paginationMeta,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
     };
   }
 
@@ -87,6 +121,30 @@ export class ProductService {
     }
 
     return product;
+  }
+
+  async getSimilarProducts(id: string, limit = 10): Promise<any[]> {
+    if (!Number.isInteger(limit) || limit < 1) {
+      throw new BadRequestException('limit must be a positive integer');
+    }
+
+    const normalizedLimit = Math.min(limit, 25);
+    const product = await this.productRepository.findById(id);
+
+    if (!product) {
+      throw new NotFoundException(`Product with id ${id} not found`);
+    }
+
+    const similarProductIds = await this.elasticsearchProductsService.findSimilarProductIds(
+      id,
+      normalizedLimit + 1,
+    );
+    const filteredProductIds = similarProductIds
+      .filter((similarProductId) => similarProductId !== id)
+      .slice(0, normalizedLimit);
+    const products = await this.productRepository.findManyByIds(filteredProductIds, false);
+
+    return products.map(toProductEntitySummary);
   }
 
   /**

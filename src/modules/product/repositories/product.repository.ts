@@ -78,7 +78,57 @@ export class ProductRepository {
 
     return productsWithCategory;
   }
+  async findManyByIdsAndPagination(
+    ids : string[],
+    filters: ProductFilters,
+    pagination: ProductPagination
+  ): Promise<ProductEntity[]> {
+    const where = this.buildWhereClause(filters);
+    const orderBy = this.buildOrderByClause(pagination.sortBy, pagination.sortOrder);
 
+    const skip = (pagination.page - 1) * pagination.limit;
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        ...where,
+        id: {
+          in: ids,
+        },
+      },
+      orderBy,
+      skip,
+      take: pagination.limit,
+      include: {
+        productSpecialOffer: true,
+        productDiscount: true,
+        banner: true,
+        productBadges: true,
+        productReviews: pagination.includeProductReview ?? true,
+      },
+    });
+
+    const productsWithCategory = await Promise.all(
+      products.map(async (product) => {
+        const entity = toProductEntityWithRelations(product);
+        // Fetch category based on productCategoryNumber
+        if (product.productCategoryNumber) {
+          const category = await this.prisma.category.findUnique({
+            where: { productCategoryNumber: product.productCategoryNumber },
+          });
+          if (category) {
+            entity.category = {
+              productCategoryNumber: category.productCategoryNumber,
+              name: category.name,
+              description: category.description,
+            };
+          }
+        }
+        return entity;
+      })
+    );
+
+    return productsWithCategory;
+  }
   /**
    * Find product by ID
    */
@@ -115,6 +165,35 @@ export class ProductRepository {
     }
 
     return entity;
+  }
+
+  async findManyByIds(ids: string[], includeProductReview = false): Promise<ProductEntity[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+      include: {
+        productSpecialOffer: true,
+        productDiscount: true,
+        banner: true,
+        productBadges: true,
+        productReviews: includeProductReview,
+      },
+    });
+
+    const productsById = new Map(
+      products.map((product) => [product.id, toProductEntityWithRelations(product)]),
+    );
+
+    return ids
+      .map((id) => productsById.get(id))
+      .filter((product): product is ProductEntity => Boolean(product));
   }
 
   /**
@@ -766,4 +845,3 @@ export class ProductRepository {
     });
   }
 }
-

@@ -193,6 +193,27 @@ services:
     networks:
       - liflow-network
     
+  es-sync:
+    build:
+      context: .
+      dockerfile: es-sync.Dockerfile
+    image: es-sync-image
+    container_name: es-sync
+    volumes:
+      - ./scripts:/app/scripts
+    entrypoint: ["sh", "/app/scripts/seed-if-empty.sh"]
+    environment:
+      - DATABASE_URL=postgresql://postgres:123456@postgres:5432/postgres?schema=public
+
+    depends_on:
+      postgres:
+          condition: service_healthy
+      elasticsearch:
+          condition: service_healthy
+    restart: "no" 
+    networks:
+      - liflow-network
+
 networks:
   liflow-network:
     driver: bridge
