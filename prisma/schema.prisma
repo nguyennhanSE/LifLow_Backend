@@ -1065,6 +1065,6 @@ model Message {
   @@index([roomId])
   @@index([senderId])
   @@index([createdAt])
-  @@index([roomId, createdAt])
+  @@index([roomId, createdAt(sort: Desc), id(sort: Desc)])
   @@map("messages")
 }

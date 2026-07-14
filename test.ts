@@ -1,5 +1,21 @@
-import bcrypt from "bcryptjs"
-import { HASH_SALT_LENGTH } from "src/common/constants/index"
+const obj = {
+    show() {
+        console.log("global obj");
+    }
+};
 
-const password = bcrypt.hashSync("123456", HASH_SALT_LENGTH)
-console.log(password)
+function foo() {
+    const obj = {
+        show() {
+            console.log("local obj");
+        }
+    };
+
+    bar();
+}
+
+function bar() {
+    obj.show();
+}
+
+foo();

@@ -45,3 +45,11 @@ export class GetRoomsQueryDto {
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc';
 }
+
+export class IsTypingDto {
+  @IsIn(['true', 'false'])
+  isTyping!: 'true' | 'false';
+  @IsString()
+  @IsUUID()
+  roomId!: string;
+}

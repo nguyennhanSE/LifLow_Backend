@@ -27,3 +27,16 @@ export class MessageEntity {
   room?: RoomEntity | null;
   sender?: UserEntity | null;
 }
+
+export type MessageCursor = {
+  id: string;
+  createdAt: Date;
+};
+
+export type RoomMessagesPage = {
+  data: MessageEntity[];
+  more: {
+    hasMore: boolean;
+    nextCursor: MessageCursor | null;
+  };
+};

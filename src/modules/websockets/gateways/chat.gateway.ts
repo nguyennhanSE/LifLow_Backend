@@ -5,7 +5,7 @@ import {Namespace, Socket} from "socket.io";
 import {ChatService} from "../chat/services/chat.service";
 import {AppLogger} from "src/libs/logger/logger.service";
 import { AuthService } from "src/modules/auth/auth.service";
-import { CreateRoomDto, JoinRoomDto, SendMessageDto } from "../dto/chat-event.dto";
+import { CreateRoomDto, IsTypingDto, JoinRoomDto, SendMessageDto } from "../dto/chat-event.dto";
 import { tokenType } from "src/common/enums";
 
 @WebSocketGateway({
@@ -36,13 +36,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             client.data.userId = userId;
 
             // await client.join(this.getUserRoomName(userId));
-            const isFirstConnection = this.addUserSocket(userId, client.id);
+            this.addUserSocket(userId, client.id);
 
-            if (isFirstConnection) {
-                client.broadcast.emit('chat:userOnline', { userId });
-            }
+            const allUserOnlineIds = Array.from(this.userSockets.keys());
+            this.server.emit('chat:userOnline', { allUserOnlineIds });
+        
+            this.logger.debug(`[ChatGateway] All connected clients: ${JSON.stringify(Array.from(this.userSockets.entries()).map(([userId, sockets]) => ({ userId, socketCount: sockets.size })))}`);
 
-            this.logger.debug(`[ChatGateway] Client connected: ${client.id}, userId: ${userId}`);
+            // this.logger.debug(`[ChatGateway] Client connected: ${client.id}, userId: ${userId}`);
         } catch (error) {
             this.logger.warn(
                 `[ChatGateway] Unauthorized client disconnected: ${client.id}. ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -50,6 +51,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             client.disconnect(true);
         }
     }
+
 
     handleDisconnect(client: Socket) {
         const userId = this.getSocketUserId(client);
@@ -120,9 +122,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
         try {
             const userId = await this.getSocketOrAuthenticatedUserId(client);
+            const isInRoom = this.isInRoom(client, dto.roomId);
+
+            if (!isInRoom) {
+                throw new WsException("You must join the room before sending messages");
+            }
             const message = await this.chatService.sendMessage(dto.roomId, userId, dto.content);
 
-            await client.join(dto.roomId);
+            // await client.join(dto.roomId);
             this.server.to(dto.roomId).emit('chat:messageCreated', message);
 
             return message;
@@ -132,6 +139,60 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             );
             throw error;
         }
+    }
+
+    @SubscribeMessage('chat:isTyping')
+    async isTyping(
+        @ConnectedSocket() client: Socket,
+        @MessageBody() dto: IsTypingDto,
+    ) {
+        this.logger.log(`[ChatGateway] chat:isTyping received: socketId=${client.id}, dto=${JSON.stringify(dto)}`);
+
+        try {
+            const userId = await this.getSocketOrAuthenticatedUserId(client);
+            const isInRoom = this.isInRoom(client, dto.roomId);
+
+            if (!isInRoom) {
+                throw new WsException("You must join the room before indicating typing status");
+            }
+
+            this.server.to(dto.roomId).emit('chat:userIsTyping', { userId, isTyping: dto.isTyping === 'true' });
+        } catch (error) {
+            this.logger.error(
+                `[ChatGateway] chat:isTyping failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            throw error;
+        }
+    }
+
+    @SubscribeMessage('chat:queryMessages')
+    async queryMessages(
+        @ConnectedSocket() client: Socket,
+        @MessageBody() dto: { roomId: string; limit: number; cursor?: { id: string; createdAt: Date } },
+    ) {
+        this.logger.log(`[ChatGateway] chat:queryMessages received: socketId=${client.id}, dto=${JSON.stringify(dto)}`);
+
+        try {
+            const userId = await this.getSocketOrAuthenticatedUserId(client);
+            const isInRoom = this.isInRoom(client, dto.roomId);
+
+            if (!isInRoom) {
+                throw new WsException("You must join the room before querying messages");
+            }
+
+            const messages = await this.chatService.getRoomMessages(dto.roomId, dto.limit, dto.cursor);
+            this.server.to(client.id).emit('chat:messagesQueried', messages);
+        } catch (error) {
+            this.logger.error(
+                `[ChatGateway] chat:queryMessages failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            throw error;
+        }
+    }
+
+    private isInRoom(client: Socket, roomId: string): boolean {
+        const room = this.server.adapter.rooms.get(roomId);
+        return room ? room.has(client.id) : false;
     }
 
     private logRealRooms() {
@@ -208,7 +269,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     private extractAccessToken(client: Socket): string | undefined {
-        const authToken = client.handshake.auth?.token;
+        const authToken = client.handshake.auth?.token || client.handshake.query?.token;
         const authorizationHeader = client.handshake.headers.authorization;
         const headerToken = Array.isArray(authorizationHeader)
             ? authorizationHeader[0]

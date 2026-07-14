@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from "@nestjs/common
 import { AppLogger } from "src/libs/logger/logger.service";
 import { ChatRepository } from "../repositories/chat.repository";
 import { GetRoomsQueryDto } from "../../dto/chat-event.dto";
-import { MessageEntity, RoomEntity } from "../entities/chat.entity";
+import { MessageCursor, MessageEntity, RoomEntity, RoomMessagesPage } from "../entities/chat.entity";
 
 @Injectable()
 export class ChatService {
@@ -66,5 +66,11 @@ export class ChatService {
         this.logger.debug(`Checking if user ${userId} is in room ${roomId}`);
         const room = await this.chatRepository.getRoomById(roomId);
         return !!room && (room.user1Id === userId || room.user2Id === userId);
+    }
+
+    async getRoomMessages(roomId: string, limit: number, cursor?: MessageCursor): Promise<RoomMessagesPage> {
+        // this.logger.debug(`Getting messages for room ${roomId} with limit ${limit} and cursor ${JSON.stringify(cursor)}`);
+        const messages = await this.chatRepository.getRoomMessages(roomId, limit, cursor);
+        return messages;
     }
 }

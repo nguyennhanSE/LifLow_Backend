@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "prisma/prisma.service";
 import { AppLogger } from "src/libs/logger/logger.service";
 import { GetRoomsQueryDto } from "../../dto/chat-event.dto";
-import { MessageEntity, RoomEntity } from "../entities/chat.entity";
+import { MessageCursor, MessageEntity, RoomEntity, RoomMessagesPage } from "../entities/chat.entity";
 import { toMessageEntity, toRoomEntity } from "../mapper/chat.mapper";
 
 @Injectable()
@@ -13,6 +13,7 @@ export class ChatRepository {
         user2: true,
         messages: {
             orderBy: { createdAt: 'desc' },
+            take : 10,
             include: { sender: true },
         },
     } satisfies Prisma.RoomInclude;
@@ -137,6 +138,53 @@ export class ChatRepository {
         }
     }
 
+    async getRoomMessages(roomId: string, limit: number, cursor?: MessageCursor): Promise<RoomMessagesPage> {
+        this.logger.debug(`Getting messages for room ${roomId} with limit ${limit} and cursor ${JSON.stringify(cursor)}`);
+        try {
+            const messages = await this.prisma.message.findMany(this.buildRoomMessagesQuery(roomId, limit, cursor));
+            const hasMore = messages.length > limit;
+            const data = messages.slice(0, limit).map(toMessageEntity);
+            const lastMessage = data[data.length - 1];
+
+            return {
+                data,
+                more: {
+                    hasMore,
+                    nextCursor: hasMore && lastMessage
+                        ? { id: lastMessage.id, createdAt: lastMessage.createdAt }
+                        : null,
+                },
+            };
+        } catch (error) {
+            this.logger.error(`Failed to get messages for room ${roomId}: ${error}`);
+            throw error;
+        }
+    }
+    
+    private buildRoomMessagesQuery(roomId : string, limit: number, cursor? : MessageCursor) : Prisma.MessageFindManyArgs {
+        const cursorCreatedAt = cursor ? new Date(cursor.createdAt) : undefined;
+
+        return {
+            where: {
+                roomId,
+                ...(cursor && {
+                    OR: [
+                        { createdAt: { lt: cursorCreatedAt } },
+                        { createdAt: cursorCreatedAt, id: { lt: cursor.id } },
+                    ],
+                })
+            },
+            orderBy: [
+                { createdAt: 'desc' },
+                { id: 'desc' }
+            ],
+            take: limit + 1,
+            include: {
+                sender: true,
+            },
+        };
+    }
+         
     async createMessage(roomId: string, senderId: string, content: string): Promise<MessageEntity> {
         this.logger.debug(`Creating message in room ${roomId} for sender: ${senderId}`);
         try {
@@ -180,6 +228,8 @@ export class ChatRepository {
             this.handlePrismaError(error, 'Failed to create message');
         }
     }
+
+
 
     private handlePrismaError(error: unknown, defaultMessage: string): never {
         if (error instanceof NotFoundException || error instanceof ConflictException || error instanceof ForbiddenException) {
