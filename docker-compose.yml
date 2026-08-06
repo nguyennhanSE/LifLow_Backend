@@ -111,6 +111,19 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - liflow-network
+
+  loki:
+    image: grafana/loki:2.8.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yml
+    networks:
+      - liflow-network
   grafana:
     image: grafana/grafana-oss:latest
     container_name: grafana
@@ -227,5 +240,5 @@ volumes:
   backup_data:
   elasticsearch_data:
   kibana_data:
-
+  loki_data:
 

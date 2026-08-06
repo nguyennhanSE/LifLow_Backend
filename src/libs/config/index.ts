@@ -100,6 +100,9 @@ export const config = {
   GRAFANA_BASE_URL: process.env.GRAFANA_BASE_URL ?? 'http://grafana:3000',  
   GRAFANA_DATASOURCE : process.env.GRAFANA_DATASOURCE ?? 'http://prometheus:9090',
 
+  // Loki
+  LOKI_BASE_URL: process.env.LOKI_BASE_URL ?? 'http://localhost:3100',
+
   // Elasticsearch:
   ELASTICSEARCH_NODE: process.env.ELASTICSEARCH_NODE ?? 'http://elasticsearch:9200',
 };

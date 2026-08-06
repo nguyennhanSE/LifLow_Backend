@@ -2,6 +2,7 @@ import { Body, Controller, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, LogoutDto, RefreshTokenRequestDto } from './dto/auth.dto';
 import { Public } from 'src/libs/decorator/public.decorator';
+import { TrackUserEvent } from 'src/libs/decorator';
 import { ResponseModel } from 'src/libs/models/response/response.model';
 
 @Controller('auth')
@@ -9,6 +10,10 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
   @Post('login')
   @Public()
+  @TrackUserEvent({
+    eventType: 'auth.login',
+    entityType: 'session',
+  })
   async login(@Body() loginDto: LoginDto) {
     const responseModel = new ResponseModel();
     try {
@@ -36,6 +41,10 @@ export class AuthController {
   }
   @Post('refresh-token')
   @Public()
+  @TrackUserEvent({
+    eventType: 'auth.refresh_token',
+    entityType: 'session',
+  })
   async refreshToken(@Body() refreshTokenDto: RefreshTokenRequestDto) {
     const responseModel = new ResponseModel();
 

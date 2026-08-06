@@ -47,6 +47,7 @@ import { CacheModule } from './libs/cache/cache.module';
 import { SseModule } from './libs/sse/sse.module';
 import { ElasticsearchClientModule } from './libs/elasticsearch/elasticsearch.module';
 import { WebsocketModule } from './modules/websockets/websocket.module';
+import { UserEventLogModule } from './modules/user-event-log/user-event-log.module';
 
 
 @Module({
@@ -82,6 +83,7 @@ import { WebsocketModule } from './modules/websockets/websocket.module';
     ElasticsearchClientModule,
     CacheModule,
     AppEventEmitterModule,
+    UserEventLogModule,
     LoggerModule,
     AuthModule,
     SseModule,

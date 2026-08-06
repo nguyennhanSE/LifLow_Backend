@@ -71,6 +71,7 @@ model User {
   chatRoomsAsUser1 Room[] @relation("RoomUser1")
   chatRoomsAsUser2 Room[] @relation("RoomUser2")
   messages Message[] @relation("MessageSender")
+  usereventLogs UserEventLog[]
   @@map("users")
 }
 
@@ -1067,4 +1068,45 @@ model Message {
   @@index([createdAt])
   @@index([roomId, createdAt(sort: Desc), id(sort: Desc)])
   @@map("messages")
+}
+
+model UserEventLog {
+  id String @id @default(uuid())
+  eventId String @unique @map("event_id")
+  eventType String @map("event_type")
+  eventVersion Int @default(1) @map("event_version")
+
+  // Actor
+  userId String? @map("user_id")
+  anonymousId String? @map("anonymous_id")
+  sessionId String? @map("session_id")
+
+  // Entity
+  entityType String? @map("entity_type")
+  entityId String? @map("entity_id")
+
+  // Request/client context
+  source String? // web, mobile, admin, system
+  ip String?
+  userAgent String? @map("user_agent")
+  requestId String? @map("request_id")
+  traceId String? @map("trace_id")
+
+  // Flexible payload
+  metadata Json? @map("metadata")
+
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  // Loki
+  lokiPushedAt DateTime? @map("loki_pushed_at")
+  lokiPushError String? @map("loki_push_error")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([entityType, entityId, occurredAt])
+  @@index([sessionId, occurredAt])
+  @@index([occurredAt])
+  @@map("user_event_logs")
 }
