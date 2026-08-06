@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { CreateCartItemDto } from '../dto/create-cart-item.dto';
@@ -16,6 +17,8 @@ import { CartItemEntity } from '../entities/cart-item.entity';
 import { ECartStatus, ECartItemStatus } from '../enums/cart.enum';
 import { CartItemRepository } from '../repositories/cart-item.repository';
 import { CartRepository } from '../repositories/cart.repository';
+import { UserEventType } from 'src/libs/decorator';
+import { UserEventLogQueueService } from 'src/modules/user-event-log/queue/user-event-log.queue.service';
 
 /**
  * Service for managing cart items
@@ -28,6 +31,7 @@ export class CartItemService {
     private readonly prisma: PrismaService,
     private readonly cartItemRepository: CartItemRepository,
     private readonly cartRepository: CartRepository,
+    private readonly userEventLogQueueService: UserEventLogQueueService,
   ) {}
 
   /**
@@ -127,6 +131,14 @@ export class CartItemService {
       });
 
       this.logger.log(`Item added successfully to cart: ${cartId}`);
+      this.enqueueCartEvent({
+        action: 'item_added',
+        userId: cart.userId ?? null,
+        cartId,
+        cartItemId: cartItem.id,
+        productId: createDto.productId,
+        quantity: createDto.quantity,
+      });
       return CartItemMapper.prismaToDtoWithProduct(cartItem);
     } catch (error: any) {
       this.logger.error(
@@ -229,6 +241,14 @@ export class CartItemService {
       });
 
       this.logger.log(`Cart item removed successfully: ${id}`);
+      this.enqueueCartEvent({
+        action: 'item_removed',
+        userId: cartItem.cart?.userId ?? null,
+        cartId: cartItem.cartId,
+        cartItemId: id,
+        productId: cartItem.productId,
+        quantity: cartItem.quantity,
+      });
     } catch (error: any) {
       this.logger.error(`Failed to remove cart item ${id}: ${error.message}`);
       this.handleError(error, `Failed to remove cart item ${id}`);
@@ -522,6 +542,45 @@ export class CartItemService {
     });
   }
 
+  private enqueueCartEvent(data: {
+    action: 'item_added' | 'item_removed';
+    userId: string | null;
+    cartId: string;
+    cartItemId: string;
+    productId: string;
+    quantity: number;
+  }): void {
+    void this.userEventLogQueueService
+      .enqueueUserEventLog({
+        eventId: randomUUID(),
+        eventType: UserEventType.CART_EVENT,
+        eventVersion: 1,
+        userId: data.userId,
+        anonymousId: null,
+        sessionId: null,
+        entityType: 'cart_item',
+        entityId: data.cartItemId,
+        source: 'web',
+        ip: null,
+        userAgent: null,
+        requestId: null,
+        traceId: null,
+        metadata: {
+          action: data.action,
+          cartId: data.cartId,
+          productId: data.productId,
+          quantity: data.quantity,
+        },
+        occurredAt: new Date().toISOString(),
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Failed to enqueue cart event ${data.action}: ${message}`,
+        );
+      });
+  }
+
   /**
    * Handle errors and throw appropriate HTTP exceptions
    */
@@ -551,4 +610,3 @@ export class CartItemService {
     throw new BadRequestException(defaultMessage);
   }
 }
-

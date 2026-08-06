@@ -12,6 +12,7 @@ import { ProductListQueryDto, CreateProductDto, UpdateProductDto, BulkDeleteProd
 import { paginationResponse } from '../../utils/responseFormatter';
 import { Roles } from '../../libs/decorator/roles.decorator';
 import { Public } from '../../libs/decorator/public.decorator';
+import { TrackUserEvent, UserEventType } from '../../libs/decorator';
 import { ERoleName } from '../roles/enums/role.enum';
 import { uploadProductImages } from '../../middlewares/uploadMiddleware';
 import { ResponseModel } from '../../libs/models/response/response.model';
@@ -110,6 +111,14 @@ export class ProductController {
 
   @Get(':id')
   @Public()
+  @TrackUserEvent({
+    eventType: UserEventType.PRODUCT_EVENT,
+    entityType: 'product',
+    entityIdFrom: 'params.id',
+    metadata: {
+      action: 'viewed',
+    },
+  })
   @ApiOperation({ summary: 'Get product by ID' })
   @ApiQuery({
     name: 'notifyTest',
