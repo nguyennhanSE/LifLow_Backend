@@ -1070,10 +1070,23 @@ model Message {
   @@map("messages")
 }
 
+enum UserEventType {
+  auth_event
+  product_event
+  cart_event
+  order_event
+  payment_event
+  coupon_event
+  membership_event
+  recipe_event
+  user_event
+  system_event
+}
+
 model UserEventLog {
   id String @id @default(uuid())
   eventId String @unique @map("event_id")
-  eventType String @map("event_type")
+  eventType UserEventType @map("event_type")
   eventVersion Int @default(1) @map("event_version")
 
   // Actor
@@ -1103,10 +1116,9 @@ model UserEventLog {
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([eventType, occurredAt])
-  @@index([userId, occurredAt])
-  @@index([entityType, entityId, occurredAt])
-  @@index([sessionId, occurredAt])
-  @@index([occurredAt])
+  // Indexes
+  @@index([eventId])
+  @@index([eventId, eventType])
+  @@index([eventId, eventType, lokiPushedAt])
   @@map("user_event_logs")
 }

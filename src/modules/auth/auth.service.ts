@@ -237,7 +237,7 @@ export class AuthService {
             await this.authRepository.markRefreshTokenUsed(refreshToken, availableToken.id)
             this.logger.debug(`[${this.context}] refreshToken used`, { refreshToken });
             this.logger.debug(`[${this.context}] refreshToken done`, { userId: sub });
-            return { accessToken, newRefreshToken };
+            return { accessToken, newRefreshToken, userId: sub };
         } catch (err) {
             this.logger.error(`[${this.context}] refreshToken failed`, err);
             throw err;

@@ -1,6 +1,7 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
+import { UserEventType } from 'src/libs/interceptor/user-event-interceptor/event-log.metadata';
 import {
   USER_EVENT_LOG_JOB_NAME,
   USER_EVENT_LOG_QUEUE_NAME,
@@ -8,7 +9,7 @@ import {
 
 export type UserEventLogJobData = {
   eventId: string;
-  eventType: string;
+  eventType: UserEventType;
   eventVersion: number;
   userId?: string | null;
   anonymousId?: string | null;

@@ -84,10 +84,10 @@ export class AuthRepository {
             });
 
             const dto = this.toDto(created);
-            this.logger.debug(
-                `[${this.context}] storeToken done`,
-                { ...meta, userId: sub, expiredAt: expiredAt.toISOString() }
-            );
+            // this.logger.debug(
+            //     `[${this.context}] storeToken done`,
+            //     { ...meta, userId: sub, expiredAt: expiredAt.toISOString() }
+            // );
             return dto;
         } catch (err) {
             this.logger.error(`[${this.context}] storeToken failed`, { ...meta, err });

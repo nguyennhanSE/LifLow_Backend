@@ -12,9 +12,18 @@ import { KakaoController } from './kakao.controller';
 import { KakaoOAuthService } from './kakao-oauth.service';
 import { NaverController } from './naver.controller';
 import { NaverOAuthService } from './naver-oauth.service';
+import { UserEventLogQueueModule } from '../user-event-log/queue/user-event-log.queue.module';
 
 @Module({
-  imports: [JwtModule, PrismaModule, LoggerModule, UserModule, RolesModule, HttpModule],
+  imports: [
+    JwtModule,
+    PrismaModule,
+    LoggerModule,
+    UserModule,
+    RolesModule,
+    HttpModule,
+    UserEventLogQueueModule,
+  ],
   controllers: [AuthController, KakaoController, NaverController],
   providers: [AuthService, AuthRepository, KakaoOAuthService, NaverOAuthService],
   exports: [AuthService, AuthRepository],

@@ -83,7 +83,6 @@ export class UserEventLogService {
   ): Promise<{ success: true } | { success: false; error: string }> {
     const timestamp = this.toLokiTimestamp(data.occurredAt);
     const logLine = JSON.stringify({
-      logType: 'user_event',
       ...data,
     });
 
@@ -93,7 +92,7 @@ export class UserEventLogService {
           {
             stream: {
               app: 'liflow-be',
-              env: NODE_ENV,
+              // env: NODE_ENV,
               log_type: 'user_event',
               event_type: data.eventType,
               source: data.source ?? 'unknown',

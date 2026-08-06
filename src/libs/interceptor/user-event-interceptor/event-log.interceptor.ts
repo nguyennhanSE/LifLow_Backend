@@ -17,10 +17,12 @@ import {
 
 @Injectable()
 export class EventLogInterceptor<T> implements NestInterceptor<T> {
+  private readonly context = EventLogInterceptor.name
   constructor(
     private readonly reflector: Reflector,
     private readonly loggerService: AppLogger,
     private readonly userEventLogQueueService: UserEventLogQueueService,
+
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<T> {
@@ -67,6 +69,7 @@ export class EventLogInterceptor<T> implements NestInterceptor<T> {
     const anonymousId =
       this.getHeader(headers['x-anonymous-id']) ??
       this.getHeader(headers['anonymous-id']);
+    this.loggerService.debug(` [${this.context}] data: ${JSON.stringify(request.user)}`);
 
     return {
       eventId: randomUUID(),

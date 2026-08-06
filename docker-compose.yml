@@ -113,7 +113,7 @@ services:
       - liflow-network
 
   loki:
-    image: grafana/loki:2.8.2
+    image: grafana/loki:3.4.2
     container_name: loki
     ports:
       - "3100:3100"
@@ -211,6 +211,7 @@ services:
       context: .
       dockerfile: es-sync.Dockerfile
     image: es-sync-image
+    pull_policy: build
     container_name: es-sync
     volumes:
       - ./scripts:/app/scripts
@@ -241,4 +242,3 @@ volumes:
   elasticsearch_data:
   kibana_data:
   loki_data:
-

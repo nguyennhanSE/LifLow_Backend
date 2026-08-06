@@ -101,6 +101,8 @@ export const config = {
   GRAFANA_DATASOURCE : process.env.GRAFANA_DATASOURCE ?? 'http://prometheus:9090',
 
   // Loki
+  LOKI_HOST: process.env.LOKI_HOST ?? 'localhost',
+  LOKI_PORT: process.env.LOKI_PORT ?? 3100,
   LOKI_BASE_URL: process.env.LOKI_BASE_URL ?? 'http://localhost:3100',
 
   // Elasticsearch:
