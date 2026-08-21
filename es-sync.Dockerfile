@@ -9,7 +9,7 @@ COPY .env.dev ./.env.dev
 COPY .env.prod ./.env.prod
 COPY prisma.config.ts ./prisma.config.ts
 
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 RUN npm install -g tsx  
 RUN npm install --save-dev @types/pg 
 RUN npx prisma generate
