@@ -7,11 +7,10 @@ dotenv.config({ path: '.env' });
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const envFile = NODE_ENV === 'production' ? '.env.prod' : '.env.dev';
 
-// Load env file tương ứng (override values từ .env base)
-dotenv.config({ path: envFile, override: true });
+// Load env file tương ứng, nhưng ưu tiên biến môi trường đã được set sẵn
+dotenv.config({ path: envFile });
 
 console.log('NODE_ENV:', NODE_ENV);
-console.log('DATABASE_URL:', env('DATABASE_URL'));
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',
