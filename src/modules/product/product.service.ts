@@ -12,6 +12,8 @@ import { toProductEntity, toProductEntitySummary } from './mapper/product.mapper
 import { AwsService } from 'src/libs/integration/aws/aws.service';
 import { ElasticsearchProductsService } from 'src/libs/elasticsearch/products/elasticsearch.products.service';
 import { queryParams } from 'src/libs/elasticsearch/elasticsearch.dto';
+import { AppEventEmitterService } from 'src/libs/event-emitter/event-emitter.service';
+import { PRODUCT_EVENTS } from './constants/product-event.constant';
 
 @Injectable()
 export class ProductService {
@@ -21,6 +23,7 @@ export class ProductService {
     private readonly prisma: PrismaService,
     private readonly awsService: AwsService,
     private readonly elasticsearchProductsService: ElasticsearchProductsService,
+    private readonly eventEmitter: AppEventEmitterService,
   ) {}
 
   /**
@@ -367,6 +370,8 @@ export class ProductService {
         timeout: 30000, // max time the interactive transaction can run before being canceled (30 seconds)
       },
     );
+
+      this.eventEmitter.emit(PRODUCT_EVENTS.CREATED, { productId: result.id });
 
       // Return product entity
       return toProductEntity(result);

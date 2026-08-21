@@ -14,6 +14,14 @@ export class ElasticsearchClientService {
         return response;
     }
 
+    async index(index: string, id: string, body: Record<string, any>) {
+        return this.esClient.index({
+            index,
+            id,
+            body,
+        });
+    }
+
     async moreLikeThis(
         index: string,
         documentId: string,

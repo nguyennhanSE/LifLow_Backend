@@ -1,5 +1,8 @@
-// products/elasticsearch-products.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { PrismaService } from 'prisma/prisma.service';
+import { PRODUCT_EVENTS } from 'src/modules/product/constants/product-event.constant';
+import type { ProductCreatedEventPayload } from 'src/modules/product/constants/product-event.constant';
 import { ElasticsearchClientService } from '../elasticsearch.service';
 import { queryParams } from '../elasticsearch.dto';
 
@@ -38,11 +41,61 @@ const NON_KEYWORD_SORT_FIELDS = new Set([
 
 @Injectable()
 export class ElasticsearchProductsService {
+    private readonly logger = new Logger(ElasticsearchProductsService.name);
+
     constructor(
     private readonly esService: ElasticsearchClientService,
+    private readonly prisma: PrismaService,
     ) {}
 
-    // ── 1. Search sản phẩm theo keyword (dùng cho debounce/enter search) ──
+    @OnEvent(PRODUCT_EVENTS.CREATED, { async: true })
+    async handleProductCreated(payload: ProductCreatedEventPayload): Promise<void> {
+    try {
+        await this.indexProductById(payload.productId);
+    } catch (error) {
+        this.logger.error(
+        `Failed to sync product ${payload.productId} to Elasticsearch after creation`,
+        error instanceof Error ? error.stack : String(error),
+        );
+    }
+    }
+
+    async indexProductById(productId: string) {
+    const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        select: {
+        id: true,
+        productCode: true,
+        productName: true,
+        englishProductName: true,
+        productSummaryDescription: true,
+        productBriefDescription: true,
+        searchKeywordSetting: true,
+        brand: true,
+        manufacturer: true,
+        supplier: true,
+        displayStatus: true,
+        saleStatus: true,
+        salePrice: true,
+        productPrice: true,
+        consumerPrice: true,
+        stockQuantity: true,
+        productCategoryNumber: true,
+        productClientCategory: true,
+        createdAt: true,
+        updatedAt: true,
+        },
+    });
+
+    if (!product) {
+        this.logger.warn(`Product ${productId} not found; skipping Elasticsearch sync`);
+        return null;
+    }
+
+    return this.esService.index(PRODUCTS_INDEX, product.id, product);
+    }
+
+    // 1. Searchung products with pagination, sorting, and filtering
     async searchProducts(query: queryParams) {
     const { search, page = 1, limit = 10, sortBy, sortOrder = 'asc' } = query;
     const from = (page - 1) * limit;
@@ -113,8 +166,6 @@ export class ElasticsearchProductsService {
     return this.formatPaginatedResponse(response, page, limit);
     }
 
-
-    // ── 2. Lấy danh sách ID sản phẩm tương tự ─────────────────────────────
     async findSimilarProductIds(
     productId: string,
     limit = 10,
@@ -136,7 +187,6 @@ export class ElasticsearchProductsService {
         );
     }
 
-    // ── 3. Lấy full document sản phẩm tương tự ────────────────────────────
     async findSimilarProducts(productId: string, query: queryParams) {
     const { page = 1, limit = 10 } = query;
     const from = (page - 1) * limit;
@@ -159,7 +209,6 @@ export class ElasticsearchProductsService {
     return this.formatPaginatedResponse(response, page, limit);
     }
 
-    // ── 4. Lấy sản phẩm theo danh sách ID (dùng sau khi có similarIds) ────
     async findProductsByIds(ids: string[]) {
     if (ids.length === 0) return [];
 

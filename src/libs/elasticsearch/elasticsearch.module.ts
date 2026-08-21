@@ -4,9 +4,11 @@ import { Client } from 'es7';
 import {config} from '../config';
 import { ElasticsearchClientService} from './elasticsearch.service';
 import { ElasticsearchProductsService } from './products/elasticsearch.products.service';
+import { PrismaModule } from 'prisma/prisma.module';
 
 @Global()
 @Module({
+  imports: [PrismaModule],
   providers: [
     {
       provide: 'ELASTICSEARCH_CLIENT',

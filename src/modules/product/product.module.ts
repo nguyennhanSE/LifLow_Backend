@@ -7,9 +7,10 @@ import { PrismaModule } from '../../../prisma/prisma.module';
 import { ProductDiscountModule } from '../product-discount/product-discount.module';
 import { AwsModule } from 'src/libs/integration/aws/aws.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AppEventEmitterModule } from 'src/libs/event-emitter/event-emitter.module';
 
 @Module({
-  imports: [PrismaModule, ProductDiscountModule, AwsModule, ScheduleModule.forRoot(), NotificationsModule],
+  imports: [PrismaModule, ProductDiscountModule, AwsModule, ScheduleModule.forRoot(), NotificationsModule, AppEventEmitterModule],
   controllers: [ProductController],
   providers: [
     ProductService,
