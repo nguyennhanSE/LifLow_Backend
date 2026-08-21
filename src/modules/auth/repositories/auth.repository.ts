@@ -216,14 +216,14 @@ export class AuthRepository {
 
     private safeSignOpts(opts: JwtSignOptions) {
         if (!opts) return undefined;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+         
         const { secret, privateKey, expiresIn, ...rest } = opts;
         return { ...rest, expiresIn: this.maskExpires(expiresIn) };
     }
 
     private safeVerifyOpts(opts: JwtVerifyOptions) {
         if (!opts) return undefined;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+         
         const { secret, publicKey, ...rest } = opts;
         return rest;
     }

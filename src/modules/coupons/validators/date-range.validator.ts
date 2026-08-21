@@ -28,7 +28,7 @@ export class IsBeforeEndDateConstraint implements ValidatorConstraintInterface {
 }
 
 export function IsBeforeEndDate(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,

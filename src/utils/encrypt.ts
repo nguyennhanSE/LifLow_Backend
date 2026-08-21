@@ -5,7 +5,7 @@ import { HASH_SALT_LENGTH } from "src/common/constants/index"
 export const hashPassword = async (password: string): Promise<string> => {
   const salt = await bcrypt.genSalt(HASH_SALT_LENGTH)
   const hashedPassword = await bcrypt.hash(password, salt)
-  return hashedPassword as string
+  return hashedPassword
 }
 export const comparePassword = (password: string, hashedPassword: string) => {
   return bcrypt.compare(password, hashedPassword)

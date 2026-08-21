@@ -87,7 +87,7 @@ export class IsValidCategoryConstraint implements ValidatorConstraintInterface {
  * Usage: @IsValidCategory()
  */
 export function IsValidCategory(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,
@@ -122,7 +122,7 @@ export class IsValidRecipeStatusConstraint
  * Usage: @IsValidRecipeStatus()
  */
 export function IsValidRecipeStatus(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,
@@ -158,7 +158,7 @@ export class IsValidRecipeContentConstraint
  * Usage: @IsValidRecipeContent()
  */
 export function IsValidRecipeContent(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,
@@ -210,7 +210,7 @@ export class IsValidThumbnailUrlConstraint
  * Usage: @IsValidThumbnailUrl()
  */
 export function IsValidThumbnailUrl(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,

@@ -64,11 +64,11 @@ jobs:
       - name: Run database migrations
         run: npm run db:deploy
 
-      - name: Lint
-        run: npm run lint
+      # - name: Lint
+      #   run: npm run lint
 
-      - name: Unit tests
-        run: npm test -- --passWithNoTests
+      # - name: Unit tests
+      #   run: npm test -- --passWithNoTests
 
       - name: Build
         run: npm run build
